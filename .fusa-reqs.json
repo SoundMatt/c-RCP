@@ -4468,7 +4468,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits ... Nr of data bits\", 8 bit R/W), TC18.txt L5343"
+      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits ... Nr of data bits\", 8 bit R/W), TC18.txt L5343",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-002",
@@ -4479,7 +4480,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.3 (\"In case uart_nr_bits is not a multiple integer of 8, then the RC Client might need to append up to 'uart_nr_bits - 1' bits...\"), TC18.txt L5402-5403"
+      "tc18": "\u00a713.7.8.3 (\"In case uart_nr_bits is not a multiple integer of 8, then the RC Client might need to append up to 'uart_nr_bits - 1' bits...\"), TC18.txt L5402-5403",
+      "tc18_master_id": "TC18-13.7.8.3-002"
     },
     {
       "id": "REQ-UART-003",
@@ -4490,7 +4492,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.3 (\"When transmitting the EP ignores the last up to 'uart_nr_bits - 1' bits from the request payload, when the length of the payload is not an integer multiple of uart_nr_bits.\"), TC18.txt L5405-5406"
+      "tc18": "\u00a713.7.8.3 (\"When transmitting the EP ignores the last up to 'uart_nr_bits - 1' bits from the request payload, when the length of the payload is not an integer multiple of uart_nr_bits.\"), TC18.txt L5405-5406",
+      "tc18_master_id": "TC18-13.7.8.3-004"
     },
     {
       "id": "REQ-UART-004",
@@ -4511,7 +4514,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-UART-006",
@@ -4522,7 +4526,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-UART-007",
@@ -4533,7 +4538,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602"
+      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-UART-008",
@@ -4544,7 +4550,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_baud_rate ... Baud rate in kbit/s\", 16 bit R/W), TC18.txt L5342 -- NOTE: units diverge from TC18's own field (this implementation uses uint32_t with no documented unit); tracked separately at REQ-UART-037"
+      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_baud_rate ... Baud rate in kbit/s\", 16 bit R/W), TC18.txt L5342 -- NOTE: units diverge from TC18's own field (this implementation uses uint32_t with no documented unit); tracked separately at REQ-UART-037",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-009",
@@ -4555,7 +4562,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-UART-010",
@@ -4566,7 +4574,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits ... Nr of data bits\", 8 bit R/W), TC18.txt L5343"
+      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits ... Nr of data bits\", 8 bit R/W), TC18.txt L5343",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-011",
@@ -4577,7 +4586,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-UART-012",
@@ -4588,7 +4598,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits\"/\"uart_parity_enable\"/\"uart_parity_pol\"/\"uart_stop_bits\" fields), TC18.txt L5343, L5346, L5350, L5364"
+      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_nr_bits\"/\"uart_parity_enable\"/\"uart_parity_pol\"/\"uart_stop_bits\" fields), TC18.txt L5343, L5346, L5350, L5364",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-013",
@@ -4599,7 +4610,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"...the UART EP shifts the received data into a fifo-rx-buffer that has a length of uart_rx_fifo_size.\"), TC18.txt L5294 -- NOTE: TC18 describes uart_rx_fifo_size only in prose, not as a numbered Table 51 register; related gap tracked at REQ-UART-032/036"
+      "tc18": "\u00a713.7.8.1 (\"...the UART EP shifts the received data into a fifo-rx-buffer that has a length of uart_rx_fifo_size.\"), TC18.txt L5294 -- NOTE: TC18 describes uart_rx_fifo_size only in prose, not as a numbered Table 51 register; related gap tracked at REQ-UART-032/036",
+      "tc18_master_id": "TC18-13.7.8.1-002"
     },
     {
       "id": "REQ-UART-014",
@@ -4610,7 +4622,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-UART-015",
@@ -4621,7 +4634,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_timeout ... receiver timeout in bit times, timeout is measure from last received stop bit\", 8 bit R/W), TC18.txt L5366-5367 -- NOTE: units/representation diverge from TC18's own field; tracked separately at REQ-UART-037"
+      "tc18": "\u00a713.7.8.2 Table 51 (\"uart_timeout ... receiver timeout in bit times, timeout is measure from last received stop bit\", 8 bit R/W), TC18.txt L5366-5367 -- NOTE: units/representation diverge from TC18's own field; tracked separately at REQ-UART-037",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-016",
@@ -4632,7 +4646,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same authorization basis as REQ-UART-007",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-UART-017",
@@ -4653,7 +4668,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row, evt[2:0]=000b-110b reserved so ordinary requests carry evt=0), TC18.txt L4083-4093; \u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row, evt[2:0]=000b-110b reserved so ordinary requests carry evt=0), TC18.txt L4083-4093; \u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-UART-019",
@@ -4664,7 +4680,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-UART-020",
@@ -4675,7 +4692,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-UART-021",
@@ -4686,7 +4704,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296; general ACF_ABB/ACF_GBB timed-response distinction, \u00a711.2.1"
+      "tc18": "\u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296; general ACF_ABB/ACF_GBB timed-response distinction, \u00a711.2.1",
+      "tc18_master_id": "TC18-13.7.8.1-003"
     },
     {
       "id": "REQ-UART-022",
@@ -4697,7 +4716,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296"
+      "tc18": "\u00a713.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L5296",
+      "tc18_master_id": "TC18-13.7.8.1-003"
     },
     {
       "id": "REQ-UART-023",
@@ -4708,7 +4728,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size...\"), TC18.txt L5297-5298"
+      "tc18": "\u00a713.7.8.1 (\"A read request will be started as soon as the fifo-rx-buffer is filled with as many bytes as requested in the read_size...\"), TC18.txt L5297-5298",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-024",
@@ -4719,7 +4740,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-UART-025",
@@ -4730,7 +4752,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-UART-026",
@@ -4741,7 +4764,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"...or in case the read_size is larger than the uart_rx_fifo_size, when the fifo is full. In the latter case the response is fragmented.\"), TC18.txt L5298-5299"
+      "tc18": "\u00a713.7.8.1 (\"...or in case the read_size is larger than the uart_rx_fifo_size, when the fifo is full. In the latter case the response is fragmented.\"), TC18.txt L5298-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-027",
@@ -4752,7 +4776,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"...or in case the read_size is larger than the uart_rx_fifo_size, when the fifo is full. In the latter case the response is fragmented.\"), TC18.txt L5298-5299"
+      "tc18": "\u00a713.7.8.1 (\"...or in case the read_size is larger than the uart_rx_fifo_size, when the fifo is full. In the latter case the response is fragmented.\"), TC18.txt L5298-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-028",
@@ -4763,7 +4788,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-001",
@@ -7828,7 +7854,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.1, TC18.txt L6033-6037 (MDIO EP's own existence and topic area); \u00a713.7.13.3 Table 60 (mdio_address: \"As per IEEE & OA SPI spec\"), TC18.txt L6085 -- TC18 defers this field's own width to an external IEEE/OA reference this codebase does not reproduce, per ep_mdio.h's own file header"
+      "tc18": "\u00a713.7.13.1, TC18.txt L6033-6037 (MDIO EP's own existence and topic area); \u00a713.7.13.3 Table 60 (mdio_address: \"As per IEEE & OA SPI spec\"), TC18.txt L6085 -- TC18 defers this field's own width to an external IEEE/OA reference this codebase does not reproduce, per ep_mdio.h's own file header",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-002",
@@ -7850,7 +7877,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Table 60 (mdio_payload field), TC18.txt L6086 -- this module's own byte-order choice for that field, not itself specified by the cited text"
+      "tc18": "\u00a713.7.13.3 Table 60 (mdio_payload field), TC18.txt L6086 -- this module's own byte-order choice for that field, not itself specified by the cited text",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-004",
@@ -7861,7 +7889,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Table 60 (mdio_payload field), TC18.txt L6086 -- this module's own byte-order choice for that field, not itself specified by the cited text"
+      "tc18": "\u00a713.7.13.3 Table 60 (mdio_payload field), TC18.txt L6086 -- this module's own byte-order choice for that field, not itself specified by the cited text",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-005",
@@ -7947,7 +7976,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 -- the real TC18 wire layout this function's own payload does not match; see REQ-MDIO-021"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 -- the real TC18 wire layout this function's own payload does not match; see REQ-MDIO-021",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-013",
@@ -7958,7 +7988,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (evt[2:0] legality, resolved at REQ-ACF-023); \u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (the real wire layout this function's own payload does not match; see REQ-MDIO-021)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (evt[2:0] legality, resolved at REQ-ACF-023); \u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (the real wire layout this function's own payload does not match; see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-014",
@@ -7969,7 +8000,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (the real TC18 mdio_payload field this response's own packed-word layout does not literally match in framing, though the underlying 16/32-bit register data is the same concept; see REQ-MDIO-021)"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (the real TC18 mdio_payload field this response's own packed-word layout does not literally match in framing, though the underlying 16/32-bit register data is the same concept; see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-015",
@@ -7980,7 +8012,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-016",
@@ -7991,7 +8024,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-017",
@@ -8002,7 +8036,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (evt[2:0] legality, resolved at REQ-ACF-023); \u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (evt[2:0] legality, resolved at REQ-ACF-023); \u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-018",
@@ -8013,7 +8048,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-019",
@@ -8024,7 +8060,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)"
+      "tc18": "\u00a713.7.13.3 Figure 43/Table 60, TC18.txt L6065-6088 (see REQ-MDIO-021)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-PWRMODE-001",
@@ -8207,7 +8244,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 40 (wake-up source pin configuration, IO_SRC[15:11]), TC18.txt L4533; reduced to a single active_high/active_low sense rather than Table 40's six-value IO_SRC encoding -- see the pre-existing gap REQ-WAKEUP-022"
+      "tc18": "\u00a713.7.2.2 Table 40 (wake-up source pin configuration, IO_SRC[15:11]), TC18.txt L4533; reduced to a single active_high/active_low sense rather than Table 40's six-value IO_SRC encoding -- see the pre-existing gap REQ-WAKEUP-022",
+      "tc18_master_id": "TC18-13.7.2.2-003"
     },
     {
       "id": "REQ-WAKEUP-004",
@@ -8218,7 +8256,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.1 (\"the endpoint listens to configurable IO signals for activity... When the WakeUp endpoint detects activity during sleep mode it wakes up the RC Server\"), TC18.txt L4484-4488; \u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_nr_io_pins_max, io_scr1/2 entries) -- see the pre-existing gap REQ-WAKEUP-021 for the reduced register model"
+      "tc18": "\u00a713.7.2.1 (\"the endpoint listens to configurable IO signals for activity... When the WakeUp endpoint detects activity during sleep mode it wakes up the RC Server\"), TC18.txt L4484-4488; \u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_nr_io_pins_max, io_scr1/2 entries) -- see the pre-existing gap REQ-WAKEUP-021 for the reduced register model",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-005",
@@ -8229,7 +8268,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status, \"Indication of wake-up source, writing '1' clears the flag. Each bit represents a wake-up source\"), TC18.txt L4505-4507 -- modeled as a single latch rather than a 16-bit per-source bitfield, see the pre-existing gap REQ-WAKEUP-021"
+      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status, \"Indication of wake-up source, writing '1' clears the flag. Each bit represents a wake-up source\"), TC18.txt L4505-4507 -- modeled as a single latch rather than a 16-bit per-source bitfield, see the pre-existing gap REQ-WAKEUP-021",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-006",
@@ -8240,7 +8280,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status register), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021"
+      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status register), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-007",
@@ -8251,7 +8292,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status, \"writing '1' clears the flag\"), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021"
+      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status, \"writing '1' clears the flag\"), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-008",
@@ -8262,7 +8304,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status register), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021"
+      "tc18": "\u00a713.7.2.2 Table 39 (ep1 - functional configuration), TC18.txt L4496-4515 (wup_status register), TC18.txt L4505-4507 -- see the pre-existing gap REQ-WAKEUP-021",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-009",
@@ -8283,7 +8326,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563, directly confirmed against the rendered PDF page image: a 1-byte SleepCMD opcode followed by an undifferentiated padding region with no target-mode field; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565; \"bring the RC Server implementation to sleep mode\" (never Standby), TC18.txt L4555 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of a 2-byte, target_mode-selecting payload"
+      "tc18": "\u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563, directly confirmed against the rendered PDF page image: a 1-byte SleepCMD opcode followed by an undifferentiated padding region with no target-mode field; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565; \"bring the RC Server implementation to sleep mode\" (never Standby), TC18.txt L4555 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of a 2-byte, target_mode-selecting payload",
+      "tc18_master_id": "TC18-13.7.2.3-003"
     },
     {
       "id": "REQ-WAKEUP-011",
@@ -8294,7 +8338,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563, directly confirmed against the rendered PDF page image; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE validation path against a field TC18 never defines"
+      "tc18": "\u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563, directly confirmed against the rendered PDF page image; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE validation path against a field TC18 never defines",
+      "tc18_master_id": "TC18-13.7.2.3-003"
     },
     {
       "id": "REQ-WAKEUP-012",
@@ -8305,7 +8350,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4554-4555; \u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565 -- refusal signalled as a positive-form response rather than an error response, see the pre-existing gap REQ-WAKEUP-019"
+      "tc18": "\u00a713.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4554-4555; \u00a713.7.2.3 Figure 23 (Endpoint sleep request), TC18.txt L4558-4563; \"SleepCMD is coded as 0xA5.\", TC18.txt L4565 -- refusal signalled as a positive-form response rather than an error response, see the pre-existing gap REQ-WAKEUP-019",
+      "tc18_master_id": "TC18-13.7.2.3-002"
     },
     {
       "id": "REQ-WAKEUP-013",
@@ -8316,7 +8362,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4554-4555 -- see the pre-existing gap REQ-WAKEUP-019 for the response-shape divergence"
+      "tc18": "\u00a713.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4554-4555 -- see the pre-existing gap REQ-WAKEUP-019 for the response-shape divergence",
+      "tc18_master_id": "TC18-13.7.2.3-002"
     },
     {
       "id": "REQ-WAKEUP-014",
@@ -8327,7 +8374,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.1 (\"After establishing a network connection, the WakeUp endpoint sends repetitive messages.\"), TC18.txt L4488-4489 -- carries no wake-up source of its own, see the pre-existing gap REQ-WAKEUP-017"
+      "tc18": "\u00a713.7.2.1 (\"After establishing a network connection, the WakeUp endpoint sends repetitive messages.\"), TC18.txt L4488-4489 -- carries no wake-up source of its own, see the pre-existing gap REQ-WAKEUP-017",
+      "tc18_master_id": "TC18-13.7.2.1-002"
     },
     {
       "id": "REQ-WAKEUP-015",
@@ -8338,7 +8386,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.1, TC18.txt L4488-4489 -- see the pre-existing gap REQ-WAKEUP-017"
+      "tc18": "\u00a713.7.2.1, TC18.txt L4488-4489 -- see the pre-existing gap REQ-WAKEUP-017",
+      "tc18_master_id": "TC18-13.7.2.1-002"
     },
     {
       "id": "REQ-WAKEUP-016",
@@ -8613,7 +8662,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"...the response is fragmented. To support fragmentation properly it is essential that the uart_rx_fifo_size is chosen such that it is slightly bigger than the maximum byte_msg_payload to be generated within a single AVTPDU...\"), TC18.txt L5299-5301"
+      "tc18": "\u00a713.7.8.1 (\"...the response is fragmented. To support fragmentation properly it is essential that the uart_rx_fifo_size is chosen such that it is slightly bigger than the maximum byte_msg_payload to be generated within a single AVTPDU...\"), TC18.txt L5299-5301",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-030",
@@ -8624,7 +8674,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1 (\"...the response is fragmented.\"), TC18.txt L5299"
+      "tc18": "\u00a713.7.8.1 (\"...the response is fragmented.\"), TC18.txt L5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-031",
@@ -8635,7 +8686,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-DISC-025",
@@ -11407,7 +11459,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2674-L2676"
+      "tc18": "\u00a712.4.1, TC18.txt L2674-L2676",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-WAKEUP-018",
@@ -11418,7 +11471,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2676-L2677"
+      "tc18": "\u00a712.4.1, TC18.txt L2676-L2677",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-WAKEUP-019",
@@ -11429,7 +11483,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2703-L2708"
+      "tc18": "\u00a712.5, TC18.txt L2703-L2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-WAKEUP-020",
@@ -11440,7 +11495,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.1, TC18.txt L4482-4483"
+      "tc18": "\u00a713.7.2.1, TC18.txt L4482-4483",
+      "tc18_master_id": "TC18-13.7.2.1-001"
     },
     {
       "id": "REQ-WAKEUP-021",
@@ -11451,7 +11507,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 39, TC18.txt L4494-4514; address-collision resolution confirmed against both the 0.5.1_RC baseline PDF and the 0.5.1_RC5 revision PDF (identical, unfixed by the spec committee, unlike MDIO's own Table 56/59 collision)"
+      "tc18": "\u00a713.7.2.2 Table 39, TC18.txt L4494-4514; address-collision resolution confirmed against both the 0.5.1_RC baseline PDF and the 0.5.1_RC5 revision PDF (identical, unfixed by the spec committee, unlike MDIO's own Table 56/59 collision)",
+      "tc18_master_id": "TC18-13.7.2.2-002"
     },
     {
       "id": "REQ-WAKEUP-022",
@@ -11462,7 +11519,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.2 Table 40, TC18.txt L4528-4541 -- CORRECTED 2026-08-14, citation-drift fix (issue #341 lineage): the previous citation (\"Table 37, TC18.txt L4128-4139\") pointed at an unrelated section (\u00a713.5.1's own compound-wait evt-field text) -- a genuine citation-drift artifact, not re-verified since this requirement's own 2026-08-11 text was last touched. Re-verified directly against the current RC5 TC18.txt before trusting it."
+      "tc18": "\u00a713.7.2.2 Table 40, TC18.txt L4528-4541 -- CORRECTED 2026-08-14, citation-drift fix (issue #341 lineage): the previous citation (\"Table 37, TC18.txt L4128-4139\") pointed at an unrelated section (\u00a713.5.1's own compound-wait evt-field text) -- a genuine citation-drift artifact, not re-verified since this requirement's own 2026-08-11 text was last touched. Re-verified directly against the current RC5 TC18.txt before trusting it.",
+      "tc18_master_id": "TC18-13.7.2.2-003"
     },
     {
       "id": "REQ-WDG-010",
@@ -12036,7 +12094,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.2 Table 59, TC18.txt L6045 and L6047-6056"
+      "tc18": "\u00a713.7.13.2 Table 59, TC18.txt L6045 and L6047-6056",
+      "tc18_master_id": "TC18-13.7.13.2-002"
     },
     {
       "id": "REQ-MDIO-023",
@@ -12047,7 +12106,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.2 Table 59, TC18.txt L6045 and L6047-6056"
+      "tc18": "\u00a713.7.13.2 Table 59, TC18.txt L6045 and L6047-6056",
+      "tc18_master_id": "TC18-13.7.13.2-002"
     },
     {
       "id": "REQ-MDIO-024",
@@ -12058,7 +12118,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a713.7.13.3 Figure 43 and Table 60, TC18.txt L6065-6088 (mdio_address itself unspecified -- TC18_spec_defects_report.md item 55; this entry's own implementation is a documented external-spec-informed assumption, not TC18-derived)"
+      "tc18": "\u00a713.7.13.3 Figure 43 and Table 60, TC18.txt L6065-6088 (mdio_address itself unspecified -- TC18_spec_defects_report.md item 55; this entry's own implementation is a documented external-spec-informed assumption, not TC18-derived)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-021",
@@ -12069,7 +12130,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Figure 43 and Table 60, TC18.txt L6065-6088 (citation-drift fix, same lineage as issue #341: RC1's own Figure 42/Table 57 are RC5's own Figure 43/Table 60)"
+      "tc18": "\u00a713.7.13.3 Figure 43 and Table 60, TC18.txt L6065-6088 (citation-drift fix, same lineage as issue #341: RC1's own Figure 42/Table 57 are RC5's own Figure 43/Table 60)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-MDIO-022",
@@ -12080,7 +12142,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.13.3 Table 60, TC18.txt L6086 (citation-drift fix, same lineage as issue #341: RC1's own Table 57 is RC5's own Table 60)"
+      "tc18": "\u00a713.7.13.3 Table 60, TC18.txt L6086 (citation-drift fix, same lineage as issue #341: RC1's own Table 57 is RC5's own Table 60)",
+      "tc18_master_id": "TC18-13.7.13.3-002"
     },
     {
       "id": "REQ-UART-032",
@@ -12091,7 +12154,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L5294-5295 (overflow-flagging requirement); \u00a713.7.8.2 Table 51, TC18.txt L5340-5341 (uart_ep_status register itself)"
+      "tc18": "\u00a713.7.8.1, TC18.txt L5294-5295 (overflow-flagging requirement); \u00a713.7.8.2 Table 51, TC18.txt L5340-5341 (uart_ep_status register itself)",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-033",
@@ -12102,7 +12166,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L5297-5299"
+      "tc18": "\u00a713.7.8.1, TC18.txt L5297-5299",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-034",
@@ -12113,7 +12178,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L5297-5299 (read_size field width)"
+      "tc18": "\u00a713.7.8.1, TC18.txt L5297-5299 (read_size field width)",
+      "tc18_master_id": "TC18-13.7.8.1-004"
     },
     {
       "id": "REQ-UART-035",
@@ -12124,7 +12190,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L5305-5307; \u00a713.5.1, TC18.txt L4134-4162"
+      "tc18": "\u00a713.7.8.1, TC18.txt L5305-5307; \u00a713.5.1, TC18.txt L4134-4162",
+      "tc18_master_id": "TC18-13.7.8.1-006"
     },
     {
       "id": "REQ-UART-036",
@@ -12135,7 +12202,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5330-5332 and L5340"
+      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5330-5332 and L5340",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-037",
@@ -12146,7 +12214,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5342, L5364, L5366, L5369"
+      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5342, L5364, L5366, L5369",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-038",
@@ -12157,7 +12226,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5354-5362 (uart_rts_enable/uart_cts_enable/uart_half_duplex), L5369 (uart_trail)"
+      "tc18": "\u00a713.7.8.2 Table 51, TC18.txt L5354-5362 (uart_rts_enable/uart_cts_enable/uart_half_duplex), L5369 (uart_trail)",
+      "tc18_master_id": "TC18-13.7.8.2-001"
     },
     {
       "id": "REQ-UART-039",
@@ -12168,7 +12238,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
     },
     {
       "id": "REQ-UART-040",
@@ -12179,7 +12250,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
     },
     {
       "id": "REQ-ACF-032",
@@ -12262,7 +12334,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.8.4 Table 52 (\"A UART EP optionally generates HW trigger event\"), TC18.txt L5414-5421"
+      "tc18": "§13.7.8.4 Table 52 (\"A UART EP optionally generates HW trigger event\"), TC18.txt L5414-5421",
+      "tc18_master_id": "TC18-13.7.8.4-001"
     },
     {
       "id": "REQ-UART-042",
@@ -12273,7 +12346,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.8.4 Table 52 (trigger signal 0, \"Transmit request finalized\"), TC18.txt L5417"
+      "tc18": "§13.7.8.4 Table 52 (trigger signal 0, \"Transmit request finalized\"), TC18.txt L5417",
+      "tc18_master_id": "TC18-13.7.8.4-002"
     },
     {
       "id": "REQ-UART-043",
@@ -12284,7 +12358,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.8.4 Table 52 (trigger signal 1, \"Read request finalized\"), TC18.txt L5418"
+      "tc18": "§13.7.8.4 Table 52 (trigger signal 1, \"Read request finalized\"), TC18.txt L5418",
+      "tc18_master_id": "TC18-13.7.8.4-002"
     },
     {
       "id": "REQ-UART-044",
@@ -12295,7 +12370,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; §13.7.8.4 Table 52, TC18.txt L5414-5421, is the trigger-signal basis cfg->trigger models (see REQ-UART-041/042/043)."
+      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; §13.7.8.4 Table 52, TC18.txt L5414-5421, is the trigger-signal basis cfg->trigger models (see REQ-UART-041/042/043).",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-UART-045",
@@ -12306,7 +12382,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-UART-044"
+      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-UART-044",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ACF-033",

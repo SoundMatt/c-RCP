@@ -306,6 +306,40 @@ built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors; `trace
 --req-coverage 100 --sec-tested 100`: 1095/1095 (100%) requirements
 traced, 512/512 (100%) functions annotated, unchanged from baseline.
 
+### v0.409.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` cross-repo linkage, MDIO/WAKEUP/UART batch)
+
+Third of several parallel per-category batches closing out
+c-RCP-AUDIT-04 (issue 166), now unblocked by the master TC18
+requirement catalog's rebuild (`RELAY/docs/tc18-master-catalog.json`,
+447 entries, `catalog_version` 1.0.0). Adds the purely additive
+`tc18_master_id` field -- the id of the corresponding master-catalog
+entry -- to `.fusa-reqs.json` entries in the `REQ-MDIO-`,
+`REQ-WAKEUP-`, and `REQ-UART-` categories, per RCP-ARCHITECTURE.md's
+canonical `.fusa-reqs.json` schema (canonical choice #6).
+
+Of this batch's 91 requirements: 77 matched a single master-catalog
+entry by section + table/figure + content confirmation and got the
+new field; 7 have no `tc18` field to begin with (implementation-only
+plumbing or test scaffolding with no TC18 basis) and were left alone,
+unchanged, as expected; 7 were left unset as genuinely ambiguous
+rather than forced -- `REQ-MDIO-002`/`005`/`006`/`007`/`008` cite
+`§13.7.13.1` only as topic-area attribution for a design their own
+`tc18` text explicitly says is *not* derived from that citation, and
+`REQ-MDIO-010`/`REQ-WAKEUP-002` cite a multi-clause shared
+field-authorization delegate (`§12.3.1.2`/`.3` jointly) that does not
+resolve to one catalog entry without guessing. No existing field
+(`text`/`title`/`status`/`tc18`) was touched on any entry, and no
+`.c`/`.h` source file was touched.
+
+Full 66-test suite unchanged. `cfusa check` (pinned v0.5.54): 0
+errors, 968 warnings/1312 info, unchanged from the pre-change
+baseline. `cfusa trace --req-coverage 100 --sec-tested 100`:
+1095/1095 traced, 512/512 functions annotated -- byte-for-byte
+identical output before and after this change (including the
+pre-existing, unrelated `REQ-UART-038` untraced-detail note),
+confirming `cfusa` tolerates the new field without affecting
+coverage numbers.
+
 ### v0.401.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill for REQ-DISC-*/REQ-MOCK-*)
 
 Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice
