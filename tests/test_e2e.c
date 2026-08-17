@@ -100,36 +100,54 @@ static void test_crc32_differs_for_different_data(void)
 
 static void test_compute_crc_matches_manual_concatenation(void)
 {
-    uint8_t concat[8 + 4 + 5];
+    /* issue #465: the coverage span now leads with avtp_subtype +
+     * header_octet1 + a tu byte (Figure 20/21's own orange header-CRC
+     * bytes), ahead of stream_id/avtp_timestamp. */
+    uint8_t concat[1 + 1 + 1 + 8 + 4 + 5];
     uint8_t acf_frame[5] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE};
+    uint8_t avtp_subtype    = 0x05u; /* TSCF */
+    uint8_t header_octet1   = 0x91u; /* arbitrary sv|version|mr|rsv|tv byte */
+    bool    tu              = true;
     uint64_t stream_id       = 0x0102030405060708ULL;
     uint32_t avtp_timestamp  = 0x11223344u;
     size_t i;
 
-    for (i = 0; i < 8; i++) concat[i]     = (uint8_t)(stream_id >> (56 - 8 * i));
-    for (i = 0; i < 4; i++) concat[8 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat + 12, acf_frame, sizeof(acf_frame));
+    concat[0] = avtp_subtype;
+    concat[1] = header_octet1;
+    concat[2] = tu ? 0x01u : 0x00u;
+    for (i = 0; i < 8; i++) concat[3 + i]  = (uint8_t)(stream_id >> (56 - 8 * i));
+    for (i = 0; i < 4; i++) concat[11 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
+    memcpy(concat + 15, acf_frame, sizeof(acf_frame));
 
     TEST_ASSERT_EQUAL_HEX32(rcp_e2e_crc32(concat, sizeof(concat)),
-                             rcp_e2e_compute_crc(stream_id, avtp_timestamp, acf_frame,
+                             rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu,
+                                                     stream_id, avtp_timestamp, acf_frame,
                                                      sizeof(acf_frame)));
 }
 
 static void test_compute_crc_zero_stream_and_timestamp_ntscf_standin(void)
 {
     /* The all-zero StreamID/avtp_timestamp stand-in an NTSCF-framed
-     * message uses should compute identically to an explicit
-     * zero-filled 12-byte prefix (8-byte StreamID + 4-byte
-     * avtp_timestamp). */
+     * message uses (rcp_e2e_wrap_framed()'s own job -- this raw function
+     * just takes whatever it's given) should compute identically to an
+     * explicit zero-filled 12-byte prefix (8-byte StreamID + 4-byte
+     * avtp_timestamp), still preceded by avtp_subtype/header_octet1/tu
+     * (issue #465). */
     uint8_t acf_frame[3] = {0x01, 0x02, 0x03};
-    uint8_t zero_prefix[12] = {0};
-    uint8_t concat[12 + 3];
+    uint8_t avtp_subtype  = 0x82u; /* NTSCF */
+    uint8_t header_octet1 = 0x80u;
+    uint8_t prefix[3 + 12] = {0};
+    uint8_t concat[3 + 12 + 3];
 
-    memcpy(concat, zero_prefix, 12);
-    memcpy(concat + 12, acf_frame, 3);
+    prefix[0] = avtp_subtype;
+    prefix[1] = header_octet1;
+    prefix[2] = 0x00u; /* tu = false */
+    memcpy(concat, prefix, sizeof(prefix));
+    memcpy(concat + sizeof(prefix), acf_frame, 3);
 
-    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_crc32(concat, sizeof(concat)),
-                             rcp_e2e_compute_crc(0, 0, acf_frame, 3));
+    TEST_ASSERT_EQUAL_HEX32(
+        rcp_e2e_crc32(concat, sizeof(concat)),
+        rcp_e2e_compute_crc(avtp_subtype, header_octet1, false, 0, 0, acf_frame, 3));
 }
 
 static void test_compute_crc_timestamp_is_4_octets_not_8(void)
@@ -141,25 +159,74 @@ static void test_compute_crc_timestamp_is_4_octets_not_8(void)
      * *width actually fed to the CRC*: the result must match a manual
      * concatenation using a 4-byte big-endian timestamp, and must NOT
      * match one using an 8-byte big-endian encoding of the same value
-     * (the pre-fix behavior). */
+     * (the pre-fix behavior). Still preceded by the 3 header-CRC bytes
+     * (issue #465). */
     uint8_t acf_frame[2] = {0x55, 0x66};
+    uint8_t avtp_subtype  = 0x05u;
+    uint8_t header_octet1 = 0x00u;
     uint32_t avtp_timestamp = 0xCAFEBABEu;
-    uint8_t concat4[8 + 4 + 2];
-    uint8_t concat8[8 + 8 + 2];
+    uint8_t concat4[3 + 8 + 4 + 2];
+    uint8_t concat8[3 + 8 + 8 + 2];
     size_t i;
 
     memset(concat4, 0, sizeof(concat4));
     memset(concat8, 0, sizeof(concat8));
-    for (i = 0; i < 4; i++) concat4[8 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat4 + 12, acf_frame, sizeof(acf_frame));
+    concat4[0] = concat8[0] = avtp_subtype;
+    concat4[1] = concat8[1] = header_octet1;
+    concat4[2] = concat8[2] = 0x00u; /* tu = false */
+    for (i = 0; i < 4; i++) concat4[11 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
+    memcpy(concat4 + 15, acf_frame, sizeof(acf_frame));
 
-    for (i = 0; i < 4; i++) concat8[8 + 4 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat8 + 16, acf_frame, sizeof(acf_frame));
+    for (i = 0; i < 4; i++) concat8[3 + 8 + 4 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
+    memcpy(concat8 + 19, acf_frame, sizeof(acf_frame));
 
-    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_crc32(concat4, sizeof(concat4)),
-                             rcp_e2e_compute_crc(0, avtp_timestamp, acf_frame, sizeof(acf_frame)));
-    TEST_ASSERT_NOT_EQUAL(rcp_e2e_crc32(concat8, sizeof(concat8)),
-                           rcp_e2e_compute_crc(0, avtp_timestamp, acf_frame, sizeof(acf_frame)));
+    TEST_ASSERT_EQUAL_HEX32(
+        rcp_e2e_crc32(concat4, sizeof(concat4)),
+        rcp_e2e_compute_crc(avtp_subtype, header_octet1, false, 0, avtp_timestamp, acf_frame,
+                             sizeof(acf_frame)));
+    TEST_ASSERT_NOT_EQUAL(
+        rcp_e2e_crc32(concat8, sizeof(concat8)),
+        rcp_e2e_compute_crc(avtp_subtype, header_octet1, false, 0, avtp_timestamp, acf_frame,
+                             sizeof(acf_frame)));
+}
+
+/* ── issue #465: Figure 20/21 header-CRC bytes actually feed the CRC ────────
+ *
+ * TC18 §13.6 Figures 20/21 (rendered page, not plain-text extraction --
+ * see e2e.h's file header) mark avtp_subtype, header_octet1 (TSCF's
+ * sv|version|mr|rsv|tv / NTSCF's sv|version|r byte), and the tu bit
+ * orange: header-CRC input, ahead of stream_id/avtp_timestamp. Each test
+ * below flips exactly one of those three inputs, holding every other
+ * argument byte-identical, and asserts the CRC32 result differs --
+ * proving each one is actually being fed into the running CRC, not
+ * silently ignored (the pre-fix defect this issue reported). */
+
+static void test_compute_crc_avtp_subtype_changes_result(void)
+{
+    uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
+    uint32_t tscf_crc  = rcp_e2e_compute_crc(0x05u, 0x00u, false, 42u, 7u, acf_frame,
+                                              sizeof(acf_frame));
+    uint32_t ntscf_crc = rcp_e2e_compute_crc(0x82u, 0x00u, false, 42u, 7u, acf_frame,
+                                              sizeof(acf_frame));
+    TEST_ASSERT_NOT_EQUAL(tscf_crc, ntscf_crc);
+}
+
+static void test_compute_crc_header_octet1_changes_result(void)
+{
+    uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
+    uint32_t a = rcp_e2e_compute_crc(0x05u, 0x00u, false, 42u, 7u, acf_frame, sizeof(acf_frame));
+    uint32_t b = rcp_e2e_compute_crc(0x05u, 0x01u, false, 42u, 7u, acf_frame, sizeof(acf_frame));
+    TEST_ASSERT_NOT_EQUAL(a, b);
+}
+
+static void test_compute_crc_tu_bit_changes_result(void)
+{
+    uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
+    uint32_t tu_false = rcp_e2e_compute_crc(0x05u, 0x00u, false, 42u, 7u, acf_frame,
+                                             sizeof(acf_frame));
+    uint32_t tu_true  = rcp_e2e_compute_crc(0x05u, 0x00u, true, 42u, 7u, acf_frame,
+                                             sizeof(acf_frame));
+    TEST_ASSERT_NOT_EQUAL(tu_false, tu_true);
 }
 
 /* ── length_with_crc ───────────────────────────────────────────────────────── */
@@ -207,6 +274,50 @@ static void make_test_acf_frame(uint8_t *out, size_t out_len)
     for (i = 3; i < out_len; i++) out[i] = (uint8_t)(i & 0xFFu);
 }
 
+/* ── issue #465: rcp_e2e_wrap_framed()/_unwrap_framed() NTSCF tu stand-in ─── */
+
+static void test_wrap_framed_forces_tu_false_under_ntscf(void)
+{
+    /* Mirrors this file's existing avtp_timestamp-is-zeroed-under-NTSCF
+     * convention (see rcp_e2e_wrap_framed()'s own doc comment): a caller
+     * passing tu=true under is_ntscf_framed=true must still get the
+     * SAME wire bytes as tu=false, since NTSCF has no tu bit to carry
+     * it -- unlike a TSCF-framed call, where tu really does change the
+     * output. */
+    uint8_t acf_frame[8];
+    rcp_bytes_t ntscf_tu_true;
+    rcp_bytes_t ntscf_tu_false;
+    rcp_bytes_t tscf_tu_true;
+    rcp_bytes_t tscf_tu_false;
+
+    make_test_acf_frame(acf_frame, sizeof(acf_frame));
+
+    ntscf_tu_true  = rcp_e2e_wrap_framed(1u, true, 0x00u, true, 999u, acf_frame,
+                                          sizeof(acf_frame));
+    ntscf_tu_false = rcp_e2e_wrap_framed(1u, true, 0x00u, false, 999u, acf_frame,
+                                          sizeof(acf_frame));
+    TEST_ASSERT_NOT_NULL(ntscf_tu_true.data);
+    TEST_ASSERT_EQUAL_UINT(ntscf_tu_true.len, ntscf_tu_false.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ntscf_tu_false.data, ntscf_tu_true.data, ntscf_tu_true.len);
+
+    tscf_tu_true  = rcp_e2e_wrap_framed(1u, false, 0x00u, true, 999u, acf_frame,
+                                         sizeof(acf_frame));
+    tscf_tu_false = rcp_e2e_wrap_framed(1u, false, 0x00u, false, 999u, acf_frame,
+                                         sizeof(acf_frame));
+    TEST_ASSERT_NOT_NULL(tscf_tu_true.data);
+    TEST_ASSERT_EQUAL_UINT(tscf_tu_true.len, tscf_tu_false.len);
+    /* Real TSCF traffic: tu does change the wire trailer -- the last
+     * RCP_E2E_CRC_LEN bytes (the CRC32 trailer) must differ. */
+    TEST_ASSERT_NOT_EQUAL(
+        0, memcmp(tscf_tu_true.data + (tscf_tu_true.len - RCP_E2E_CRC_LEN),
+                  tscf_tu_false.data + (tscf_tu_false.len - RCP_E2E_CRC_LEN), RCP_E2E_CRC_LEN));
+
+    rcp_bytes_free(&ntscf_tu_true);
+    rcp_bytes_free(&ntscf_tu_false);
+    rcp_bytes_free(&tscf_tu_true);
+    rcp_bytes_free(&tscf_tu_false);
+}
+
 static void test_wrap_appends_crc_len_bytes(void)
 {
     /* Must be quadlet-aligned (a multiple of 4) -- REQ-E2E-042's fix
@@ -217,7 +328,7 @@ static void test_wrap_appends_crc_len_bytes(void)
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
 
-    out = rcp_e2e_wrap(42, 7, acf_frame, sizeof(acf_frame));
+    out = rcp_e2e_wrap(0x05u, 0x00u, false, 42, 7, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(out.data);
     TEST_ASSERT_EQUAL_UINT(sizeof(acf_frame) + RCP_E2E_CRC_LEN, out.len);
 
@@ -226,7 +337,7 @@ static void test_wrap_appends_crc_len_bytes(void)
 
 static void test_wrap_null_frame_nonzero_len_fails_safe(void)
 {
-    rcp_bytes_t out = rcp_e2e_wrap(1, 1, NULL, 4);
+    rcp_bytes_t out = rcp_e2e_wrap(0x05u, 0x00u, false, 1, 1, NULL, 4);
     TEST_ASSERT_NULL(out.data);
     TEST_ASSERT_EQUAL_UINT(0, out.len);
 }
@@ -240,7 +351,7 @@ static void test_wrap_too_short_for_length_field_fails_safe(void)
      * than silently skip the adaptation and produce a non-conformant
      * frame. */
     uint8_t tiny[1] = {0xAA};
-    rcp_bytes_t out = rcp_e2e_wrap(1, 1, tiny, sizeof(tiny));
+    rcp_bytes_t out = rcp_e2e_wrap(0x05u, 0x00u, false, 1, 1, tiny, sizeof(tiny));
     TEST_ASSERT_NULL(out.data);
     TEST_ASSERT_EQUAL_UINT(0, out.len);
 }
@@ -264,7 +375,7 @@ static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
     original_type_bits = (uint8_t)(acf_frame[0] & 0xFEu);
     original_len = (uint16_t)(((uint16_t)(acf_frame[0] & 0x01u) << 8) | (uint16_t)acf_frame[1]);
 
-    wrapped = rcp_e2e_wrap(1, 1, acf_frame, sizeof(acf_frame));
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 1, 1, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     adapted_type_bits = (uint8_t)(wrapped.data[0] & 0xFEu);
@@ -296,10 +407,10 @@ static void test_wrap_unwrap_round_trip_ok(void)
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
 
-    wrapped = rcp_e2e_wrap(0xDEADBEEFu, 0xCAFEu, acf_frame, sizeof(acf_frame));
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 0xDEADBEEFu, 0xCAFEu, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
-    rc = rcp_e2e_unwrap(0xDEADBEEFu, 0xCAFEu, wrapped.data, wrapped.len, &body);
+    rc = rcp_e2e_unwrap(0x05u, 0x00u, false, 0xDEADBEEFu, 0xCAFEu, wrapped.data, wrapped.len, &body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK, rc);
     TEST_ASSERT_EQUAL_UINT(sizeof(acf_frame), body.len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(acf_frame, body.data, body.len);
@@ -314,7 +425,7 @@ static void test_unwrap_short_frame(void)
     rcp_bytes_t body = {0};
 
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_SHORT_FRAME,
-                           rcp_e2e_unwrap(0, 0, buf, sizeof(buf), &body));
+                           rcp_e2e_unwrap(0x05u, 0x00u, false, 0, 0, buf, sizeof(buf), &body));
     TEST_ASSERT_NULL(body.data);
 }
 
@@ -327,12 +438,12 @@ static void test_unwrap_crc_mismatch_on_corruption(void)
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
 
-    wrapped = rcp_e2e_wrap(5, 5, acf_frame, sizeof(acf_frame));
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 5, 5, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     wrapped.data[3] ^= 0xFFu; /* corrupt the payload, not the header/trailer */
 
-    rc = rcp_e2e_unwrap(5, 5, wrapped.data, wrapped.len, &body);
+    rc = rcp_e2e_unwrap(0x05u, 0x00u, false, 5, 5, wrapped.data, wrapped.len, &body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH, rc);
 
     rcp_bytes_free(&wrapped);
@@ -347,13 +458,13 @@ static void test_unwrap_crc_mismatch_on_wrong_stream_id(void)
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
 
-    wrapped = rcp_e2e_wrap(1, 1, acf_frame, sizeof(acf_frame));
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 1, 1, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     /* Same bytes, but unwrapped against the wrong stream_id -- the
      * coverage span includes stream_id, so this must fail too. */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
-                           rcp_e2e_unwrap(2, 1, wrapped.data, wrapped.len, &body));
+                           rcp_e2e_unwrap(0x05u, 0x00u, false, 2, 1, wrapped.data, wrapped.len, &body));
 
     rcp_bytes_free(&wrapped);
     rcp_bytes_free(&body);
@@ -827,10 +938,14 @@ int main(void)
     RUN_TEST(test_compute_crc_matches_manual_concatenation);
     RUN_TEST(test_compute_crc_zero_stream_and_timestamp_ntscf_standin);
     RUN_TEST(test_compute_crc_timestamp_is_4_octets_not_8);
+    RUN_TEST(test_compute_crc_avtp_subtype_changes_result);
+    RUN_TEST(test_compute_crc_header_octet1_changes_result);
+    RUN_TEST(test_compute_crc_tu_bit_changes_result);
 
     RUN_TEST(test_length_with_crc_adds_trailer_size);
     RUN_TEST(test_length_with_crc_saturates);
 
+    RUN_TEST(test_wrap_framed_forces_tu_false_under_ntscf);
     RUN_TEST(test_wrap_appends_crc_len_bytes);
     RUN_TEST(test_wrap_null_frame_nonzero_len_fails_safe);
     RUN_TEST(test_wrap_too_short_for_length_field_fails_safe);

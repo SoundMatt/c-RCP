@@ -12,6 +12,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Issue #465 (e2e.h's own "Figure 20/21 header-CRC bytes" section):
+ * rcp_e2e_compute_crc()/_wrap()/_unwrap() now require the real TSCF/NTSCF
+ * header_octet1 byte (sv|version|mr|rsv|tv or sv|version|r) and tu bit as
+ * part of the CRC's coverage span, but this server double's own public
+ * dispatch_e2e()/_dispatch_e2e_fragment() surface (mock.h) has never
+ * carried per-message sv/mr/tv/tu bits -- only avtp_subtype, stream_id,
+ * and avtp_timestamp. Extending that public surface to carry the real
+ * wire bits, and threading them from wherever a real caller decodes an
+ * AVTPDU header, is a separate, materially larger architecture item
+ * outside this issue's own file scope (src/e2e.c, include/rcp/e2e.h).
+ * This placeholder is fed uniformly on every e2e.c call this file makes
+ * (both the encode-side... this file has none; it is decode-only... and
+ * decode-side unwrap/CRC-check calls), so every existing dispatch_e2e()
+ * caller that itself used rcp_e2e_wrap_framed() to build its own request
+ * (test code; a real client would do the same) must use this identical
+ * placeholder for header_octet1/tu when constructing that request, or
+ * every CRC check through this mock will (correctly, per the coverage
+ * fix) mismatch. This does NOT model real sv/mr/tv/tu wire traffic --
+ * a caller that needs the real wire-accurate values must call
+ * rcp_e2e_wrap()/_unwrap()/_wrap_framed()/_unwrap_framed() directly. */
+#define RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER ((uint8_t)0x00u)
+#define RCP_MOCK_E2E_TU_PLACEHOLDER            (false)
+
 /* ── Endpoint slot ─────────────────────────────────────────────────────────── */
 
 typedef struct {
@@ -1923,6 +1946,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
     }
 
     unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                           RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                           RCP_MOCK_E2E_TU_PLACEHOLDER,
                                            avtp_timestamp, request, request_len, &unwrapped);
     if (unwrap_result != RCP_E2E_OK) {
         /* Not executed, not even admitted -- TC18 §13.6. RCP_E2E_ERR_CRC_MISMATCH
@@ -2087,6 +2112,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *
     }
 
     unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                           RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                           RCP_MOCK_E2E_TU_PLACEHOLDER,
                                            avtp_timestamp, request, request_len, &unwrapped);
     if (unwrap_result != RCP_E2E_OK) {
         /* Same CRC-mismatch/short-frame handling as
@@ -2302,6 +2329,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
         }
 
         unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                               RCP_MOCK_E2E_TU_PLACEHOLDER,
                                                avtp_timestamp, fragment, fragment_len, &unwrapped);
         if (unwrap_result == RCP_E2E_ERR_SHORT_FRAME) {
             rcp_bytes_free(&unwrapped);
@@ -2332,7 +2361,10 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 return RCP_MOCK_DISPATCH_REJECTED;
             }
             rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
-            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+            want = rcp_e2e_compute_fragmented_crc(avtp_subtype,
+                                                   RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                                   RCP_MOCK_E2E_TU_PLACEHOLDER,
+                                                   stream_id, effective_ts,
                                                    srv->frag_first_header[stream_index - 1u],
                                                    srv->frag_first_header_len[stream_index - 1u],
                                                    reassembled, reassembled_len);
@@ -2395,7 +2427,10 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 return RCP_MOCK_DISPATCH_REJECTED;
             }
             rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
-            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+            want = rcp_e2e_compute_fragmented_crc(avtp_subtype,
+                                                   RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                                   RCP_MOCK_E2E_TU_PLACEHOLDER,
+                                                   stream_id, effective_ts,
                                                    srv->frag_first_header[stream_index - 1u],
                                                    srv->frag_first_header_len[stream_index - 1u],
                                                    reassembled, reassembled_len);
@@ -2622,6 +2657,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
         }
 
         unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                               RCP_MOCK_E2E_TU_PLACEHOLDER,
                                                avtp_timestamp, fragment, fragment_len, &unwrapped);
         if (unwrap_result == RCP_E2E_ERR_SHORT_FRAME) {
             rcp_bytes_free(&unwrapped);
@@ -2652,7 +2689,10 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
                 return RCP_MOCK_DISPATCH_REJECTED;
             }
             rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
-            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+            want = rcp_e2e_compute_fragmented_crc(avtp_subtype,
+                                                   RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                                   RCP_MOCK_E2E_TU_PLACEHOLDER,
+                                                   stream_id, effective_ts,
                                                    srv->frag_first_header[stream_index - 1u],
                                                    srv->frag_first_header_len[stream_index - 1u],
                                                    reassembled, reassembled_len);
@@ -2715,7 +2755,10 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
                 return RCP_MOCK_DISPATCH_REJECTED;
             }
             rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
-            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+            want = rcp_e2e_compute_fragmented_crc(avtp_subtype,
+                                                   RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+                                                   RCP_MOCK_E2E_TU_PLACEHOLDER,
+                                                   stream_id, effective_ts,
                                                    srv->frag_first_header[stream_index - 1u],
                                                    srv->frag_first_header_len[stream_index - 1u],
                                                    reassembled, reassembled_len);

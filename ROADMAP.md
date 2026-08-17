@@ -19106,6 +19106,68 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.385.0 -- 2026-08-16 (issue #465: Figure 20/21 header-CRC bytes --
+rcp_e2e_compute_crc() was missing avtp_subtype/header_octet1/tu from
+the E2E CRC coverage span)
+
+Closes issue #465 (sev:high, wire-format-affecting). TC18 §13.6
+Figure 20 (ACF_ABB under TSCF)/Figure 21 (ACF_GBB under NTSCF) use a
+color legend (orange = header-CRC input, green = ACF-CRC input, pink =
+explicitly excluded, blue = CRC result, yellow = padding) invisible to
+`pdftotext` -- confirming this needed the rendered page. Rendered the
+RC5 PDF's pages 88/89 at 250dpi with `pdftoppm`, inspected every
+field's fill color directly (cross-checked via pixel-sampled RGB, not
+just eyeballing), and read the prose immediately under each figure.
+
+Confirmed, not a false positive: Figure 20's orange region is the
+AVTPDU subtype byte (byte 0) + the sv|version|mr|rsv|tv byte (byte 1)
++ the tu bit alone (byte 3's last bit only -- its other 7 bits and
+byte 2, sequence_num_lsb, are white/uncolored, genuinely skipped) +
+stream_id (8 bytes) + avtp_timestamp (4 bytes). `rcp_e2e_compute_crc()`
+fed only the last two regions into the CRC, dropping the subtype
+octet, header octet 1, and tu entirely -- a real wire-format gap: a
+spec-conformant peer's CRC32 over a TSCF-headed E2E-safe frame would
+not match this library's prior output, meaning either interop failure
+or a corrupted header byte going undetected. Figure 21 (NTSCF)
+confirms the same shape minus the fields NTSCF's header doesn't carry.
+
+Fix: `rcp_e2e_compute_crc()`/`_wrap()`/`_unwrap()`/
+`_compute_fragmented_crc()` each gained three new leading parameters
+(`avtp_subtype`, `header_octet1`, `tu`), fed ahead of
+`stream_id`/`avtp_timestamp` in Figure 20/21's own exact byte order --
+mathematically exact (not approximate) per CRC32's own incremental
+property, see `e2e.h`'s file header. `_wrap_framed()`/`_unwrap_framed()`
+derive `avtp_subtype` from `is_ntscf_framed` internally and force `tu`
+false under NTSCF framing, mirroring the pre-existing
+`avtp_timestamp`-zeroed-under-NTSCF convention. `mock.c`'s
+`dispatch_e2e()`/`_fragment()` (this module's only in-tree caller, with
+no per-message `header_octet1`/`tu` on its own public signature) use a
+newly-documented placeholder uniformly; extending `mock.h`'s own public
+signatures to carry real wire values is a separate, larger item outside
+this issue's file scope.
+
+Wire-format-affecting: every CRC assertion in `test_e2e.c`/
+`test_tc18_gaps_e2e.c` audited -- all self-referential (concat vs.
+`rcp_e2e_crc32()`) except the unaffected CRC-32/AUTOSAR known-answer
+test; every self-referential concatenation rewritten with the new
+3-byte prefix, cross-checked against an independent from-scratch
+Python CRC-32/AUTOSAR reference implementation, which reproduced the
+new C output exactly. New tests prove `avtp_subtype`/`header_octet1`/
+`tu` each independently change the CRC, and that `wrap_framed()` forces
+`tu` false under NTSCF specifically. Mutation-tested (disabled the new
+`crc32_update()` calls in both compute functions): reproduced exactly
+the expected 7+1 new/updated test failures, confirmed, restored.
+
+Full clean rebuild + full 66-test suite green; ASan/UBSan clean;
+`cfusa check` 0 errors; `cfusa trace` full coverage. `.fusa-reqs.json`
+REQ-E2E-003/005/006/007/008/009 updated with this investigation's
+dated notes and exact Figure 20/21 page citations.
+
+**Next**: extending `mock.h`'s public dispatch surface to carry real
+per-message `header_octet1`/`tu` bits, if a caller ever needs
+wire-accurate E2E CRC verification through the mock rather than the
+raw `rcp_e2e_wrap()`/`_unwrap()` primitives directly.
+
 ### v0.384.0 -- 2026-08-16 (REQ-WIREERR-005/006/007: SEQUENCER_NOT_KNOWN,
 GPTP_FAIL, PWM_IN_NO_SIGNAL wire-error mappings)
 
@@ -19266,6 +19328,7 @@ every new test frees its own `rcp_bytes_t` allocations with
 `rcp_bytes_free()`, matching this codebase's established pattern); `cfusa
 check`: 0 errors; `cfusa trace`: 1089/1089 requirements traced and
 tested (not decreased).
+
 ### v0.382.0 -- 2026-08-16 (issue #455: Figure 17 lifecycle-diagram
 re-transcription -- missing transition added, idle-gate misattribution
 corrected, Figure-16-should-be-17 citations fixed)

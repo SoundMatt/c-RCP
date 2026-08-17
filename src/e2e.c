@@ -108,8 +108,18 @@ static uint8_t acf_pad_octets(const uint8_t *frame, size_t frame_len)
     return (uint8_t)((frame[2] >> 6) & 0x3u);
 }
 
+/* AVTP subtype byte values (IEEE 1722-2016's public subtype registry),
+ * hardcoded here rather than included from avtp.h, per this module's own
+ * "no dependency on avtp.c" layering discipline (see the file header) --
+ * numerically identical to avtp.h's own RCP_AVTP_SUBTYPE_TSCF/_NTSCF.
+ * Used only by rcp_e2e_wrap_framed()/_unwrap_framed() to derive
+ * avtp_subtype from is_ntscf_framed themselves, below. */
+#define RCP_E2E_AVTP_SUBTYPE_TSCF  ((uint8_t)0x05u)
+#define RCP_E2E_AVTP_SUBTYPE_NTSCF ((uint8_t)0x82u)
+
 //cfusa:req REQ-E2E-003
-uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+uint32_t rcp_e2e_compute_crc(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                                 uint64_t stream_id, uint32_t avtp_timestamp,
                                  const uint8_t *acf_frame, size_t acf_frame_len)
 {
     uint32_t crc = 0xFFFFFFFFu;
@@ -119,6 +129,15 @@ uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
 
     put_u64(sid, stream_id);
     put_u32(ts, avtp_timestamp);
+
+    /* TC18 §13.6 Figures 20/21's own orange "header CRC" bytes, in their
+     * exact left-to-right wire order (issue #465 -- see e2e.h's file
+     * header "Figure 20/21 header-CRC bytes" section for the rendered-page
+     * investigation this order comes from and why running it continuously
+     * into the green ACF-CRC bytes below is exact, not approximate). */
+    crc = crc32_update(crc, avtp_subtype);
+    crc = crc32_update(crc, header_octet1);
+    crc = crc32_update(crc, tu ? (uint8_t)0x01u : (uint8_t)0x00u);
 
     for (i = 0; i < 8; i++) crc = crc32_update(crc, sid[i]);
     for (i = 0; i < 4; i++) crc = crc32_update(crc, ts[i]);
@@ -175,7 +194,8 @@ size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count)
 
 //cfusa:req REQ-E2E-005
 //cfusa:req REQ-E2E-006
-rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
+rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                             uint64_t stream_id, uint32_t avtp_timestamp,
                              const uint8_t *acf_frame, size_t acf_frame_len)
 {
     rcp_bytes_t out = {0};
@@ -231,7 +251,8 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
 
     /* Coverage span: header-and-real-payload only, excluding the pad
      * octets sitting at acf_frame[real_len..acf_frame_len). */
-    crc = rcp_e2e_compute_crc(stream_id, avtp_timestamp, data, real_len);
+    crc = rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp,
+                               data, real_len);
     put_u32(data + real_len, crc);
 
     /* Re-seat the original trailing pad octets after the trailer instead
@@ -249,7 +270,8 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
 //cfusa:req REQ-E2E-007
 //cfusa:req REQ-E2E-008
 //cfusa:req REQ-E2E-009
-rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
+rcp_e2e_errc_t rcp_e2e_unwrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                                     uint64_t stream_id, uint32_t avtp_timestamp,
                                      const uint8_t *frame, size_t frame_len,
                                      rcp_bytes_t *out_acf_frame)
 {
@@ -277,7 +299,8 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
     real_len = frame_len - RCP_E2E_CRC_LEN - pad_octets;
 
     got      = get_u32(frame + real_len);
-    want     = rcp_e2e_compute_crc(stream_id, avtp_timestamp, frame, real_len);
+    want     = rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp,
+                                    frame, real_len);
 
     /* Reassemble the plain ACF message acf.c's decoders expect --
      * header-and-real-payload immediately followed by the pad octets,
@@ -315,20 +338,28 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
 
 //cfusa:req REQ-E2E-035
 rcp_bytes_t rcp_e2e_wrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                 uint8_t header_octet1, bool tu,
                                  uint32_t avtp_timestamp,
                                  const uint8_t *acf_frame, size_t acf_frame_len)
 {
-    return rcp_e2e_wrap(stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
+    uint8_t avtp_subtype = is_ntscf_framed ? RCP_E2E_AVTP_SUBTYPE_NTSCF
+                                            : RCP_E2E_AVTP_SUBTYPE_TSCF;
+    return rcp_e2e_wrap(avtp_subtype, header_octet1, is_ntscf_framed ? false : tu,
+                         stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
                          acf_frame, acf_frame_len);
 }
 
 //cfusa:req REQ-E2E-035
 rcp_e2e_errc_t rcp_e2e_unwrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                      uint8_t header_octet1, bool tu,
                                       uint32_t avtp_timestamp,
                                       const uint8_t *frame, size_t frame_len,
                                       rcp_bytes_t *out_acf_frame)
 {
-    return rcp_e2e_unwrap(stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
+    uint8_t avtp_subtype = is_ntscf_framed ? RCP_E2E_AVTP_SUBTYPE_NTSCF
+                                            : RCP_E2E_AVTP_SUBTYPE_TSCF;
+    return rcp_e2e_unwrap(avtp_subtype, header_octet1, is_ntscf_framed ? false : tu,
+                           stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
                            frame, frame_len, out_acf_frame);
 }
 
@@ -341,7 +372,8 @@ bool rcp_e2e_fragment_carries_crc(bool is_last_fragment)
 }
 
 //cfusa:req REQ-E2E-038
-uint32_t rcp_e2e_compute_fragmented_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+uint32_t rcp_e2e_compute_fragmented_crc(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                                         uint64_t stream_id, uint32_t avtp_timestamp,
                                          const uint8_t *first_fragment_header,
                                          size_t first_fragment_header_len,
                                          const uint8_t *reassembled_payload,
@@ -354,6 +386,12 @@ uint32_t rcp_e2e_compute_fragmented_crc(uint64_t stream_id, uint32_t avtp_timest
 
     put_u64(sid, stream_id);
     put_u32(ts, avtp_timestamp);
+
+    /* Same orange header-CRC bytes, same order, as rcp_e2e_compute_crc()
+     * above -- issue #465, see e2e.h's file header. */
+    crc = crc32_update(crc, avtp_subtype);
+    crc = crc32_update(crc, header_octet1);
+    crc = crc32_update(crc, tu ? (uint8_t)0x01u : (uint8_t)0x00u);
 
     for (i = 0; i < 8; i++) crc = crc32_update(crc, sid[i]);
     for (i = 0; i < 4; i++) crc = crc32_update(crc, ts[i]);
