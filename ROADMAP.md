@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.391.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill:
+LIFECYCLE/RMAP/E2E/ACF/PWRMODE/WIREERR + RELAY/MOCK/LOAN/ALLOC
+scoping, 2 of 66 requirements in scope now cited)
+
+Continuation of issue #164 (c-RCP-AUDIT-02), two parts. **Part A**:
+LIFECYCLE, RMAP, E2E, ACF, PWRMODE, WIREERR, previously excluded to
+avoid file overlap with the now-merged issue #198 lifecycle/
+access-control work -- only 18 uncited going in (already substantially
+cited by PRs #171-175/#182). **Part B**: RELAY, MOCK, LOAN, ALLOC, not
+previously individually triaged.
+
+**Cited 2, both in WIREERR** (6/7, up from 4/7): `REQ-WIREERR-003`
+(CRC mismatch -> POCI_FAILURE, TC18 §12.9.6 Table 30's `POCI_FAILURE
+12 - CRC of request does not match` row) and `REQ-WIREERR-004`
+(LOCKED_MEM_ACCESS vs UNAUTHORIZED_ACCESS, TC18 §13.7.1.2's
+write-prohibited-register prose plus Table 30's rows, cross-
+referencing REQ-LIFECYCLE-024's own Figure 17 finding).
+
+**64 left uncited, individually re-verified against a fresh
+`pdftotext -layout` extraction:** the `strerror()`/`string()`
+uniqueness pattern (LIFECYCLE-013/021, E2E-001, ACF-001, PWRMODE-001/
+002, WIREERR-002) and RMAP's zero-init/bitmask-distinctness residuals
+(013-019) -- same implementation-detail pattern as every prior batch.
+E2E-006 and ACF-011 have no explicit TC18 mandate for their specific
+zero-fill/fail-safe byte content. **RELAY (17), LOAN (9), ALLOC (6)
+confirmed to have no TC18 basis at all** -- RELAY is this project's
+own RELAY-spec C binding plus its own original TC18-adapter-glue
+design (`adapt.h`'s own header explicitly calls it "this repository's
+own interim answer"); LOAN is a free-list buffer pool
+(self-documented "own original engineering design"); ALLOC is a
+pluggable malloc/calloc/free/realloc indirection for fault-injection.
+Exhaustive grep of the extracted TC18 text: zero "pool"/"free-list"
+hits, "allocat" only in two unrelated prose uses. Recommend adding all
+three to issue #164's not-a-TC18-concept exclusion list, same
+disposition as MDNS/CFG. MOCK's remaining 16 re-confirmed as genuine
+thin wrappers by reading `src/mock.c` directly, matching PR #496's own
+prior characterization.
+
+**Citation-drift candidate surfaced (pre-existing, not touched here):**
+`REQ-LIFECYCLE-024`'s citation claims "TC18.txt L4039-L4041" for
+§13.7.1.2's UNAUTHORIZED_ACCESS prose; the fresh extraction shows that
+prose is actually at L4436-4437 (L4039 is unrelated mid-§13.3 content).
+Same class as issue #434/PR #444/PR #492's PWR findings.
+
+Full clean rebuild + full 66-test suite green, unchanged; `cfusa
+check` (v0.5.54) 0 errors, 968/1312 warnings/info unchanged; `cfusa
+trace` (v0.5.54) 1095/1095 traced and tested, unchanged -- citations
+are additive-only, as expected. `.fusa-reqs.json`'s `tc18_master_id`
+field intentionally untouched.
+
 ### v0.390.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch:
 CFG/DISC/MOCK/SEQ/TRIG/CANCEL/CHAIN/CMP/CANEP/UART/SRV, 10 of 46
 uncited requirements in scope now cited)

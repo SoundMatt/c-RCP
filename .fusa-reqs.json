@@ -8617,7 +8617,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "\u00a712.9.6 Table 30 (\"POCI_FAILURE 12 - CRC of request does not match\"), TC18.txt L3830"
     },
     {
       "id": "REQ-WIREERR-004",
@@ -8627,7 +8628,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "\u00a713.7.1.2 (\"Writing to a write prohibited register (e.g. lock bit for map set) creates a response with err = 1 and an error code UNAUTHORIZED_ACCESS\"), TC18.txt L4436-4437; \u00a712.9.6 Table 30 (UNAUTHORIZED_ACCESS=3, LOCKED_MEM_ACCESS=4), TC18.txt L3815-3816; Figure 17's LOCKED_CONFIG_ACCESS transition, cross-referencing REQ-LIFECYCLE-024's own citation for the state-locked case"
     },
     {
       "id": "REQ-WIREERR-005",
