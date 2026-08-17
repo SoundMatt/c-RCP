@@ -165,7 +165,7 @@ rcp_bytes_t rcp_cancel_encode_clear_all(rcp_byte_bus_id_t byte_bus_id, uint8_t t
  * RCP_CANCEL_ERR_RESERVED_NONZERO when any of message_timestamp's 7
  * trailing octets carries a set bit (REQ-CANCEL-013), and
  * RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when evt[2:0], hs, or cs is nonzero
- * (TC18 Table 11; REQ-CANCEL-014). On RCP_CANCEL_OK, *out_byte_bus_id
+ * (TC18 Table 13; REQ-CANCEL-014). On RCP_CANCEL_OK, *out_byte_bus_id
  * and *out_transaction_num are populated. */
 rcp_cancel_errc_t rcp_cancel_decode_clear_all(const uint8_t *b, size_t len,
                                                rcp_byte_bus_id_t *out_byte_bus_id,
@@ -191,7 +191,7 @@ rcp_bytes_t rcp_cancel_encode_clear_single(rcp_byte_bus_id_t byte_bus_id,
  * RCP_CANCEL_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte
  * is not RCP_REQUEST_TYPE_CLEAR_SINGLE, RCP_CANCEL_ERR_RESERVED_NONZERO
  * per REQ-CANCEL-007's own contract, and RCP_CANCEL_ERR_EVT_HS_CS_NONZERO
- * when evt[2:0], hs, or cs is nonzero (TC18 Table 13; REQ-CANCEL-015).
+ * when evt[2:0], hs, or cs is nonzero (TC18 Table 15; REQ-CANCEL-015).
  * On RCP_CANCEL_OK, *out_byte_bus_id, *out_clear_transaction_num, and
  * *out_transaction_num are populated. */
 rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,

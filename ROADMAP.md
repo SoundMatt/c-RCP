@@ -19106,6 +19106,58 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.399.0 -- 2026-08-16 (issue #341: cancel-family `Table 11`/
+`12`/`13` cluster, `ep_adc.c` `Table 50`->`53`, `regmap.c`
+`Table 34`->`35` fixes)
+
+Ninth pass on issue #341. Fixed the three concrete content bugs
+PR #504's own top-to-bottom classification sweep surfaced and
+deliberately left unfixed (out of that pass's `Table 4`/`5`/`36`/
+`52`/`58` scope).
+
+Cancel-family cluster (`request_cancel.h`/`.c`,
+`request_compound.h`/`.c`, `.fusa-reqs.json`): fresh `pdftotext
+-layout` extraction of both PDFs confirmed RC1 `Table 11` ("cancel
+all requests") -> RC5 `Table 13`, RC1 `Table 12` ("clear all
+non-safestate requests") -> RC5 `Table 14`, RC1 `Table 13` ("cancel
+a single, specific request") -> RC5 `Table 15` -- captions
+byte-for-byte identical between revisions. Fixed all 10 stale
+bare-number code occurrences plus 6 stale `.fusa-reqs.json` `text`
+fields (the recurring "tc18 field correct, narrative text lagging"
+pattern already seen in prior passes). One subtler catch: REQ-
+CANCEL-005/015's own `text` fields cited RC1's stale `Figure 15 /
+Table 13` for clear-single -- both numbers happen to also be valid
+RC5 citations, just for the unrelated clear-non-safestate/cancel-all
+functions, so this would have survived a naive "is this a real RC5
+number" check; real RC5 numbering for clear-single is `Figure 16 /
+Table 15`. Confirmed NOT part of this cluster: `.fusa-reqs.json`'s
+`§11.2.2.6 Table 11` (chained requests) / `§11.2.2.7 Table 12`
+(timed requests) citations are genuinely RC5-native (RC1's own
+chained/timed-request tables are `9`/`10`, reusing digits `11`/`12`
+for unrelated content in RC5) -- left untouched.
+
+`src/ep_adc.c:233`: "adc trigger outputs" caption-identical between
+RC1 `Table 50` and RC5 `Table 53` -- plain shift, not a reused-digit
+case (RC1's own different `Table 53` = "can functional
+configuration", already correctly shifted elsewhere to RC5
+`Table 56`). Fixed the flagged occurrence plus 3 more of the
+identical stale citation outside the classification sweep's own
+file scope: `tests/test_ep_adc.c:398,542`,
+`tests/test_tc18_gaps_ep2.c:677`.
+
+`src/regmap.c:2316`: confirmed `ep_clear_req_storage`'s row lives in
+RC5 `Table 35` ("EP functional config common entries"), not
+`Table 34` ("CRC32 Polynomial", unrelated, correctly cited
+elsewhere) -- plain wrong-digit typo, fixed.
+
+Citation-text-only, trace coverage unchanged. Full 66-test suite:
+66/66. `cfusa check`/`trace` (v0.5.54): 0 errors, 968/1312
+warnings/info, 1095/1095 traced/tested -- all unchanged.
+
+Does not close #341. The `(c)`-list table numbers from PR #504's
+classification sweep (`Table 55`/`37`/`40`/`57`/`19`/`59`/`49`/`15`/
+`34`/`17`/`14`/`16`) remain open for a future pass.
+
 ### v0.398.0 -- 2026-08-16 (issue #341: `Table 4`/`5`/`52`/`58`
 exhaustive census, `Table 36` reused-digit fix, final convergence
 classification)

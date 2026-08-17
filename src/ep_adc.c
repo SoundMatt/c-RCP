@@ -230,7 +230,7 @@ bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
     return true;
 }
 
-/* ── Trigger outputs (Table 50), REQ-ADC-031 ─────────────────────────────── */
+/* ── Trigger outputs (Table 53), REQ-ADC-031 ─────────────────────────────── */
 
 //cfusa:req REQ-ADC-031
 void rcp_ep_adc_trigger_state_init(rcp_ep_adc_trigger_state_t *s)

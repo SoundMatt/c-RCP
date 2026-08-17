@@ -674,7 +674,7 @@ static void test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin(v
     /* Not a deviation (RENAMED 2026-08-13, issue #336, REQ-ADC-031 already
      * fixed this): the comment this replaces claimed "c-RCP defines no
      * trigger enum, no threshold registers and no evaluation predicate" for
-     * TC18 §13.7.9.1 Table 50's five ADC trigger outputs -- stale since
+     * TC18 §13.7.9.1 Table 53's five ADC trigger outputs -- stale since
      * REQ-ADC-031 (issue #201) added rcp_ep_adc_trigger_state_t/
      * rcp_ep_adc_trigger_evaluate(), which decides exactly this from a
      * caller-supplied newly-acquired value plus the tracked previous one

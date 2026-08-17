@@ -6273,7 +6273,7 @@
     {
       "id": "REQ-CANCEL-005",
       "title": "rcp_cancel_encode_clear_single() packs clear_transaction_num at the specification's own offset",
-      "text": "rcp_cancel_encode_clear_single() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte RCP_REQUEST_TYPE_CLEAR_SINGLE at octet offset 0 of the repurposed message_timestamp region, clear_transaction_num at octet offset 3, and octets 1-2 and 4-7 all-zero (TC18 v0.5.1_RC \u00a711.2.3.3 Figure 15 / Table 13).",
+      "text": "rcp_cancel_encode_clear_single() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte RCP_REQUEST_TYPE_CLEAR_SINGLE at octet offset 0 of the repurposed message_timestamp region, clear_transaction_num at octet offset 3, and octets 1-2 and 4-7 all-zero (TC18 v0.5.1_RC \u00a711.2.3.3 Figure 16 / Table 15).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6361,7 +6361,7 @@
     {
       "id": "REQ-CANCEL-013",
       "title": "rcp_cancel_decode_clear_all() rejects a nonzero reserved message_timestamp octet",
-      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_RESERVED_NONZERO when any of message_timestamp's 7 trailing octets (every octet after the leading request_type byte) carries a set bit, since clear-all carries no sub-field of its own. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): the decode function previously read only the leading request_type byte and never validated the remaining 7 octets TC18 Table 11 marks reserved.",
+      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_RESERVED_NONZERO when any of message_timestamp's 7 trailing octets (every octet after the leading request_type byte) carries a set bit, since clear-all carries no sub-field of its own. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): the decode function previously read only the leading request_type byte and never validated the remaining 7 octets TC18 Table 13 marks reserved.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6372,7 +6372,7 @@
     {
       "id": "REQ-CANCEL-014",
       "title": "rcp_cancel_decode_clear_all() rejects nonzero evt[2:0], hs, or cs",
-      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero -- TC18 Table 11 defines only evt = 0000b (no ack) or 1000b (ack requested) as valid, meaning evt[2:0] must be zero, and both hs and cs are documented as always 0b. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated by any of the three cancel-family decode functions before this milestone.",
+      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero -- TC18 Table 13 defines only evt = 0000b (no ack) or 1000b (ack requested) as valid, meaning evt[2:0] must be zero, and both hs and cs are documented as always 0b. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated by any of the three cancel-family decode functions before this milestone.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6383,7 +6383,7 @@
     {
       "id": "REQ-CANCEL-015",
       "title": "rcp_cancel_decode_clear_single() rejects nonzero evt[2:0], hs, or cs",
-      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 13's explicit prose (\"Evt, hs and cs shall be zero\") -- the same rule as REQ-CANCEL-014's clear-all case, applied to clear-single. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H). Distinct from REQ-CANCEL-007's own RCP_CANCEL_ERR_RESERVED_NONZERO check, which validates message_timestamp's own reserved octets, a different wire region from the ACF header's evt/hs/cs bits.",
+      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 15's explicit prose (\"Evt, hs and cs shall be zero\") -- the same rule as REQ-CANCEL-014's clear-all case, applied to clear-single. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H). Distinct from REQ-CANCEL-007's own RCP_CANCEL_ERR_RESERVED_NONZERO check, which validates message_timestamp's own reserved octets, a different wire region from the ACF header's evt/hs/cs bits.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -8865,7 +8865,7 @@
     {
       "id": "REQ-CMP-028",
       "title": "rcp_compound_decode_clear_non_safestate() rejects a nonzero reserved message_timestamp octet",
-      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_RESERVED_NONZERO when any of message_timestamp's 7 trailing octets (every octet after the leading request_type byte) carries a set bit, since clear-non-safestate carries no sub-field of its own. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): the decode function previously read only the leading request_type byte and never validated the remaining 7 octets TC18 Table 12 marks reserved.",
+      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_RESERVED_NONZERO when any of message_timestamp's 7 trailing octets (every octet after the leading request_type byte) carries a set bit, since clear-non-safestate carries no sub-field of its own. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): the decode function previously read only the leading request_type byte and never validated the remaining 7 octets TC18 Table 14 marks reserved.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -8876,7 +8876,7 @@
     {
       "id": "REQ-CMP-029",
       "title": "rcp_compound_decode_clear_non_safestate() rejects nonzero evt[2:0], hs, or cs",
-      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 12's explicit prose (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"). Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated before this milestone -- Table 12 is the only one of the three cancel-family tables (11/12/13) to name a specific TC18 Table 30 wire error code for this violation, which a caller wiring this into a real response should reuse (RCP_ERROR_UNSUPPORTED_CMD, errors.h) rather than inventing its own mapping.",
+      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 14's explicit prose (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"). Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated before this milestone -- Table 14 is the only one of the three cancel-family tables (13/14/15) to name a specific TC18 Table 30 wire error code for this violation, which a caller wiring this into a real response should reuse (RCP_ERROR_UNSUPPORTED_CMD, errors.h) rather than inventing its own mapping.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

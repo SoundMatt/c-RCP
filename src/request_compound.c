@@ -257,12 +257,12 @@ rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, si
 
     /* REQ-CMP-028: clear-non-safestate carries no sub-field of its own --
      * all 7 trailing octets of message_timestamp are reserved (TC18
-     * Table 12). */
+     * Table 14). */
     if ((hdr.message_timestamp & 0x00FFFFFFFFFFFFFFull) != 0ull) {
         return RCP_COMPOUND_ERR_RESERVED_NONZERO;
     }
 
-    /* REQ-CMP-029: TC18 Table 12 states explicitly -- "evt[2:0], hs, cs:
+    /* REQ-CMP-029: TC18 Table 14 states explicitly -- "evt[2:0], hs, cs:
      * All bits shall be written as 0, else the request shall be rejected
      * with error code = UNSUPPORTED_CMD". */
     if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
