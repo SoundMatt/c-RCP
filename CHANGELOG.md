@@ -34,6 +34,58 @@ the rationale.
 
 ## Releases
 
+### v0.386.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: AVTP/WDG/PWR/TSN/UDP/DL/L2/MDNS/FRAG, 34 of 113 uncited requirements in scope cited)
+
+Partial progress on issue #164 (c-RCP-AUDIT-02). Worked the AVTP, WDG,
+PWR, TSN, UDP, DL, L2, MDNS, and FRAG categories -- 113 requirements
+in these categories carried no `tc18` citation field at the start of
+this pass (category totals have shifted since #164 was filed, due to
+concurrent work: AVTP was 14/23 cited, WDG 1/12, PWR 2/15 already,
+with TSN/UDP/DL/L2/MDNS/FRAG fully uncited).
+
+Per requirement: read the `text` field, located the governing TC18
+section in a fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, and confirmed the
+requirement's stated behavior actually matches the spec text before
+citing it -- not a mechanical fill.
+
+**34 cited** (see `.fusa-reqs.json` `tc18` fields): AVTP 14->17,
+WDG 1->6, PWR 2->10, TSN 0->2, UDP 0->2, DL 0->4, L2 0->3, MDNS 0->0,
+FRAG 0->7.
+
+**79 left uncited, each individually confirmed to have no genuine
+TC18 counterpart** rather than forced onto a citation -- overwhelmingly
+implementation-only plumbing (socket/thread lifecycle, memory
+management, strerror() convenience APIs, callback-subscription APIs)
+that this repo's own module file-header comments already self-document
+as original engineering choices, not spec-derived. Full flagged-id
+list with individual reasons is in this PR's description.
+
+**Notable finding: the entire MDNS category (11/11) has no TC18 basis
+for citation at all.** TC18's own "Discovery" mechanism (§12.6) is an
+AVTP/ACF_ABB register-map read request/response exchange over the RCP
+wire itself -- an entirely different thing from this module's mDNS/
+DNS-SD bootstrap layer. Exhaustive grep of the extracted spec text for
+mDNS/DNS-SD/zeroconf/bonjour/service-discovery terminology finds
+nothing. Recommend re-triaging MDNS alongside issue #164's existing
+"not a TC18 concept" exclusion list (ADMIN/AUTH/CLI/CORE/DDS/DOIP/
+GRPC/MQTT/OBS/PLATFORM/REC/REST/RL/SHMEM/SOMEIP/UDS/ERR/FI) rather than
+continuing to track it as citation-backfillable.
+
+**Also surfaced, not fixed here (out of this PR's additive-only
+scope):** two already-cited PWR entries have stale citation line
+numbers against the current `TC18.txt` -- REQ-PWR-005 cites
+L2304-L2305 (now page-break boilerplate; the quoted sentence is
+actually at L2680-2681) and REQ-PWR-001 cites "Figure 22" at
+L4160-4166 (the figure is now captioned "Figure 23" at L4563). Same
+class of drift as issue #434/PR #444; worth a targeted follow-up pass.
+
+Citations are additive-only: no `text`/`status`/`tc18_master_id`
+field touched, no impl/test change. Full clean rebuild + full 66-test
+suite green (unchanged); `cfusa check` (v0.5.54) 0 errors, unchanged
+warnings/info counts; `cfusa trace` (v0.5.54) 1095/1095 traced and
+tested, unchanged from before this pass.
+
 ### v0.385.0 -- 2026-08-16 (Figure 20/21 header-CRC bytes: rcp_e2e_compute_crc() was missing avtp_subtype/header_octet1/tu from the E2E CRC coverage span)
 
 Closes issue #465 (sev:high, wire-format-affecting). TC18 §13.6
