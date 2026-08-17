@@ -72,6 +72,51 @@ field is tolerated without affecting coverage.
 requirement categories (separate batches), then the same pass across
 cpp-RCP/go-RCP/rust-RCP.
 
+### v0.402.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` backfill for CAN/CANEP requirements, issue 166)
+
+First `tc18_master_id` batch for c-RCP, now that the 447-entry master
+TC18 requirement catalog (`docs/tc18-master-catalog.json` in RELAY,
+RC5-based, published 2026-08-17) unblocks issue 166. This batch covers
+the `REQ-CAN-*`/`REQ-CANEP-*` category only (34 requirements); the
+remaining categories are separate, disjoint parallel batches against
+the same issue.
+
+Purely additive: added `"tc18_master_id"` to 29 of the 34 requirements
+that already carry a `tc18` citation, matched against the master
+catalog by section + table/figure number and confirmed against the
+catalog entry's own `summary`/`citation` text (not section number
+alone). No other field on any entry was touched, and no `.c`/`.h`
+source file changed.
+
+- 4 requirements have no `tc18` field at all (`REQ-CAN-001`/`002`,
+  `REQ-CANEP-007`/`015` -- implementation-only plumbing: stub-backend
+  error return, default-config values, functional-config
+  zero-initialization, and the CAN error-string table) and were left
+  untouched, per this project's established discipline against forcing
+  a TC18 basis onto requirements that genuinely have none.
+- 1 requirement (`REQ-CANEP-032`, "remote frames not supported, and an
+  11-bit CAN ID is right-aligned") cites a single TC18 sentence that
+  the master catalog itself split into two separate MUST entries
+  (`TC18-13.7.11.3-004` and `TC18-13.7.11.3-005`); since
+  `tc18_master_id` is a single-value field, this is flagged as an
+  ambiguous 1:2 case for follow-up rather than forced onto either
+  catalog id.
+- Two pre-existing `tc18` citations (`REQ-CANEP-001`/`002`) cite
+  "§13.7.11.2 Table 56", but their own title text and the `ep_can.c`
+  file-header comment ("TC18 Table 57") make clear their real basis is
+  Table 57's FrameFormat code table, not Table 56's register map;
+  matched to `TC18-13.7.11.3-003` on content, and this pre-existing
+  citation-text/content mismatch is flagged here for a future
+  citation-accuracy pass -- not corrected in this PR, which only adds
+  the new field.
+
+Verified directly against the pinned `cfusa` v0.5.54 (not assumed):
+`cfusa check` and `cfusa trace --req-coverage 100 --sec-tested 100`
+both exit 0 with byte-identical output (aside from the run timestamp)
+before and after this change -- 1095/1095 requirements traced,
+512/512 functions annotated, 968/1312 check warnings/info, all
+unchanged. Full 66/66 test suite unchanged.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the twelve remaining table numbers, closes out the issue's own tracked backlog)
 
 Tenth pass on the RC1->RC5 table-number citation-drift audit
