@@ -19106,6 +19106,78 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.414.0 -- 2026-08-17 (c-RCP-18: "Writing a requirement"
+convention in CONTRIBUTING.md)
+
+Docs-only change addressing issue 519 (c-RCP-18)'s Method step 1:
+establish the requirement-atomicity/tagging convention before any
+batched requirement-splitting audit, rather than auditing against an
+unwritten standard.
+
+Issue 519 found two real gaps hiding behind CI's two 100%
+`cfusa trace` gates. First, `--func-coverage`'s "function annotation
+density" metric is file-level, not function-level: a function counts
+as covered if *any other* function in its file carries a
+`//cfusa:req` tag. Confirmed concretely against `src/ep_pwm.c`'s
+`saturating_add_u16()`/`saturating_sub_u16()` (lines 37-56), which
+implement REQ-PWM-006/REQ-PWM-007's saturating-clamp arithmetic with
+zero `//cfusa:req` tags of their own -- they count as "annotated"
+solely because ~40 other functions in the same file are tagged.
+Second, `.fusa-reqs.json` has no rule against bundling multiple
+independently-testable behaviors under one `REQ-*` id. Confirmed
+against `REQ-AUTH-009`, which bundles `rcp_authz_policy_new()`'s
+alloc contract with `rcp_authz_policy_retain(NULL)`'s and
+`rcp_authz_policy_release(NULL)`'s NULL-tolerance under one id, right
+next to `REQ-AUTH-010`/`REQ-AUTH-011` already doing exactly this
+correctly as two separate, atomic ids for the non-NULL case. A third
+finding showed the concrete consequence of both gaps together:
+`tests/test_deadline.c`'s `test_heartbeat_unknown_stream_returns_false()`
+(L153) is the real test proving REQ-DL-001's "unregistered stream"
+clause, but carries no `//cfusa:test` tag of its own -- REQ-DL-001's
+"100% tested" status is instead carried entirely by a file-header tag
+block (L2) plus an unrelated sibling test
+(`test_alive_event_on_first_heartbeat`, L133, which exercises
+REQ-DL-001's *other* bundled clause) -- so deleting the one test that
+actually proves the unregistered-stream behavior would very likely
+leave `cfusa trace --sec-tested 100` green.
+
+Adds a "Writing a requirement" section to `CONTRIBUTING.md` codifying
+the atomic, one-shall-statement-per-id pattern this repo already uses
+well in most places (`REQ-PWM-002` through `-009`/`-056`'s nine
+separate ids for one `evt[2:0]` switch statement; `REQ-AUTH-010`/
+`-011`'s separate retain/release contracts) as the standard to
+follow going forward, with `REQ-AUTH-009` documented as the concrete
+"don't do this" counter-example, and requiring `//cfusa:req`/
+`//cfusa:test` tags to sit directly above the specific function/test
+they describe rather than relying on a file-header block.
+
+Explicitly out of scope for this PR, per issue 519's own phased
+proposal: tightening `cfusa`'s `--func-coverage` semantics itself
+(a breaking change shared across every downstream x-RCP repo, needs
+its own issue against `cfusa`, not this repo), and the actual
+category-by-category requirement-splitting audit (Method steps 2-4).
+Issue 519 stays open, tracking that follow-on batched work the same
+way #164/#472 were tracked.
+
+No `.c`/`.h` file touched, no `.fusa-reqs.json` entry touched, no
+requirement `text`/`title`/`status`/tag changed. Full 66-test suite
+green (unchanged pass count); ASan/UBSan build
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`,
+`ASAN_OPTIONS=detect_leaks=0`) clean. Pinned `cfusa` (v0.5.54)
+`check`: 0 errors, 968 warnings/1312 info -- identical to the
+pre-change baseline. `cfusa trace --req-coverage 100
+--sec-tested 100`: 1095/1095 (100%) requirements traced, 512/512
+(100%) functions annotated -- byte-for-byte identical to baseline, as
+expected for a docs-only change that adds no tag and touches no
+requirement.
+
+**Next**: issue 519's Method step 3, a category-by-category
+atomicity audit (protocol-generic, per-endpoint, then
+server/dispatch prefixes), batched the same way as this repo's own
+citation-backfill (#164) and table-number-census (#472) efforts, is
+the concrete follow-on. A master tracker issue for that batching
+(mirroring #256's pattern) is still needed before starting it.
+
 ### v0.412.0 -- 2026-08-17 (c-RCP-17 Phase (a): route all raw libc
 allocation call sites through `alloc.h`)
 

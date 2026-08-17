@@ -34,6 +34,62 @@ the rationale.
 
 ## Releases
 
+### v0.414.0 -- 2026-08-17 (c-RCP-18: "Writing a requirement" convention in CONTRIBUTING.md)
+
+Docs-only change addressing issue 519 (c-RCP-18)'s Method step 1:
+establish the requirement-atomicity/tagging convention before any
+batched requirement-splitting audit, rather than auditing against an
+unwritten standard.
+
+Issue 519 found two real gaps hiding behind CI's two 100%
+`cfusa trace` gates: `--func-coverage`'s "function annotation
+density" metric is file-level, not function-level (a function counts
+as covered if *any other* function in its file carries a
+`//cfusa:req` tag -- confirmed concretely against `src/ep_pwm.c`'s
+`saturating_add_u16()`/`saturating_sub_u16()`, which implement
+REQ-PWM-006/REQ-PWM-007's saturating-clamp arithmetic with zero tags
+of their own); and `.fusa-reqs.json` has no rule against bundling
+multiple independently-testable behaviors under one `REQ-*` id
+(confirmed against `REQ-AUTH-009`, which bundles three different
+functions' contracts under one id, next to `REQ-AUTH-010`/`REQ-AUTH-011`
+already doing it correctly as two ids). A third finding showed the
+consequence concretely: `tests/test_deadline.c`'s
+`test_heartbeat_unknown_stream_returns_false()` (L153) proves
+REQ-DL-001's "unregistered stream" clause but carries no
+`//cfusa:test` tag of its own -- REQ-DL-001's "100% tested" status is
+carried entirely by a file-header tag block and an unrelated sibling
+test, so deleting that one real test would very likely leave the gate
+green.
+
+Adds a "Writing a requirement" section to `CONTRIBUTING.md` codifying
+the atomic, one-shall-statement-per-id pattern this repo already uses
+well in most places (`REQ-PWM-002`-`009`/`-056`, `REQ-AUTH-010`/`011`)
+as the standard, with `REQ-AUTH-009` as the concrete counter-example,
+and requiring `//cfusa:req`/`//cfusa:test` tags to sit directly above
+the specific function/test they describe rather than only at a file
+header.
+
+Explicitly out of scope for this PR (per issue 519's own phased
+proposal): tightening `cfusa`'s `--func-coverage` semantics itself
+(a breaking change to every downstream x-RCP repo, needs its own
+issue against `cfusa`), and the actual category-by-category
+requirement-splitting audit (Method steps 2-4) -- issue 519 stays
+open, tracking that follow-on work.
+
+No `.c`/`.h` file touched, no `.fusa-reqs.json` entry touched, no
+requirement text or tag changed. Full 66-test suite green; ASan/UBSan
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`)
+clean; pinned `cfusa` (v0.5.54) `check`: 0 errors, 968 warnings/1312
+info, unchanged; `trace --req-coverage 100 --sec-tested 100`:
+1095/1095 (100%) requirements traced, 512/512 (100%) functions
+annotated -- byte-for-byte identical to the pre-change baseline, as
+expected for a docs-only change.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.414.0` to match `CMakeLists.txt`,
+per the new `version-sources-agree` gate this branch was rebased
+past (c-RCP-09, PR #529).
+
 ### v0.413.0 -- 2026-08-17 (c-RCP-09: fix SBOM/provenance/SPDX version drift)
 
 `sbom.json`, `provenance.json`, and the newest `c-RCP-*.spdx.json` had been
