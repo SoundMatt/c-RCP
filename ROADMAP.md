@@ -19106,6 +19106,45 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.408.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
+`REQ-LIFECYCLE-*`/`REQ-RMAP-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) exists.
+Scope is only the `REQ-LIFECYCLE-*`/`REQ-RMAP-*` prefixes; sibling
+batches (see the releases below) cover the rest of `.fusa-reqs.json`
+under their own PRs.
+
+Added `tc18_master_id` to 102 of the 120 requirements in scope that
+already carry a `tc18` citation, matched by section + table/figure
+number + a content check against the catalog entry's own summary
+(not on section number alone -- `§12.7.5` Table 20 alone owns 16 of
+this batch's requirements, all pointed at the same
+`TC18-12.7.5-001` table entry by content, and `REQ-RMAP-020`/`021`/
+`022`/`056`'s ascending-order clause is cited under two different
+section numbers across those four requirements yet is the same
+sentence character-for-character, matched to `TC18-12.7.8-006` on
+content). The 9 requirements with no `tc18` field at all were left
+alone, as expected. 9 requirements were left unset and flagged
+ambiguous rather than forced: `REQ-RMAP-004`/`005`/`006`/`007`/`008`
+(RETIRED, own `tc18` text says "citation found incorrect"),
+`REQ-RMAP-046` (RETIRED, `tc18` field is a cross-reference, not a
+citation), `REQ-RMAP-061` (spans two adjacent catalog MUSTs evenly),
+`REQ-RMAP-072` (an aggregate authorization check spanning four
+sections, no one catalog entry captures it), and
+`REQ-LIFECYCLE-024` (`LOCKED_MEM_ACCESS` has no exact catalog match
+-- the closest analog is named `LOCKED_CONFIG_ACCESS` there).
+
+Purely additive field; `cfusa` v0.5.54 `check`/`trace
+--req-coverage 100 --sec-tested 100` output confirmed unchanged
+(same 1095/1095 traced, 512/512 annotated, 0 errors) before and
+after. Full 66-test suite unchanged.
+
+**Next**: the remaining c-RCP categories' `tc18_master_id` batches,
+then the same pass across cpp-RCP/go-RCP/rust-RCP; follow-up on the
+9 flagged ambiguous entries above.
+
 ### v0.407.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
 `REQ-AVTP-*`/`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/`REQ-UDP-*`/
 `REQ-DL-*`/`REQ-L2-*`/`REQ-FRAG-*`)

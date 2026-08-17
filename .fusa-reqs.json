@@ -2681,7 +2681,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.2 Table 36, svr_lifecycle_state row (\"0x00: HW_UNCONFIGURED / 0x55: HW_CONFIGURED / 0xAA: RCP_CONFIGURED\"), TC18.txt L4388-4390 -- corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): the prior citation (\u00a712.3, TC18.txt L2063) pointed only to the sentence naming the three states, not to where their numeric wire values are actually defined; code itself (include/rcp/lifecycle.h:122-124) was always correct against the right source, only the citation was wrong"
+      "tc18": "\u00a713.7.1.2 Table 36, svr_lifecycle_state row (\"0x00: HW_UNCONFIGURED / 0x55: HW_CONFIGURED / 0xAA: RCP_CONFIGURED\"), TC18.txt L4388-4390 -- corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): the prior citation (\u00a712.3, TC18.txt L2063) pointed only to the sentence naming the three states, not to where their numeric wire values are actually defined; code itself (include/rcp/lifecycle.h:122-124) was always correct against the right source, only the citation was wrong",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-LIFECYCLE-002",
@@ -2692,7 +2693,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"All EPs configured to be used (ep_used set to 1) match to pin mapping in the HW_config... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2547-2550"
+      "tc18": "\u00a712.3.1.1 (\"All EPs configured to be used (ep_used set to 1) match to pin mapping in the HW_config... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2547-2550",
+      "tc18_master_id": "TC18-12.3.1.1-007"
     },
     {
       "id": "REQ-LIFECYCLE-003",
@@ -2703,7 +2705,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"All EPs configured to be used have a configuration for the request queue... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2548-2550"
+      "tc18": "\u00a712.3.1.1 (\"All EPs configured to be used have a configuration for the request queue... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2548-2550",
+      "tc18_master_id": "TC18-12.3.1.1-007"
     },
     {
       "id": "REQ-LIFECYCLE-004",
@@ -2714,7 +2717,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.1 (\"An endpoint may be used or not used in a specific instantiation of a RC Server\"), TC18.txt L3900"
+      "tc18": "\u00a713.1 (\"An endpoint may be used or not used in a specific instantiation of a RC Server\"), TC18.txt L3900",
+      "tc18_master_id": "TC18-13.1-002"
     },
     {
       "id": "REQ-LIFECYCLE-005",
@@ -2725,7 +2729,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Each EP used has at least one stream_id/byte_bus_id association... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2568-2572"
+      "tc18": "\u00a712.3.1.2 (\"Each EP used has at least one stream_id/byte_bus_id association... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2568-2572",
+      "tc18_master_id": "TC18-12.3.1.2-006"
     },
     {
       "id": "REQ-LIFECYCLE-006",
@@ -2736,7 +2741,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Each response stream configured is assigned to at least one request stream... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2570-2572"
+      "tc18": "\u00a712.3.1.2 (\"Each response stream configured is assigned to at least one request stream... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2570-2572",
+      "tc18_master_id": "TC18-12.3.1.2-006"
     },
     {
       "id": "REQ-LIFECYCLE-007",
@@ -2747,7 +2753,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: Each EP used has at least one stream_id/byte_bus_id association...\"), TC18.txt L2566-2568"
+      "tc18": "\u00a712.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: Each EP used has at least one stream_id/byte_bus_id association...\"), TC18.txt L2566-2568",
+      "tc18_master_id": "TC18-12.3.1.2-006"
     },
     {
       "id": "REQ-LIFECYCLE-008",
@@ -2758,7 +2765,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"...the life-cycle state can be advanced to HW_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2544-2550"
+      "tc18": "\u00a712.3.1.1 (\"...the life-cycle state can be advanced to HW_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2544-2550",
+      "tc18_master_id": "TC18-12.3.1.1-007"
     },
     {
       "id": "REQ-LIFECYCLE-009",
@@ -2769,7 +2777,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...the life-cycle state can be advanced to RCP_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2562-2572"
+      "tc18": "\u00a712.3.1.2 (\"...the life-cycle state can be advanced to RCP_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2562-2572",
+      "tc18_master_id": "TC18-12.3.1.2-006"
     },
     {
       "id": "REQ-LIFECYCLE-010",
@@ -2780,7 +2789,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request to the server functional configuration entry svr_lifecycle_state.\" -- no plausibility gate is described for this direction), TC18.txt L2574-2577"
+      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request to the server functional configuration entry svr_lifecycle_state.\" -- no plausibility gate is described for this direction), TC18.txt L2574-2577",
+      "tc18_master_id": "TC18-12.3.1.2-007"
     },
     {
       "id": "REQ-LIFECYCLE-011",
@@ -2791,7 +2801,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request...\"), TC18.txt L2574-2577 -- NOTE: TC18's Figure 17 state-transition chart additionally gates this specific demotion on all other EPs being idle (\"other EPs are not Idle -> send error response EPs_NOT_IDLE\", TC18.txt L2501-2502); CORRECTED 2026-08-16 (issue #456): that gate IS implemented -- rcp_lifecycle_transition()'s RCP_CONFIGURED->HW_UNCONFIGURED branch enforces it via the all_other_eps_idle parameter (src/lifecycle.c:189, `if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;`), landed under REQ-LIFECYCLE-022; see that requirement for the separate, still-open gap (EPs_NOT_IDLE has no corresponding numbered wire error code in \u00a712.9.6's table, so the local error is not yet wired to a wire response) -- not this requirement, which documents the snapshot-independence of the transition itself"
+      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request...\"), TC18.txt L2574-2577 -- NOTE: TC18's Figure 17 state-transition chart additionally gates this specific demotion on all other EPs being idle (\"other EPs are not Idle -> send error response EPs_NOT_IDLE\", TC18.txt L2501-2502); CORRECTED 2026-08-16 (issue #456): that gate IS implemented -- rcp_lifecycle_transition()'s RCP_CONFIGURED->HW_UNCONFIGURED branch enforces it via the all_other_eps_idle parameter (src/lifecycle.c:189, `if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;`), landed under REQ-LIFECYCLE-022; see that requirement for the separate, still-open gap (EPs_NOT_IDLE has no corresponding numbered wire error code in \u00a712.9.6's table, so the local error is not yet wired to a wire response) -- not this requirement, which documents the snapshot-independence of the transition itself",
+      "tc18_master_id": "TC18-12.3-002"
     },
     {
       "id": "REQ-LIFECYCLE-012",
@@ -2802,7 +2813,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"A request to advance the state directly to RCP_CONFIGURED will be rejected with an error response.\"), TC18.txt L2545 -- this sentence's own scope is HW_UNCONFIGURED->RCP_CONFIGURED specifically (skipping HW_CONFIGURED entirely), the one transition genuinely absent from Figure 17's own chart, TC18.txt L2432-2517 (page 51 of the current RC5 PDF) -- verified at pixel resolution against the diagram image directly, not just this cached text extraction, before correcting this entry 2026-08-16 (issue #455)."
+      "tc18": "\u00a712.3.1.1 (\"A request to advance the state directly to RCP_CONFIGURED will be rejected with an error response.\"), TC18.txt L2545 -- this sentence's own scope is HW_UNCONFIGURED->RCP_CONFIGURED specifically (skipping HW_CONFIGURED entirely), the one transition genuinely absent from Figure 17's own chart, TC18.txt L2432-2517 (page 51 of the current RC5 PDF) -- verified at pixel resolution against the diagram image directly, not just this cached text extraction, before correcting this entry 2026-08-16 (issue #455).",
+      "tc18_master_id": "TC18-12.3.1.1-006"
     },
     {
       "id": "REQ-LIFECYCLE-013",
@@ -2823,7 +2835,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted... Within the stream only requests ACF_ABB are supported for configuration, and all requests need to be directed to EP0 via the discovery byte_bus_id 0x00.\"), TC18.txt L2539-2541"
+      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted... Within the stream only requests ACF_ABB are supported for configuration, and all requests need to be directed to EP0 via the discovery byte_bus_id 0x00.\"), TC18.txt L2539-2541",
+      "tc18_master_id": "TC18-12.3.1.1-003"
     },
     {
       "id": "REQ-LIFECYCLE-015",
@@ -2834,7 +2847,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted... Within the stream only requests ACF_ABB are supported for configuration, and all requests need to be directed to EP0 via the discovery byte_bus_id 0x00.\"), TC18.txt L2539-2541 -- governs the avtp_subtype and byte_bus_id conditions only (both still produce RCP_LIFECYCLE_DROP); the acf_msg_type condition no longer does, since TC18 \u00a712.7's more specific EP0-scoped rule (\"REQUEST_REJECTED\", TC18.txt L2830) was found to override \u00a712.3.1.1's general \"all other requests are dropped without further response\" for exactly the case of a non-ABB message correctly addressed to EP0 -- see REQ-LIFECYCLE-033 (implemented) for the fix and full reconciliation between the two sections."
+      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted... Within the stream only requests ACF_ABB are supported for configuration, and all requests need to be directed to EP0 via the discovery byte_bus_id 0x00.\"), TC18.txt L2539-2541 -- governs the avtp_subtype and byte_bus_id conditions only (both still produce RCP_LIFECYCLE_DROP); the acf_msg_type condition no longer does, since TC18 \u00a712.7's more specific EP0-scoped rule (\"REQUEST_REJECTED\", TC18.txt L2830) was found to override \u00a712.3.1.1's general \"all other requests are dropped without further response\" for exactly the case of a non-ABB message correctly addressed to EP0 -- see REQ-LIFECYCLE-033 (implemented) for the fix and full reconciliation between the two sections.",
+      "tc18_master_id": "TC18-12.3.1.1-003"
     },
     {
       "id": "REQ-LIFECYCLE-016",
@@ -2845,7 +2859,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted and all others are dropped without further response.\" -- TSCF is one of those \"others\"), TC18.txt L2539"
+      "tc18": "\u00a712.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted and all others are dropped without further response.\" -- TSCF is one of those \"others\"), TC18.txt L2539",
+      "tc18_master_id": "TC18-12.3.1.1-002"
     },
     {
       "id": "REQ-LIFECYCLE-017",
@@ -2856,7 +2871,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140 -- same general rule as REQ-AVTP-014, now correctly scoped to RCP_CONFIGURED only; TC18 \u00a712.3.1.2 separately specifies HW_CONFIGURED drops TSCF unconditionally regardless of time-sync support, formally tracked at REQ-LIFECYCLE-028"
+      "tc18": "\u00a711.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140 -- same general rule as REQ-AVTP-014, now correctly scoped to RCP_CONFIGURED only; TC18 \u00a712.3.1.2 separately specifies HW_CONFIGURED drops TSCF unconditionally regardless of time-sync support, formally tracked at REQ-LIFECYCLE-028",
+      "tc18_master_id": "TC18-11.1-005"
     },
     {
       "id": "REQ-LIFECYCLE-018",
@@ -2867,7 +2883,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"In this state access to the HW configuration of the RC Server shall have been concluded and as such all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554; \u00a712.3.1.1 (\"All configurations must be run via the stream which was used for discovery.\"), TC18.txt L2537, the basis for the HW_UNCONFIGURED via_discovery_stream gate (REQ-LIFECYCLE-026/035)"
+      "tc18": "\u00a712.3.1.2 (\"In this state access to the HW configuration of the RC Server shall have been concluded and as such all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554; \u00a712.3.1.1 (\"All configurations must be run via the stream which was used for discovery.\"), TC18.txt L2537, the basis for the HW_UNCONFIGURED via_discovery_stream gate (REQ-LIFECYCLE-026/035)",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-LIFECYCLE-019",
@@ -2878,7 +2895,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602; \u00a712.3.1.2 (TC18.txt L2552), the basis for HW_CONFIGURED's wider via_discovery_stream allowance (REQ-LIFECYCLE-030/036)"
+      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602; \u00a712.3.1.2 (TC18.txt L2552), the basis for HW_CONFIGURED's wider via_discovery_stream allowance (REQ-LIFECYCLE-030/036)",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-LIFECYCLE-020",
@@ -2889,7 +2907,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3 (\"Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables (W*: write prohibited in depending on lifecycle state.)\"), TC18.txt L2601-2602 -- TC18's W* marker is general; c-RCP's split into FUNCTIONAL_W (conditionally writable via authorization) versus FUNCTIONAL_W_STAR (unconditionally locked once RCP_CONFIGURED) is this implementation's own refinement of which W* fields fall into which case, not itself named in the cited text"
+      "tc18": "\u00a712.3.1.3 (\"Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables (W*: write prohibited in depending on lifecycle state.)\"), TC18.txt L2601-2602 -- TC18's W* marker is general; c-RCP's split into FUNCTIONAL_W (conditionally writable via authorization) versus FUNCTIONAL_W_STAR (unconditionally locked once RCP_CONFIGURED) is this implementation's own refinement of which W* fields fall into which case, not itself named in the cited text",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-SRV-001",
@@ -2946,7 +2965,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164"
+      "tc18": "\u00a712.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164",
+      "tc18_master_id": "TC18-12.3.1.1-003"
     },
     {
       "id": "REQ-RMAP-002",
@@ -2957,7 +2977,8 @@
       "asil": "ASIL-A",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164"
+      "tc18": "\u00a712.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164",
+      "tc18_master_id": "TC18-12.3.1.1-003"
     },
     {
       "id": "REQ-RMAP-003",
@@ -2968,7 +2989,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.2 Table 36 (\"svr_root_client_index... 0: no stream has 'root' write access\"), TC18.txt L4385-4387"
+      "tc18": "\u00a713.7.1.2 Table 36 (\"svr_root_client_index... 0: no stream has 'root' write access\"), TC18.txt L4385-4387",
+      "tc18_master_id": "TC18-13.7.1.2-002"
     },
     {
       "id": "REQ-RMAP-004",
@@ -3034,7 +3056,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-RMAP-010",
@@ -3045,7 +3068,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-RMAP-011",
@@ -3056,7 +3080,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183"
+      "tc18": "\u00a712.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183",
+      "tc18_master_id": "TC18-12.3.1.2-003"
     },
     {
       "id": "REQ-RMAP-012",
@@ -3067,7 +3092,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183"
+      "tc18": "\u00a712.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183",
+      "tc18_master_id": "TC18-12.3.1.2-003"
     },
     {
       "id": "REQ-RMAP-013",
@@ -3148,7 +3174,8 @@
       "asil": "ASIL-A",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
+      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)",
+      "tc18_master_id": "TC18-12.7.8-006"
     },
     {
       "id": "REQ-RMAP-021",
@@ -3159,7 +3186,8 @@
       "asil": "ASIL-A",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
+      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)",
+      "tc18_master_id": "TC18-12.7.8-006"
     },
     {
       "id": "REQ-RMAP-022",
@@ -3170,7 +3198,8 @@
       "asil": "ASIL-A",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
+      "tc18": "\u00a713.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)",
+      "tc18_master_id": "TC18-12.7.8-006"
     },
     {
       "id": "REQ-DISC-001",
@@ -9973,7 +10002,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.3, TC18.txt L2492-L2495 and L2504-L2506 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.3, TC18.txt L2492-L2495 and L2504-L2506 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.3-002"
     },
     {
       "id": "REQ-LIFECYCLE-023",
@@ -9984,7 +10014,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3, TC18.txt L2485-L2488 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517; directly confirmed against the rendered PDF page image, not just text extraction)"
+      "tc18": "\u00a712.3, TC18.txt L2485-L2488 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517; directly confirmed against the rendered PDF page image, not just text extraction)",
+      "tc18_master_id": "TC18-12.3-002"
     },
     {
       "id": "REQ-LIFECYCLE-024",
@@ -10006,7 +10037,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.3, TC18.txt L2476-L2480 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.3, TC18.txt L2476-L2480 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.3-002"
     },
     {
       "id": "REQ-LIFECYCLE-026",
@@ -10017,7 +10049,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1, TC18.txt L2537"
+      "tc18": "\u00a712.3.1.1, TC18.txt L2537",
+      "tc18_master_id": "TC18-12.3.1.1-001"
     },
     {
       "id": "REQ-LIFECYCLE-027",
@@ -10028,7 +10061,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.1, TC18.txt L2543 (repeated \u00a712.3.1.2 L2557, \u00a712.3.1.3 L2599)"
+      "tc18": "\u00a712.3.1.1, TC18.txt L2543 (repeated \u00a712.3.1.2 L2557, \u00a712.3.1.3 L2599)",
+      "tc18_master_id": "TC18-12.3.1.1-005"
     },
     {
       "id": "REQ-LIFECYCLE-028",
@@ -10039,7 +10073,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2574-L2575"
+      "tc18": "\u00a712.3.1.2, TC18.txt L2574-L2575",
+      "tc18_master_id": "TC18-12.3.1.2-002"
     },
     {
       "id": "REQ-LIFECYCLE-029",
@@ -10050,7 +10085,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2556-L2557"
+      "tc18": "\u00a712.3.1.2, TC18.txt L2556-L2557",
+      "tc18_master_id": "TC18-12.3.1.2-002"
     },
     {
       "id": "REQ-LIFECYCLE-030",
@@ -10061,7 +10097,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2, TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-LIFECYCLE-031",
@@ -10072,7 +10109,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2562-L2565 and L2574-L2577 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.3.1.2, TC18.txt L2562-L2565 and L2574-L2577 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.3.1.2-005"
     },
     {
       "id": "REQ-LIFECYCLE-032",
@@ -10083,7 +10121,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2561"
+      "tc18": "\u00a712.3.1.2, TC18.txt L2561",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-LIFECYCLE-033",
@@ -10094,7 +10133,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7 Configuration, TC18.txt L2827-2830"
+      "tc18": "\u00a712.7 Configuration, TC18.txt L2827-2830",
+      "tc18_master_id": "TC18-12.7-002"
     },
     {
       "id": "REQ-LIFECYCLE-034",
@@ -10105,7 +10145,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7 Configuration, TC18.txt L2833-L2834 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.7 Configuration, TC18.txt L2833-L2834 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.7-003"
     },
     {
       "id": "REQ-LIFECYCLE-035",
@@ -10116,7 +10157,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.2 Configuration in HW_UNCONFIGURED state, TC18.txt L2868-2870"
+      "tc18": "\u00a712.7.2 Configuration in HW_UNCONFIGURED state, TC18.txt L2868-2870",
+      "tc18_master_id": "TC18-12.7.2-001"
     },
     {
       "id": "REQ-LIFECYCLE-036",
@@ -10127,7 +10169,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.3 Configuration in HW_CONFIGURED state, TC18.txt L2872-2874"
+      "tc18": "\u00a712.7.3 Configuration in HW_CONFIGURED state, TC18.txt L2872-2874",
+      "tc18_master_id": "TC18-12.7.3-001"
     },
     {
       "id": "REQ-LIFECYCLE-037",
@@ -10138,7 +10181,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.4 Configuration in RCP_CONFIGURED state, TC18.txt L2876-2879"
+      "tc18": "\u00a712.7.4 Configuration in RCP_CONFIGURED state, TC18.txt L2876-2879",
+      "tc18_master_id": "TC18-12.7.4-001"
     },
     {
       "id": "REQ-LIFECYCLE-038",
@@ -10149,7 +10193,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: ... For each configured stream at least one stream_id/byte_bus_id is configured ... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2566-2572"
+      "tc18": "\u00a712.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: ... For each configured stream at least one stream_id/byte_bus_id is configured ... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2566-2572",
+      "tc18_master_id": "TC18-12.3.1.2-006"
     },
     {
       "id": "REQ-LIFECYCLE-039",
@@ -10160,7 +10205,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.3, TC18.txt L2492-L2495 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517; page 51 of OA_TC18_specification_v_0.5.1_RC_5_3624.pdf) -- verified directly against the primary-source PDF image at pixel resolution (not just the pre-existing text extraction, which loses the diagram's own arrow topology), independently of issue #455's own initial report."
+      "tc18": "\u00a712.3, TC18.txt L2492-L2495 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517; page 51 of OA_TC18_specification_v_0.5.1_RC_5_3624.pdf) -- verified directly against the primary-source PDF image at pixel resolution (not just the pre-existing text extraction, which loses the diagram's own arrow topology), independently of issue #455's own initial report.",
+      "tc18_master_id": "TC18-12.3-002"
     },
     {
       "id": "REQ-PWM-055",
@@ -10409,7 +10455,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.3.1.1/\u00a712.3.1.2, TC18.txt L2167, L2186, L2198 (also \u00a712.4.1 L2291)"
+      "tc18": "\u00a712.3.1.1/\u00a712.3.1.2, TC18.txt L2167, L2186, L2198 (also \u00a712.4.1 L2291)",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-RMAP-024",
@@ -10420,7 +10467,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7 Configuration, TC18.txt L2452-2453"
+      "tc18": "\u00a712.7 Configuration, TC18.txt L2452-2453",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-025",
@@ -10431,7 +10479,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2520-2521, L2661, L2664-2665"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2520-2521, L2661, L2664-2665",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-026",
@@ -10442,7 +10491,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2918-2922"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2918-2922",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-027",
@@ -10453,7 +10503,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2543-2547"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2543-2547",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-028",
@@ -10464,7 +10515,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2548-2550"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2548-2550",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-029",
@@ -10475,7 +10527,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2551-2553"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2551-2553",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-030",
@@ -10486,7 +10539,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2554-2560 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 51, and \u00a712.9.1.1, page 64 (this milestone)"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2554-2560 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 51, and \u00a712.9.1.1, page 64 (this milestone)",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-031",
@@ -10497,7 +10551,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2562"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2562",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-032",
@@ -10508,7 +10563,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2564-2566"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2564-2566",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-033",
@@ -10519,7 +10575,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2584-2586, L2617"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2584-2586, L2617",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-034",
@@ -10530,7 +10587,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2587-2598"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2587-2598",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-035",
@@ -10541,7 +10599,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2599"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2599",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-036",
@@ -10552,7 +10611,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2982-2985 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf Table 20"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2982-2985 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf Table 20",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-037",
@@ -10563,7 +10623,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2604-2609 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 52"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2604-2609 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 52",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-038",
@@ -10574,7 +10635,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2610-2615 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 52"
+      "tc18": "\u00a712.7.5 Table 20, TC18.txt L2610-2615 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 20, page 52",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-039",
@@ -10585,7 +10647,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20 (continued), TC18.txt L2635-2659 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf Table 20, p.61 (svr_device_specific_cfg_ptr/_capacity immediately follow svr_security_cfg_capacity; address column confirmed blank in the primary source itself for this whole continuation page; relative addresses INFERRED, not directly read)"
+      "tc18": "\u00a712.7.5 Table 20 (continued), TC18.txt L2635-2659 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC_5_3624.pdf Table 20, p.61 (svr_device_specific_cfg_ptr/_capacity immediately follow svr_security_cfg_capacity; address column confirmed blank in the primary source itself for this whole continuation page; relative addresses INFERRED, not directly read)",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-040",
@@ -10596,7 +10659,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6 HW pin mapping configuration, TC18.txt L2691-2695"
+      "tc18": "\u00a712.7.6 HW pin mapping configuration, TC18.txt L2691-2695",
+      "tc18_master_id": "TC18-12.7.6-002"
     },
     {
       "id": "REQ-RMAP-041",
@@ -10607,7 +10671,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6 Table 21: HW_config, TC18.txt L2698-2717"
+      "tc18": "\u00a712.7.6 Table 21: HW_config, TC18.txt L2698-2717",
+      "tc18_master_id": "TC18-12.7.6-003"
     },
     {
       "id": "REQ-RMAP-042",
@@ -10618,7 +10683,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6 Table 22: IO-pin properties, TC18.txt L3096-3145"
+      "tc18": "\u00a712.7.6 Table 22: IO-pin properties, TC18.txt L3096-3145",
+      "tc18_master_id": "TC18-12.7.6-005"
     },
     {
       "id": "REQ-RMAP-043",
@@ -10629,7 +10695,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6, TC18.txt L2720-2722"
+      "tc18": "\u00a712.7.6, TC18.txt L2720-2722",
+      "tc18_master_id": "TC18-12.7.6-004"
     },
     {
       "id": "REQ-RMAP-044",
@@ -10640,7 +10707,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6 Table 23: Enumeration of signals at endpoints, TC18.txt L2779-2820"
+      "tc18": "\u00a712.7.6 Table 23: Enumeration of signals at endpoints, TC18.txt L2779-2820",
+      "tc18_master_id": "TC18-12.7.6-006"
     },
     {
       "id": "REQ-RMAP-045",
@@ -10651,7 +10719,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.6 Table 23 + Table 21 row hw_ep_pin_nr, TC18.txt L2704, L2764, L2779-2820"
+      "tc18": "\u00a712.7.6 Table 23 + Table 21 row hw_ep_pin_nr, TC18.txt L2704, L2764, L2779-2820",
+      "tc18_master_id": "TC18-12.7.6-006"
     },
     {
       "id": "REQ-RMAP-046",
@@ -10673,7 +10742,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2859-L2860"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2859-L2860",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-048",
@@ -10684,7 +10754,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2912-L2916"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2912-L2916",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-049",
@@ -10695,7 +10766,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2917-L2921"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2917-L2921",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-050",
@@ -10706,7 +10778,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2855-L2857"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2855-L2857",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-051",
@@ -10717,7 +10790,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7, TC18.txt L2930-L2931"
+      "tc18": "\u00a712.7.7, TC18.txt L2930-L2931",
+      "tc18_master_id": "TC18-12.7.7-002"
     },
     {
       "id": "REQ-RMAP-052",
@@ -10728,7 +10802,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8 Table 25, TC18.txt L3330, L3331, L3332"
+      "tc18": "\u00a712.7.8 Table 25, TC18.txt L3330, L3331, L3332",
+      "tc18_master_id": "TC18-12.7.8-001"
     },
     {
       "id": "REQ-RMAP-053",
@@ -10739,7 +10814,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8 Table 25/26, TC18.txt L3332, L3345"
+      "tc18": "\u00a712.7.8 Table 25/26, TC18.txt L3332, L3345",
+      "tc18_master_id": "TC18-12.7.8-001"
     },
     {
       "id": "REQ-RMAP-054",
@@ -10750,7 +10826,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L3361"
+      "tc18": "\u00a712.7.8, TC18.txt L3361",
+      "tc18_master_id": "TC18-12.7.8-004"
     },
     {
       "id": "REQ-RMAP-055",
@@ -10761,7 +10838,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L3362"
+      "tc18": "\u00a712.7.8, TC18.txt L3362",
+      "tc18_master_id": "TC18-12.7.8-005"
     },
     {
       "id": "REQ-RMAP-056",
@@ -10772,7 +10850,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L3364-L3367 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
+      "tc18": "\u00a712.7.8, TC18.txt L3364-L3367 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)",
+      "tc18_master_id": "TC18-12.7.8-006"
     },
     {
       "id": "REQ-RMAP-057",
@@ -10783,7 +10862,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L3370"
+      "tc18": "\u00a712.7.8, TC18.txt L3370",
+      "tc18_master_id": "TC18-12.7.8-008"
     },
     {
       "id": "REQ-RMAP-058",
@@ -10794,7 +10874,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L3384"
+      "tc18": "\u00a712.7.8, TC18.txt L3384",
+      "tc18_master_id": "TC18-12.7.8-011"
     },
     {
       "id": "REQ-RMAP-059",
@@ -10805,7 +10886,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.9, TC18.txt L3403-L3404"
+      "tc18": "\u00a712.7.9, TC18.txt L3403-L3404",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-RMAP-060",
@@ -10816,7 +10898,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.9 Table 27, TC18.txt L3425"
+      "tc18": "\u00a712.7.9 Table 27, TC18.txt L3425",
+      "tc18_master_id": "TC18-12.7.9-007"
     },
     {
       "id": "REQ-RMAP-061",
@@ -10838,7 +10921,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.9, TC18.txt L3408-L3409"
+      "tc18": "\u00a712.7.9, TC18.txt L3408-L3409",
+      "tc18_master_id": "TC18-12.7.9-003"
     },
     {
       "id": "REQ-RMAP-063",
@@ -10849,7 +10933,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.9, TC18.txt L3410-L3413 (and Table 27 row 0x0006, L3432-3436)"
+      "tc18": "\u00a712.7.9, TC18.txt L3410-L3413 (and Table 27 row 0x0006, L3432-3436)",
+      "tc18_master_id": "TC18-12.7.9-004"
     },
     {
       "id": "REQ-RMAP-064",
@@ -10860,7 +10945,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.9, TC18.txt L3414-L3415 (and Table 27 row 0x0008, L3437-3438)"
+      "tc18": "\u00a712.7.9, TC18.txt L3414-L3415 (and Table 27 row 0x0008, L3437-3438)",
+      "tc18_master_id": "TC18-12.7.9-005"
     },
     {
       "id": "REQ-RMAP-065",
@@ -10871,7 +10957,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7.9, TC18.txt L3416-L3417"
+      "tc18": "\u00a712.7.9, TC18.txt L3416-L3417",
+      "tc18_master_id": "TC18-12.7.9-006"
     },
     {
       "id": "REQ-RMAP-066",
@@ -10882,7 +10969,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L4392-4393"
+      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L4392-4393",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-RMAP-067",
@@ -10893,7 +10981,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L4370-4395"
+      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L4370-4395",
+      "tc18_master_id": "TC18-13.7.1.2-001"
     },
     {
       "id": "REQ-RMAP-068",
@@ -10904,7 +10993,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.2, TC18.txt L4420-L4425 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a713.7.1.2, TC18.txt L4420-L4425 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-13.7.1.2-007"
     },
     {
       "id": "REQ-RMAP-069",
@@ -10915,7 +11005,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.2, TC18 spec PDF 0.5.1_RC5 p.92 (formula corrected, NXP_101/BE44 tracked-change; superseding TC18.txt L4035-4036 from the 0.5.1_RC baseline)"
+      "tc18": "\u00a713.7.1.2, TC18 spec PDF 0.5.1_RC5 p.92 (formula corrected, NXP_101/BE44 tracked-change; superseding TC18.txt L4035-4036 from the 0.5.1_RC baseline)",
+      "tc18_master_id": "TC18-13.7.1.2-005"
     },
     {
       "id": "REQ-RMAP-070",
@@ -10926,7 +11017,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2, TC18.txt L2184 (same basis as REQ-RMAP-009 -- this entry covers the writer_ctx construction contract as a whole, not a new TC18 clause)"
+      "tc18": "\u00a712.3.1.2, TC18.txt L2184 (same basis as REQ-RMAP-009 -- this entry covers the writer_ctx construction contract as a whole, not a new TC18 clause)",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-RMAP-071",
@@ -10937,7 +11029,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L3252-L3256 (same citation as REQ-E2E-030's own -- this entry covers the register-map content-modeling half, REQ-E2E-030 covers the runtime-decision half) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L3252-L3256 (same citation as REQ-E2E-030's own -- this entry covers the register-map content-modeling half, REQ-E2E-030 covers the runtime-decision half) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-RMAP-072",
@@ -10959,7 +11052,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3564 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3564 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-074",
@@ -10970,7 +11064,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3565-3569 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3565-3569 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-075",
@@ -10981,7 +11076,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3570-3574 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3570-3574 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-076",
@@ -10992,7 +11088,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3555-3559 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3555-3559 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-077",
@@ -11003,7 +11100,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3562 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3562 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-078",
@@ -11014,7 +11112,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3534-3582 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3534-3582 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-079",
@@ -11025,7 +11124,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.2 Table 28/31 + \u00a713.7.1.2, TC18.txt L3932-3980 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a713.2 Table 28/31 + \u00a713.7.1.2, TC18.txt L3932-3980 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-13.2-001"
     },
     {
       "id": "REQ-RMAP-080",
@@ -11036,7 +11136,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.5 Table 20 + \u00a713.2 Table 28/31, TC18.txt L2600-2603 + L3534-3582 (RC5 baseline; identical on RC1)"
+      "tc18": "\u00a712.7.5 Table 20 + \u00a713.2 Table 28/31, TC18.txt L2600-2603 + L3534-3582 (RC5 baseline; identical on RC1)",
+      "tc18_master_id": "TC18-12.7.5-001"
     },
     {
       "id": "REQ-RMAP-081",
@@ -11047,7 +11148,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "\u00a713.2 (prose immediately below Table 31), TC18.txt L3982-3983; TC18_spec_defects_report.md item 22 (and its _audited/_quadruple_checked review copies)"
+      "tc18": "\u00a713.2 (prose immediately below Table 31), TC18.txt L3982-3983; TC18_spec_defects_report.md item 22 (and its _audited/_quadruple_checked review copies)",
+      "tc18_master_id": "TC18-13.2-003"
     },
     {
       "id": "REQ-SEQ-012",
