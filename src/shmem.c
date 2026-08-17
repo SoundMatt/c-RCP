@@ -166,10 +166,14 @@ static void shmem_side_destroy(rcp_avtp_transport_t *self)
         rcp_mutex_destroy(&c->mu);
         rcp_cond_destroy(&c->cv);
         free(c->a_to_b_items);
+        c->a_to_b_items = NULL;
         free(c->b_to_a_items);
+        c->b_to_a_items = NULL;
         free(c);
+        c = NULL;
     }
     free(s);
+    s = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t shmem_side_vtable = {
@@ -207,8 +211,11 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
     b_to_a_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*b_to_a_items));
     if (!a_to_b_items || !b_to_a_items) {
         free(a_to_b_items);
+        a_to_b_items = NULL;
         free(b_to_a_items);
+        b_to_a_items = NULL;
         free(c);
+        c = NULL;
         return RCP_SHMEM_ERR_ALLOC;
     }
     c->a_to_b_items = a_to_b_items;
@@ -223,12 +230,17 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
     b = (rcp_shmem_side_t *)calloc(1, sizeof(*b));
     if (!a || !b) {
         free(a);
+        a = NULL;
         free(b);
+        b = NULL;
         free(c->a_to_b_items);
+        c->a_to_b_items = NULL;
         free(c->b_to_a_items);
+        c->b_to_a_items = NULL;
         rcp_mutex_destroy(&c->mu);
         rcp_cond_destroy(&c->cv);
         free(c);
+        c = NULL;
         return RCP_SHMEM_ERR_ALLOC;
     }
 
