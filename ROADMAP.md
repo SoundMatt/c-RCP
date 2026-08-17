@@ -19213,6 +19213,33 @@ output before/after (aside from the run timestamp) -- 1095/1095
 traced, 512/512 functions annotated, 968/1312 warnings/info, all
 unchanged. Full 66/66 test suite unchanged.
 
+### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` backfill,
+`REQ-E2E-*`/`REQ-ACF-*`/`REQ-PWRMODE-*`/`REQ-WIREERR-*`)
+
+Adds `tc18_master_id` (RCP-ARCHITECTURE.md canonical choice #6) to
+`.fusa-reqs.json` entries in these four categories, now that the
+447-entry master TC18 requirement catalog exists
+(`RELAY/docs/tc18-master-catalog.json`) for cross-repo reconciliation
+to reference. Purely additive: no other field and no source file
+touched.
+
+113 requirements in scope; 7 have no `tc18` citation at all
+(implementation-only plumbing with no TC18 spec basis) and were
+correctly left alone. Of the 106 that do carry a citation: 80 matched
+a single master-catalog entry with high confidence and got
+`tc18_master_id` added; 26 were left unset and flagged for follow-up
+rather than forced onto an entry that didn't cleanly fit -- either
+because the citation genuinely spans more than one catalog clause, or
+because this codebase's own prior investigations (task #97,
+`REQ-E2E-016`-`019`/`027`'s `rx_safety_measure`/`rx_wd_info_enable`
+RC5-reserved-field gap; `REQ-E2E-012`/`013`'s noted citation drift)
+already flag the underlying citation as unresolved.
+
+66/66 tests unchanged. `cfusa check`/`trace` (pinned v0.5.54): 0
+errors, 968/1312 warnings/info unchanged; 1095/1095 traced unchanged
+-- confirms `cfusa` tolerates the new field without affecting any
+reported count.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked
