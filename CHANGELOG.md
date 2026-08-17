@@ -34,6 +34,135 @@ the rationale.
 
 ## Releases
 
+### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the twelve remaining table numbers, closes out the issue's own tracked backlog)
+
+Tenth pass on the RC1->RC5 table-number citation-drift audit
+(c-RCP-AUDIT-08). Worked the full "(c)" list PR #504's own
+top-to-bottom classification sweep left as genuinely unverified --
+`Table 55`, `37`, `40`, `57`, `19`, `59`, `49`, `15`, `34`, `17`,
+`14`, `16` -- every occurrence individually read against a fresh
+`pdftotext -layout` extraction of both the RC1 and RC5 PDFs, with
+the same discipline PR #501 used for `Table 33` and PR #504 used for
+its own five assigned numbers.
+
+- **`Table 55` -> `58`** (`src/ep_iseled.c:122`): the classic
+  "`tc18` field correct, narrative doc-comment lagging" pattern
+  again -- `REQ-ISELED-007`/`009`/`029`'s own `tc18` fields already
+  correctly cite `§13.7.12.2 Table 58` for `iseled_use_rcv_clk`, but
+  this one doc comment was never updated to match. RC5-native
+  `Table 55` ("lin functional configuration") is unrelated and
+  correctly cited everywhere else (`ep_lin.h`, `.fusa-reqs.json`).
+- **`Table 37`**: fully converged already -- all 14 occurrences are
+  either RC5-native `§13.7.1.3` RC-Server PTP trigger-signal content,
+  or the already-established `Table 37/40` WakeUp dual notation. No
+  changes.
+- **`Table 40`**: fully converged already -- all 13 occurrences are
+  either the established `Table 40 (RC1)/Table 43 (RC5)` GPIO dual
+  notation or RC5-native WakeUp source-pin-configuration content. No
+  changes.
+- **`Table 57` -> `60`** (`.fusa-reqs.json` `REQ-MDIO-001`/`002` text
+  fields): same lagging-narrative pattern -- both requirements'
+  `text` fields still cited RC1's stale `§13.7.13.3 Table 57` for
+  `mdio_address`/`mdio_mode` content that the sibling `REQ-MDIO-021`/
+  `022` entries (and `REQ-MDIO-001`'s own `tc18` field) already
+  correctly cite as `Table 60`. Also found and fixed an adjacent,
+  previously line-wrap-hidden bug encountered in the same
+  investigation: `include/rcp/ep_can.h:156` cited RC1's stale
+  `Table 54` for the six CAN FrameFormat variants, one sentence
+  before the same paragraph's own already-correct `Table 57`
+  references -- the stale digit had escaped every prior pass's plain
+  `grep` because "Table" and "54" fell on separate wrapped comment
+  lines, the exact miss-class PR #503/#504 previously fixed
+  elsewhere. Confirmed via fresh extraction (`Table 57: can frame
+  formats`, RC5) before fixing.
+- **`Table 19` -> `21`** (`include/rcp/config.h:112`): `hw_pin_type`'s
+  own field-naming comment ("renamed from `pin_property` to match the
+  wire register's own name") still cited RC1's stale `Table 19`
+  (`HW_config`); the identically-worded sibling comment in
+  `include/rcp/regmap.h:1684` already correctly says `Table 21`.
+  Fixed to match. `src/regmap.c:825`'s own `Table 19/21` dual
+  notation, and every `.fusa-reqs.json` `Table 19` citing genuinely
+  RC5-native "Discovery response" content, were already correct and
+  untouched.
+- **`Table 59`**: fully converged already -- all 11 occurrences cite
+  RC5-native `§13.7.13.2` MDIO functional-configuration content; RC1
+  has no native `Table 59` at all (its own sequence tops out at
+  `Table 57`), so no reused-digit case exists for this number. No
+  changes.
+- **`Table 49`**: fully converged already -- all 6 occurrences cite
+  RC5-native `§13.7.7.2` i2c functional-configuration content,
+  several already explicitly noting "RC5 renumbering of RC1's
+  `Table 46`". No changes.
+- **`Table 15` -> `17`** (`include/rcp/acf.h:250,294`,
+  `.fusa-reqs.json` `REQ-ACF-002` text field): three occurrences
+  citing RC1's stale `Table 15` ("Usage of ABB/GBB message for
+  responses") for `§11.3`/`§11.3.1-§11.3.4` Acknowledge/Write/Read/
+  Error response-classification content -- the RC5-native meaning of
+  this content is `Table 17`, already correctly cited by
+  `REQ-ACF-002`'s own `tc18` field ("Table 16/17") and by
+  `rcp_acf_classify_response()`'s own doc comment two paragraphs
+  away. Every remaining bare `Table 15` occurrence (`request_cancel.h`
+  /`.c`, `.fusa-reqs.json`) correctly cites the unrelated, already
+  RC5-native `§11.2.3.3` "cancel a single, specific request" content
+  established by PR #505 -- left untouched.
+- **`Table 34`**: fully converged already -- all 3 remaining
+  occurrences (after PR #505's own `regmap.c` typo fix) are genuine,
+  content-verified `§13.6` CRC32 Polynomial citations (Polynomial
+  `0xF4ACFB13`, Width 32bit, Initial/Final XOR `0xFFFFFFFF`, both
+  reflections `TRUE` -- confirmed field-for-field against the fresh
+  RC5 extraction), correctly distinct from RC1's own, different
+  `Table 34` ("RC Server trigger signals", already resolved as
+  `Table 37`). No changes.
+- **`Table 17`**: fully converged as of this pass -- the pre-existing
+  4 correct occurrences plus the 3 fixed above from the `Table 15`
+  slice, all confirmed `§11.3` "Usage of ABB/GBB message for
+  responses" content.
+- **`Table 14`**: fully converged already -- all 11 occurrences
+  correctly cite `§11.2.3.2` clear-non-safestate content (RC5-native,
+  matching PR #505's own cancel-family fix). No stray RC1-native
+  "types of responses" mislabeling found. No changes.
+- **`Table 16`**: fully converged already -- all 3 occurrences
+  correctly cite `§11.3`'s own `Table 16` ("Types of responses":
+  Acknowledge/Write Response/Read Response/Error Response), distinct
+  from `Table 17`'s field-layout table in the same section. No
+  changes.
+
+### Before/after census (this pass's touched numbers only)
+
+```
+before: 14 Table 55,  19 Table 58,  12 Table 57,  27 Table 60,
+        12 Table 19,  13 Table 21,  10 Table 15,   4 Table 17,
+        23 Table 54
+after:  13 Table 55,  20 Table 58,  10 Table 57,  29 Table 60,
+        11 Table 19,  14 Table 21,   7 Table 15,   7 Table 17,
+        23 Table 54 (unchanged -- the ep_can.h fix was a
+        line-wrap-hidden occurrence `grep -roh "Table [0-9]+"` never
+        counted on either side, since "Table" and "54"/"57" fall on
+        separate physical comment lines)
+```
+Every fix in this pass is a citation-text-only substitution; trace
+coverage counts are unchanged throughout.
+
+### Closing status for this issue's own tracked backlog
+
+Ran a full top-to-bottom `grep -roh "Table [0-9]\+" include/ src/
+.fusa-reqs.json | sort | uniq -c | sort -rn` after this pass and
+cross-referenced every number currently in the codebase against
+every prior pass's own comment in this issue's history (ten PRs:
+`#494`, `#495`, `#499`, `#500`, `#501`, `#502`, `#503`, `#504`,
+`#505`, plus this one). Every table number the census currently
+turns up has now been individually, exhaustively verified by at
+least one pass -- none remain in the "never individually checked"
+state the issue's own background section originally worried about.
+This is the last item on PR #504's own explicit "(c)" list; no
+further table-number census work is currently known to remain open
+for this issue.
+
+66/66 tests, unchanged. `cfusa check` (pinned v0.5.54, run from repo
+root): 0 errors, 968/1312 warnings/info, unchanged. `cfusa trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 traced and tested,
+unchanged.
+
 ### v0.399.0 -- 2026-08-16 (issue #341: cancel-family `Table 11`/`12`/`13` cluster, `ep_adc.c` `Table 50`->`53`, `regmap.c` `Table 34`->`35` fixes)
 
 Ninth pass on issue #341. Fixed the three concrete, verified-but-
