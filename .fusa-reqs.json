@@ -2509,7 +2509,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Figure 7's fixed byte_message_info header, TC18.txt L1142-1149"
+      "tc18": "\u00a711.2.1 Figure 7's fixed byte_message_info header, TC18.txt L1142-1149",
+      "tc18_master_id": "TC18-11.2.1-004"
     },
     {
       "id": "REQ-ACF-006",
@@ -2520,7 +2521,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Table 4 (\"acf_msg_length: number of quadlets of data contained in this message\"), TC18.txt L1154"
+      "tc18": "\u00a711.2.1 Table 4 (\"acf_msg_length: number of quadlets of data contained in this message\"), TC18.txt L1154",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-007",
@@ -2553,7 +2555,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Table 4's acf_msg_length field, TC18.txt L1154"
+      "tc18": "\u00a711.2.1 Table 4's acf_msg_length field, TC18.txt L1154",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-010",
@@ -2564,7 +2567,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170"
+      "tc18": "\u00a711.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-011",
@@ -2596,7 +2600,8 @@
       "asil": "ASIL-A",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Figure 7 (acf_msg_type is byte 0 of byte_message_info), TC18.txt L1142-1153"
+      "tc18": "\u00a711.2.1 Figure 7 (acf_msg_type is byte 0 of byte_message_info), TC18.txt L1142-1153",
+      "tc18_master_id": "TC18-11.2.1-004"
     },
     {
       "id": "REQ-ACF-014",
@@ -2618,7 +2623,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170"
+      "tc18": "\u00a711.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-016",
@@ -2629,7 +2635,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1 Figure 7 / Table 4 (\"ABB message standard request\" / \"Usage of ABB message for standard requests\"), TC18.txt L1142-1170"
+      "tc18": "\u00a711.2.1 Figure 7 / Table 4 (\"ABB message standard request\" / \"Usage of ABB message for standard requests\"), TC18.txt L1142-1170",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-LIFECYCLE-001",
@@ -6537,7 +6544,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 Table 34 (\"CRC32 Polynomial\": Polynomial=0xF4ACFB13, Width=32bit, Initial Value=0xFFFFFFFF, Final XOR=0xFFFFFFFF, Input reflection=TRUE, Output reflection=TRUE), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87 (TC18.txt's own \"Table 31\" reflects the bundled file's pre-RC5 pagination; the parameter values themselves are unchanged, per ROADMAP.md's own prior confirmation)"
+      "tc18": "\u00a713.6 Table 34 (\"CRC32 Polynomial\": Polynomial=0xF4ACFB13, Width=32bit, Initial Value=0xFFFFFFFF, Final XOR=0xFFFFFFFF, Input reflection=TRUE, Output reflection=TRUE), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87 (TC18.txt's own \"Table 31\" reflects the bundled file's pre-RC5 pagination; the parameter values themselves are unchanged, per ROADMAP.md's own prior confirmation)",
+      "tc18_master_id": "TC18-13.6-003"
     },
     {
       "id": "REQ-E2E-003",
@@ -6559,7 +6567,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 (\"When calculating the CRC, it needs to be considered that adding the CRC to the byte_msg_payload increases the acf_msg_length by 1.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.88"
+      "tc18": "\u00a713.6 (\"When calculating the CRC, it needs to be considered that adding the CRC to the byte_msg_payload increases the acf_msg_length by 1.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.88",
+      "tc18_master_id": "TC18-13.6-006"
     },
     {
       "id": "REQ-E2E-005",
@@ -6602,7 +6611,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 (\"If a request is received by an endpoint that is in 'Safe command mode' and the CRC does not match, the request is not executed, and an error response is generated with error code: CRC_ERROR.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87"
+      "tc18": "\u00a713.6 (\"If a request is received by an endpoint that is in 'Safe command mode' and the CRC does not match, the request is not executed, and an error response is generated with error code: CRC_ERROR.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87",
+      "tc18_master_id": "TC18-13.6-001"
     },
     {
       "id": "REQ-E2E-009",
@@ -6613,7 +6623,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 (\"The CRC calculation for request and response follows the identical scheme.\"), TC18.txt L3828"
+      "tc18": "\u00a713.6 (\"The CRC calculation for request and response follows the identical scheme.\"), TC18.txt L3828",
+      "tc18_master_id": "TC18-13.6-008"
     },
     {
       "id": "REQ-E2E-010",
@@ -6624,7 +6635,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.89"
+      "tc18": "\u00a713.6 (\"Fragmentation, if applied to a message, happens after CRC calculation. So, the CRC is only calculated once and will be transmitted in the last segment.\"), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.89",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-E2E-011",
@@ -6635,7 +6647,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\" -- 0.5.1_RC5's own tracked-change comment marks this a \"clarification to TI_012\", replacing the older \"will only be executed...In normal operation these requests stay in the queue and are not executed\" sentence entirely), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.25"
+      "tc18": "\u00a711.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\" -- 0.5.1_RC5's own tracked-change comment marks this a \"clarification to TI_012\", replacing the older \"will only be executed...In normal operation these requests stay in the queue and are not executed\" sentence entirely), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.25",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-E2E-012",
@@ -6668,7 +6681,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 (\"If a watch-dog overflow is configured to trigger a safe state and execute a safety operation, compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow as they belong to the safety sequence to be executed based on the watch-dog triggering.\" -- renumbered from \u00a711.2.2.1 in TC18.txt's own pre-RC5 revision because 0.5.1_RC5 inserts a new draft \"Trigger request\" section before it; quoted text itself is unchanged), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.28"
+      "tc18": "\u00a711.2.2.2 (\"If a watch-dog overflow is configured to trigger a safe state and execute a safety operation, compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow as they belong to the safety sequence to be executed based on the watch-dog triggering.\" -- renumbered from \u00a711.2.2.1 in TC18.txt's own pre-RC5 revision because 0.5.1_RC5 inserts a new draft \"Trigger request\" section before it; quoted text itself is unchanged), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.28",
+      "tc18_master_id": "TC18-11.2.2.2-006"
     },
     {
       "id": "REQ-E2E-015",
@@ -6679,7 +6693,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 (\"...compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow...\" -- renumbered from \u00a711.2.2.1 in TC18.txt's own pre-RC5 revision, see REQ-E2E-014's rationale), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.28"
+      "tc18": "\u00a711.2.2.2 (\"...compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow...\" -- renumbered from \u00a711.2.2.1 in TC18.txt's own pre-RC5 revision, see REQ-E2E-014's rationale), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.28",
+      "tc18_master_id": "TC18-11.2.2.2-006"
     },
     {
       "id": "REQ-E2E-016",
@@ -6734,7 +6749,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails) / 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2861-2867"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails) / 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2861-2867",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-021",
@@ -6745,7 +6761,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2865-2867"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2865-2867",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-022",
@@ -6756,7 +6773,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails)\"), TC18.txt L2861-2864"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails)\"), TC18.txt L2861-2864",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-023",
@@ -6767,7 +6785,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released...\"), TC18.txt L2865-2867 -- the counterpart release mechanism this blocked/latched state implies"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released...\"), TC18.txt L2865-2867 -- the counterpart release mechanism this blocked/latched state implies",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-024",
@@ -6778,7 +6797,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 (\"...enable Watchdog for this Stream\" / \"WatchDog time out for this Stream in clock tics\"), TC18.txt L2855-2856, L2875-2877"
+      "tc18": "\u00a712.7.7 (\"...enable Watchdog for this Stream\" / \"WatchDog time out for this Stream in clock tics\"), TC18.txt L2855-2856, L2875-2877",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-025",
@@ -6789,7 +6809,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 (\"...the watchdog is reset with each request received from this RC Client. If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken and if so which.\"), TC18.txt L2937-2939"
+      "tc18": "\u00a712.7.7 (\"...the watchdog is reset with each request received from this RC Client. If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken and if so which.\"), TC18.txt L2937-2939",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-026",
@@ -6800,7 +6821,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_wd_safestate_enable ... bring all endpoints for this Stream to safe state if WD triggers\"), TC18.txt L2878-2880"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_wd_safestate_enable ... bring all endpoints for this Stream to safe state if WD triggers\"), TC18.txt L2878-2880",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-027",
@@ -7771,7 +7793,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"After a cold start the RC Server will be in its configured lifecycle state.\"), TC18.txt L2665 -- NOTE: TC18 requires restoring the actually-configured state, not always HW_UNCONFIGURED; that divergence is a known, separately-tracked gap, see REQ-PWRMODE-014 (not this requirement, which documents the mechanism c-RCP actually implements)"
+      "tc18": "\u00a712.4.1 (\"After a cold start the RC Server will be in its configured lifecycle state.\"), TC18.txt L2665 -- NOTE: TC18 requires restoring the actually-configured state, not always HW_UNCONFIGURED; that divergence is a known, separately-tracked gap, see REQ-PWRMODE-014 (not this requirement, which documents the mechanism c-RCP actually implements)",
+      "tc18_master_id": "TC18-12.4.1-001"
     },
     {
       "id": "REQ-PWRMODE-004",
@@ -7782,7 +7805,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4 (\"The RC Server may support different power modes\"), TC18.txt L2644"
+      "tc18": "\u00a712.4 (\"The RC Server may support different power modes\"), TC18.txt L2644",
+      "tc18_master_id": "TC18-12.4-001"
     },
     {
       "id": "REQ-PWRMODE-005",
@@ -7793,7 +7817,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"If the wake-up source was a TC14/TC10 wake-up request on the network this will also wake the RC Server, but it will directly check for the network availability and proceed as before.\"), TC18.txt L2680-2681"
+      "tc18": "\u00a712.4.1 (\"If the wake-up source was a TC14/TC10 wake-up request on the network this will also wake the RC Server, but it will directly check for the network availability and proceed as before.\"), TC18.txt L2680-2681",
+      "tc18_master_id": "TC18-12.4.1-004"
     },
     {
       "id": "REQ-PWRMODE-006",
@@ -7804,7 +7829,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"Hot-start-up procedure:\"), TC18.txt L2671 -- the initial (not-yet-started) state of the procedure described in L2672-2678"
+      "tc18": "\u00a712.4.1 (\"Hot-start-up procedure:\"), TC18.txt L2671 -- the initial (not-yet-started) state of the procedure described in L2672-2678",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-007",
@@ -7815,7 +7841,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"...it will first enable the network interface, check if the network is available and if not initiate a WakeUp to be sent via the network.\"), TC18.txt L2672-2673"
+      "tc18": "\u00a712.4.1 (\"...it will first enable the network interface, check if the network is available and if not initiate a WakeUp to be sent via the network.\"), TC18.txt L2672-2673",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-008",
@@ -7826,7 +7853,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"...the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2676"
+      "tc18": "\u00a712.4.1 (\"...the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2676",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-009",
@@ -7837,7 +7865,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2678"
+      "tc18": "\u00a712.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2678",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-010",
@@ -7848,7 +7877,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2678 -- the completed end-state of the hot-start-up procedure"
+      "tc18": "\u00a712.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2678 -- the completed end-state of the hot-start-up procedure",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-011",
@@ -7859,7 +7889,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"Repetition time of the message can be configured inside the WakeUp EP.\"), TC18.txt L2676-2677 -- TC18 bounds the repetition by a configurable time rather than a configurable attempt count; c-RCP's wakeup_repeat_limit/has_failed() is this implementation's own finite-attempt realization of that bound, not itself named in the cited text"
+      "tc18": "\u00a712.4.1 (\"Repetition time of the message can be configured inside the WakeUp EP.\"), TC18.txt L2676-2677 -- TC18 bounds the repetition by a configurable time rather than a configurable attempt count; c-RCP's wakeup_repeat_limit/has_failed() is this implementation's own finite-attempt realization of that bound, not itself named in the cited text",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-012",
@@ -7881,7 +7912,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when: The wake-up event register (wup_status) is not cleared / At least one EP is not idle / In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708"
+      "tc18": "\u00a712.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when: The wake-up event register (wup_status) is not cleared / At least one EP is not idle / In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-WAKEUP-001",
@@ -8699,7 +8731,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.6 Table 30, TC18.txt L3804-3844"
+      "tc18": "\u00a712.9.6 Table 30, TC18.txt L3804-3844",
+      "tc18_master_id": "TC18-12.9.6-004"
     },
     {
       "id": "REQ-WIREERR-002",
@@ -8720,7 +8753,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.6 Table 30 (\"POCI_FAILURE 12 - CRC of request does not match\"), TC18.txt L3830"
+      "tc18": "\u00a712.9.6 Table 30 (\"POCI_FAILURE 12 - CRC of request does not match\"), TC18.txt L3830",
+      "tc18_master_id": "TC18-12.9.6-004"
     },
     {
       "id": "REQ-WIREERR-004",
@@ -8764,7 +8798,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.6.2 Table 48 (pwmi_err_on_max_period, pwmi_max_period rows), TC18.txt L5107-5149; §12.9.6 Table 30 (PWM_IN_NO_SIGNAL=9), TC18.txt L3812-3844"
+      "tc18": "§13.7.6.2 Table 48 (pwmi_err_on_max_period, pwmi_max_period rows), TC18.txt L5107-5149; §12.9.6 Table 30 (PWM_IN_NO_SIGNAL=9), TC18.txt L3812-3844",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-UDP-015",
@@ -9327,7 +9362,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a711.2.1, TC18.txt L1169 (Table 4); \u00a711.2.2.1, TC18.txt L1280 (Table 6)"
+      "tc18": "\u00a711.2.1, TC18.txt L1169 (Table 4); \u00a711.2.2.1, TC18.txt L1280 (Table 6)",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-019",
@@ -9338,7 +9374,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.1, TC18.txt L1163-1164 (Table 4)"
+      "tc18": "\u00a711.2.1, TC18.txt L1163-1164 (Table 4)",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-020",
@@ -9349,7 +9386,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a711.2.1, TC18.txt L1142 (Figure 7) and L1158 (Table 4)"
+      "tc18": "\u00a711.2.1, TC18.txt L1142 (Figure 7) and L1158 (Table 4)",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-021",
@@ -9360,7 +9398,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a711.2.1, TC18.txt L1156-1167 (Table 4); \u00a711.2.2.3, TC18.txt L1468-1474 (Table 8)"
+      "tc18": "\u00a711.2.1, TC18.txt L1156-1167 (Table 4); \u00a711.2.2.3, TC18.txt L1468-1474 (Table 8)",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-ACF-022",
@@ -9371,7 +9410,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.3, TC18.txt L2260"
+      "tc18": "\u00a711.3, TC18.txt L2260",
+      "tc18_master_id": "TC18-11.3-003"
     },
     {
       "id": "REQ-ACF-023",
@@ -9382,7 +9422,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710 (the reserved-range wording); \u00a713.7.9.3 Figure 33/34 (\"RC Client sends a standard read request\" / ADC response with 8 measurements), the corroborating worked example resolving the ambiguity in Table 33's own favor for evt=000b"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710 (the reserved-range wording); \u00a713.7.9.3 Figure 33/34 (\"RC Client sends a standard read request\" / ADC response with 8 measurements), the corroborating worked example resolving the ambiguity in Table 33's own favor for evt=000b",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-ACF-024",
@@ -9393,7 +9434,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3735-3762 (evt[2:0] = 011b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3762 (evt[2:0] = 011b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-025",
@@ -9404,7 +9446,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3735-3741 (length-capping rule and its own SPI example)"
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3741 (length-capping rule and its own SPI example)",
+      "tc18_master_id": "TC18-13.5.1-001"
     },
     {
       "id": "REQ-ACF-026",
@@ -9415,7 +9458,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3742 (evt[2:0] = 000b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3742 (evt[2:0] = 000b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-027",
@@ -9426,7 +9470,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3743-3746 (evt[2:0] = 001b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3743-3746 (evt[2:0] = 001b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-028",
@@ -9437,7 +9482,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3747-3750 (evt[2:0] = 010b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3747-3750 (evt[2:0] = 010b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-029",
@@ -9448,7 +9494,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3753-3758 (evt[2:0] = 100b/101b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3753-3758 (evt[2:0] = 100b/101b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-030",
@@ -9459,7 +9506,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)"
+      "tc18": "\u00a713.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-ACF-031",
@@ -9470,7 +9518,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.6 (\"The error response shall contain the byte_bus_id and transaction number of the request. The error response shall contain a byte_msg_payload with an error code.\"), TC18.txt L3808-3809; \u00a711.3.4, TC18.txt L2299-2301"
+      "tc18": "\u00a712.9.6 (\"The error response shall contain the byte_bus_id and transaction number of the request. The error response shall contain a byte_msg_payload with an error code.\"), TC18.txt L3808-3809; \u00a711.3.4, TC18.txt L2299-2301",
+      "tc18_master_id": "TC18-12.9.6-003"
     },
     {
       "id": "REQ-CFG-011",
@@ -9525,7 +9574,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2868-L2870"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2868-L2870",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-029",
@@ -9536,7 +9586,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2871-L2873"
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L2871-L2873",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-030",
@@ -9547,7 +9598,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, TC18.txt L3252-L3256 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.7.7 Table 24, TC18.txt L3252-L3256 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-GPIO-033",
@@ -9914,7 +9966,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3, TC18.txt L2435-L2438 (also \u00a712.4.1 L2665-L2667)"
+      "tc18": "\u00a712.3, TC18.txt L2435-L2438 (also \u00a712.4.1 L2665-L2667)",
+      "tc18_master_id": "TC18-12.3-001"
     },
     {
       "id": "REQ-PWRMODE-015",
@@ -9925,7 +9978,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4, TC18.txt L2650-L2651 (also \u00a712.4.1 L2669-L2670)"
+      "tc18": "\u00a712.4, TC18.txt L2650-L2651 (also \u00a712.4.1 L2669-L2670)",
+      "tc18_master_id": "TC18-12.4-001"
     },
     {
       "id": "REQ-PWRMODE-016",
@@ -9936,7 +9990,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2672-L2674"
+      "tc18": "\u00a712.4.1, TC18.txt L2672-L2674",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-017",
@@ -9947,7 +10002,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2674-L2675"
+      "tc18": "\u00a712.4.1, TC18.txt L2674-L2675",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-018",
@@ -9958,7 +10014,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2676-L2677"
+      "tc18": "\u00a712.4.1, TC18.txt L2676-L2677",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-019",
@@ -9969,7 +10026,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2677-L2679"
+      "tc18": "\u00a712.4.1, TC18.txt L2677-L2679",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWRMODE-020",
@@ -9980,7 +10038,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1, TC18.txt L2680-L2681"
+      "tc18": "\u00a712.4.1, TC18.txt L2680-L2681",
+      "tc18_master_id": "TC18-12.4.1-004"
     },
     {
       "id": "REQ-PWRMODE-021",
@@ -9991,7 +10050,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2694"
+      "tc18": "\u00a712.5, TC18.txt L2694",
+      "tc18_master_id": "TC18-12.5-001"
     },
     {
       "id": "REQ-PWRMODE-022",
@@ -10002,7 +10062,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2695"
+      "tc18": "\u00a712.5, TC18.txt L2695",
+      "tc18_master_id": "TC18-12.5-001"
     },
     {
       "id": "REQ-PWRMODE-023",
@@ -10024,7 +10085,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2701-L2702"
+      "tc18": "\u00a712.5, TC18.txt L2701-L2702",
+      "tc18_master_id": "TC18-12.5-004"
     },
     {
       "id": "REQ-PWRMODE-025",
@@ -10035,7 +10097,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2706-L2708"
+      "tc18": "\u00a712.5, TC18.txt L2706-L2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-PWRMODE-026",
@@ -10046,7 +10109,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2710-L2711"
+      "tc18": "\u00a712.5, TC18.txt L2710-L2711",
+      "tc18_master_id": "TC18-12.5-006"
     },
     {
       "id": "REQ-PWRMODE-027",
@@ -10057,7 +10121,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.5, TC18.txt L2712-L2713"
+      "tc18": "\u00a712.5, TC18.txt L2712-L2713",
+      "tc18_master_id": "TC18-12.5-007"
     },
     {
       "id": "REQ-PWRMODE-028",
@@ -10068,7 +10133,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3, TC18.txt L4550-4557"
+      "tc18": "\u00a713.7.2.3, TC18.txt L4550-4557",
+      "tc18_master_id": "TC18-13.7.2.3-002"
     },
     {
       "id": "REQ-RMAP-023",
@@ -11078,7 +11144,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3789-3791"
+      "tc18": "\u00a713.6, TC18.txt L3789-3791",
+      "tc18_master_id": "TC18-13.6-002"
     },
     {
       "id": "REQ-E2E-034",
@@ -11100,7 +11167,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3811"
+      "tc18": "\u00a713.6, TC18.txt L3811",
+      "tc18_master_id": "TC18-13.6-005"
     },
     {
       "id": "REQ-E2E-036",
@@ -11111,7 +11179,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3813-3814"
+      "tc18": "\u00a713.6, TC18.txt L3813-3814",
+      "tc18_master_id": "TC18-13.6-006"
     },
     {
       "id": "REQ-E2E-037",
@@ -11122,7 +11191,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3814-3815"
+      "tc18": "\u00a713.6, TC18.txt L3814-3815",
+      "tc18_master_id": "TC18-13.6-006"
     },
     {
       "id": "REQ-E2E-038",
@@ -11133,7 +11203,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3816-3819"
+      "tc18": "\u00a713.6, TC18.txt L3816-3819",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-E2E-039",
@@ -11144,7 +11215,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3821-3823"
+      "tc18": "\u00a713.6, TC18.txt L3821-3823",
+      "tc18_master_id": "TC18-13.6-007"
     },
     {
       "id": "REQ-E2E-040",
@@ -11155,7 +11227,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3826"
+      "tc18": "\u00a713.6, TC18.txt L3826",
+      "tc18_master_id": "TC18-13.6-008"
     },
     {
       "id": "REQ-E2E-041",
@@ -11166,7 +11239,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6, TC18.txt L3827-3828"
+      "tc18": "\u00a713.6, TC18.txt L3827-3828",
+      "tc18_master_id": "TC18-13.6-001"
     },
     {
       "id": "REQ-E2E-042",
@@ -11188,7 +11262,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked...\"), TC18.txt L2861-2864 -- the initial, not-yet-faulted state this register default implies"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 0b: stream is not blocked...\"), TC18.txt L2861-2864 -- the initial, not-yet-faulted state this register default implies",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-044",
@@ -11199,7 +11274,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails.\"), TC18.txt L2865-2867"
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails.\"), TC18.txt L2865-2867",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-045",
@@ -11210,7 +11286,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_crc ... 1b: stream is blocked until released, when CRC check at EP fails and Safe state will be entered\"), TC18.txt L3239-L3243 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
+      "tc18": "\u00a712.7.7 Table 24 (\"rx_enforce_crc ... 1b: stream is blocked until released, when CRC check at EP fails and Safe state will be entered\"), TC18.txt L3239-L3243 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-E2E-046",
@@ -11221,7 +11298,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.7 Table 24, spec revision 0.5.1_RC5 PDF p.67 (\"0x000D.7 rx_stream_status ... set automatically as a reaction to either CRC error, sequence error, watchdog overflow, EP overflow, when enabled\", ticket-tagged 051RC4 \"config bit added\")"
+      "tc18": "\u00a712.7.7 Table 24, spec revision 0.5.1_RC5 PDF p.67 (\"0x000D.7 rx_stream_status ... set automatically as a reaction to either CRC error, sequence error, watchdog overflow, EP overflow, when enabled\", ticket-tagged 051RC4 \"config bit added\")",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-ADC-031",
@@ -11721,7 +11799,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (request_type/message_timestamp-repurposing scheme, common to every conditional request kind), TC18.txt L1299-1541"
+      "tc18": "\u00a711.2.2 (request_type/message_timestamp-repurposing scheme, common to every conditional request kind), TC18.txt L1299-1541",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-ALLOC-001",
@@ -11847,7 +11926,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.3.1 Acknowledge (err=1 rejection sub-case, distinct from §11.3.4 Error Response), TC18.txt"
+      "tc18": "§11.3.1 Acknowledge (err=1 rejection sub-case, distinct from §11.3.4 Error Response), TC18.txt",
+      "tc18_master_id": "TC18-11.3.1-002"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."

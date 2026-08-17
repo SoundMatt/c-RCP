@@ -117,6 +117,37 @@ before and after this change -- 1095/1095 requirements traced,
 512/512 functions annotated, 968/1312 check warnings/info, all
 unchanged. Full 66/66 test suite unchanged.
 
+### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` backfill for E2E/ACF/PWRMODE/WIREERR)
+
+Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice #6)
+to `.fusa-reqs.json` entries in the `REQ-E2E-*`, `REQ-ACF-*`,
+`REQ-PWRMODE-*` and `REQ-WIREERR-*` categories, now that the 447-entry
+master TC18 requirement catalog (`RELAY/docs/tc18-master-catalog.json`)
+exists to reference. Purely additive -- no other field, and no `.c`/`.h`
+source file, touched.
+
+Of the 113 requirements in these four categories, 7 have no `tc18` field
+at all (implementation-only plumbing -- `strerror()`-style helpers, an
+encode-time zeroing detail -- with no TC18 spec basis) and were correctly
+left alone. Of the remaining 106 that do carry a `tc18` citation:
+
+- **80** matched a single master-catalog entry with high confidence
+  (section + table/figure number + content cross-check against the
+  catalog's own `summary`/`title` fields) and got `tc18_master_id` added.
+- **26** were left unset and are flagged here for dedicated follow-up
+  rather than forced: citations that genuinely span two or more distinct
+  catalog entries with no single owning clause (e.g. `REQ-WIREERR-006`'s
+  two-error-code mapping, `REQ-E2E-003`'s dual-figure field list), and a
+  cluster already self-flagged as unresolved by this codebase's own prior
+  investigations (`REQ-E2E-016`/`017`/`018`/`019`/`027`, tied to the
+  RC5-reserved `rx_safety_measure`/`rx_wd_info_enable` fields, task #97;
+  `REQ-E2E-012`/`013`, an already-noted citation-drift case).
+
+66/66 tests, unchanged. `cfusa check` (pinned v0.5.54): 0 errors,
+968/1312 warnings/info, unchanged. `cfusa trace --req-coverage 100
+--sec-tested 100`: 1095/1095 traced, unchanged -- confirms `cfusa`
+tolerates the new field with no effect on any reported count.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the twelve remaining table numbers, closes out the issue's own tracked backlog)
 
 Tenth pass on the RC1->RC5 table-number citation-drift audit
