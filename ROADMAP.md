@@ -19106,6 +19106,59 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.376.0 -- 2026-08-16 (orphaned classifier/error-mapping
+primitives wired into real dispatch: issues #468, #469)
+
+Closes issues #468 and #469 -- both "wire an existing-but-unused
+classifier/error-mapping function into the real dispatch path"
+fixes, following this project's own established mock.c-owns-no-per-
+endpoint-semantics architecture (issue #392/PR D's own GPIO-debounce
+precedent) exactly: a caller-registered rcp_mock_endpoint_handler_fn
+in test_tc18_gaps_ep.c is the real, documented dispatch integration
+point, not a change to mock.c itself.
+
+**Issue #469** (REQ-GPIO-012/REQ-PWM-008/REQ-PWM-028):
+rcp_ep_gpio_wire_error()/rcp_ep_pwm_out_wire_error() -- mapping the
+evt[2:0]=100b RESERVED_EVT decode error to RCP_ERROR_UNSUPPORTED_CMD
+-- had no caller outside their own unit tests, not even
+gpio_dispatch_handler(), the reference GPIO dispatch fixture
+REQ-GPIO-035/036 already prove reachable through a real mock.c
+dispatch() call. gpio_dispatch_handler() now calls
+rcp_ep_gpio_wire_error() on every rejected write and builds the
+required err-response via rcp_acf_build_error_response() when it
+returns non-NONE. PWM_OUT had no reference dispatch handler in this
+test file at all until now: the new pwm_out_dispatch_handler()
+mirrors gpio_dispatch_handler()'s shape (and its identical fix)
+exactly. Two new tests dispatch a real RESERVED_EVT write through
+rcp_mock_server_dispatch() and confirm a genuine Error Response
+frame carrying RCP_ERROR_UNSUPPORTED_CMD comes back in the same
+call, built by the handler itself.
+
+**Issue #468** (REQ-PWM-058): rcp_ep_pwm_in_max_period_outcome()
+(TC18 Table 48's pwmi_err_on_max_period rule) had zero callers
+outside its own unit test -- unlike its own reference pattern,
+rcp_ep_gpio_debounce_sample(), which gpio_dispatch_handler() already
+calls on every dispatched write. The new pwm_in_dispatch_handler()
+mirrors that same pattern for PWM_IN's own read path: it calls the
+classifier on every dispatched read and honors all four of Table
+48's own outcomes end-to-end through a real mock.c dispatch() call
+-- OK reports the captured value immediately; INVALIDATE/STOP leave
+the response unfabricated; STOP_AND_ERROR builds a genuine Error
+Response carrying RCP_ERROR_PWM_IN_NO_SIGNAL. Three new tests cover
+all three caller-observable branches.
+
+`.fusa-reqs.json` updated for all four requirements with dated
+notes; none needed a status downgrade -- each classifier/mapping
+function was, and remains, correctly implemented, only its real-
+dispatch reachability was closed this batch. Every new assertion
+mutation-tested: reverting each fix (forcing the wire-error/
+classifier call site back to its pre-fix behavior) makes exactly
+its own new test(s) fail, nothing else; restoring returns the suite
+to green. Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0
+errors; `cfusa trace`: 1088/1088 traced and tested (unchanged).
+
+**Next**: no other orphaned-primitive issues currently open in this
+tracker; awaiting new findings from the ongoing conformance audit.
 ### v0.374.0 -- 2026-08-16 (REQ-ACF-012 RCP_ACF_MTV_UNCERTAIN citation
 closed; RCP_EP_PWM_IN_NO_SIGNAL payload-sentinel ambiguity resolved,
 honestly documented as no-TC18-basis)
