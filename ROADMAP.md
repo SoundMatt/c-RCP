@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.445.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-ADC-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-ADC-*` (`src/ep_adc.c`/`include/rcp/ep_adc.h`)
+-- tracker-reported 40 total, 4 proxy-flagged -- triaged all 40 in
+full rather than only the 4 flagged, per Group 1's `REQ-RMAP-*` batch
+finding real bundled requirements the "2+ shall" proxy missed
+entirely.
+
+9 ids split into 24 (`REQ-ADC-041..055`): `-004`/`-041` (average_
+interval's exclude-from-mean vs. return-NO_SIGNAL-only-when-all-timed-
+out), `-011`/`-042` (encode_response's success payload vs. its
+zeroed-return failure path -- also fixed a pre-existing tag stuck on
+the wrong function), `-025`/`-043` (decode_read_request's round trip
+vs. encode_read_request's own "no payload" wire clause -- a real
+silent-gap risk, closed with a brand-new test), `-026`/`-044`/`-045`/
+`-046` (four distinct decode_read_request error codes bundled under
+one id; a fifth dispatch-layer UNSUPPORTED_CMD clause deliberately
+left unsplit -- no wire_error() mapping exists for ADC to test),
+`-029`/`-047` (decode_response's two error codes, only 1 "shall" in
+the original text despite bundling two behaviours), `-031`/`-048`..
+`-052` (trigger_state_init's own contract vs. trigger_evaluate's five
+independent Table 53 trigger outputs -- the same per-outcome
+granularity `REQ-PWM-002..009` already establishes, previously one
+narrative entry with zero "shall" occurrences), `-037`/`-053`
+(cadence_case, reclassified tc18-gap -> tc18/ASIL-B, vs.
+cadence_response_ready's own genuine dispatch-wiring partial caveat),
+`-038`/`-054` (render_registers vs. encode_reconfig_request, two
+different functions), `-039`/`-055` (apply_reconfig vs.
+reconfig_strerror's own never-NULL contract).
+
+All splits' tags moved to sit directly above the exact function/test
+per `CONTRIBUTING.md`; every new id independently tested (one
+brand-new test, `test_read_request_carries_no_payload()`, the rest
+already existed but mis-tagged); every split mutation-tested (all 15
+new ids' test tags individually removed, confirmed to drop `cfusa
+trace --sec-tested` to 99% and surface under `--gaps`, restored --
+file diffed identical afterward; two splits additionally verified
+with a real injected source defect, exactly the intended 2 of 70
+`test_ep_adc` assertions failing each time).
+
+`AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md` re-synced for the new
+1189-requirement total (1157 `tc18` / 19 `tc18-gap` / 7 `retired` / 6
+`internal`).
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (run
+standalone) each 100% (1189/1189 requirements, 512/512 functions).
+
+**Next**: other Group 2 (`REQ-CANEP-*`, `REQ-GPIO-*`, `REQ-I2C-*`,
+`REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-SPI-*`, `REQ-UART-*`,
+`REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4 prefixes remain, tracked
+as separate batches against the same tracker.
+
 ### v0.444.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-SPI-*: requirement-atomicity audit, Group 2 per-endpoint)
 

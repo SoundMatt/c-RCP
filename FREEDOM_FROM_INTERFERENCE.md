@@ -28,13 +28,13 @@ Issue #518's own text describes the split as `.fusa-reqs.json` mixing
 "the retired pre-TC18 Zone/Command surface, still linked into the same
 binary per `src/rcp.c`/`tests/legacy_mock.*`"). That framing is now
 **stale** — `.fusa-reqs.json`'s current `scope` values (verified by
-direct enumeration of all 1174 entries at HEAD, after the [c-RCP-16
+direct enumeration of all 1189 entries at HEAD, after the [c-RCP-16
 follow-up] issue #552 fix and the [c-RCP-18-tracker] issue #533 Group
-3/Group 1 (REQ-ACF-*, REQ-AVTP-*, REQ-RMAP-*) requirement-atomicity splits) are:
+3/Group 1/Group 2 (REQ-ACF-*, REQ-AVTP-*, REQ-RMAP-*, REQ-ADC-*) requirement-atomicity splits) are:
 
 | `scope` | Count | ASIL mix | What it actually is today |
 |---|---|---|---|
-| `tc18` | 1142 | 1035 ASIL-B, 36 ASIL-A, 71 QM | The shipped TC18 behavior. The 71 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
+| `tc18` | 1157 | 1050 ASIL-B, 36 ASIL-A, 71 QM | The shipped TC18 behavior. The 71 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
 | `tc18-gap` | 19 | 19 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. |
 | `retired` | 7 | 4 ASIL-B, 1 ASIL-A, 2 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. Includes `REQ-ISELED-028` (moved here from `tc18-gap` by issue #552 -- its own text already said RETIRED, only the scope field hadn't caught up). |
 | `internal` | 6 | 6 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. See §2's main finding. |
@@ -213,7 +213,12 @@ closed implementation gap, so promoting it would have double-counted
 
 **19 entries remain genuinely `tc18-gap`** at HEAD, all QM (the
 catalog note's invariant now actually holds, with zero exceptions):
-`REQ-RMAP-023/043/044/045/065/067/081`, `REQ-ADC-037`,
+`REQ-RMAP-023/043/044/045/065/067/081`, `REQ-ADC-053` (split 2026-08-18
+from `REQ-ADC-037` by the [c-RCP-18-tracker] issue #533 `REQ-ADC-*`
+atomicity batch -- the split separated `REQ-ADC-037`'s own now-fully-
+tested `cadence_case()` contract, reclassified to `tc18`/ASIL-B, from
+`rcp_ep_adc_cadence_response_ready()`'s own genuinely-partial
+dispatch-wiring caveat, which `REQ-ADC-053` alone now carries),
 `REQ-CANEP-029/030`, `REQ-DISC-029`, `REQ-GPIO-035`,
 `REQ-LIFECYCLE-022/025/034`, `REQ-MDIO-024`, `REQ-PWM-057`,
 `REQ-SPI-037`, `REQ-SRV-017`. Three of these

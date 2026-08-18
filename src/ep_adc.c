@@ -39,6 +39,7 @@ size_t rcp_ep_adc_response_value_count(uint16_t read_size)
 //cfusa:req REQ-ADC-002
 //cfusa:req REQ-ADC-003
 //cfusa:req REQ-ADC-004
+//cfusa:req REQ-ADC-041
 //cfusa:req REQ-ADC-005
 rcp_ep_adc_avg_value_t rcp_ep_adc_average_interval(const rcp_ep_adc_sample_t *samples,
                                                     size_t sample_count)
@@ -125,7 +126,6 @@ rcp_ep_adc_spacing_result_t rcp_ep_adc_validate_sample_spacing(
 //cfusa:req REQ-ADC-008
 //cfusa:req REQ-ADC-009
 //cfusa:req REQ-ADC-010
-//cfusa:req REQ-ADC-011
 size_t rcp_ep_adc_collect_response_values(const rcp_ep_adc_avg_value_t *avg_values,
                                            size_t avg_count,
                                            uint16_t *out_values, size_t value_count)
@@ -157,7 +157,7 @@ rcp_ep_adc_cadence_case_t rcp_ep_adc_cadence_case(uint16_t avg_intervals_per_req
     return RCP_EP_ADC_CADENCE_ONE_TO_ONE;
 }
 
-//cfusa:req REQ-ADC-037
+//cfusa:req REQ-ADC-053
 bool rcp_ep_adc_cadence_response_ready(size_t pending_value_count, uint8_t combine_avg_values)
 {
     return pending_value_count >= (size_t)combine_avg_values;
@@ -242,7 +242,11 @@ void rcp_ep_adc_trigger_state_init(rcp_ep_adc_trigger_state_t *s)
     s->previous_value = 0;
 }
 
-//cfusa:req REQ-ADC-031
+//cfusa:req REQ-ADC-048
+//cfusa:req REQ-ADC-049
+//cfusa:req REQ-ADC-050
+//cfusa:req REQ-ADC-051
+//cfusa:req REQ-ADC-052
 uint8_t rcp_ep_adc_trigger_evaluate(rcp_ep_adc_trigger_state_t *s, uint16_t value,
                                      uint16_t trigger_min, uint16_t trigger_max,
                                      bool measurement_finished)
@@ -360,7 +364,7 @@ static bool reg_offset_read_only(uint16_t addr)
            addr == (uint16_t)(RCP_EP_ADC_REG_BASE_CLK + 1u);
 }
 
-//cfusa:req REQ-ADC-039
+//cfusa:req REQ-ADC-055
 const char *rcp_ep_adc_reconfig_strerror(rcp_ep_adc_reconfig_errc_t e)
 {
     switch (e) {
@@ -375,7 +379,6 @@ const char *rcp_ep_adc_reconfig_strerror(rcp_ep_adc_reconfig_errc_t e)
     }
 }
 
-//cfusa:req REQ-ADC-038
 //cfusa:req REQ-ADC-039
 //cfusa:req REQ-ADC-040
 rcp_ep_adc_reconfig_errc_t rcp_ep_adc_apply_reconfig(rcp_ep_adc_functional_cfg_t *cfg,
@@ -416,7 +419,7 @@ rcp_ep_adc_reconfig_errc_t rcp_ep_adc_apply_reconfig(rcp_ep_adc_functional_cfg_t
     return RCP_EP_ADC_RECONFIG_OK;
 }
 
-//cfusa:req REQ-ADC-038
+//cfusa:req REQ-ADC-054
 rcp_bytes_t rcp_ep_adc_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                 uint16_t start_address, const uint8_t *data,
                                                 size_t data_len, uint8_t transaction_num)
@@ -476,6 +479,7 @@ const char *rcp_ep_adc_strerror(rcp_ep_adc_errc_t e)
 /* ── Read request ──────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ADC-025
+//cfusa:req REQ-ADC-043
 rcp_bytes_t rcp_ep_adc_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16_t read_size,
                                             uint8_t transaction_num)
 {
@@ -494,6 +498,9 @@ rcp_bytes_t rcp_ep_adc_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16
 
 //cfusa:req REQ-ADC-025
 //cfusa:req REQ-ADC-026
+//cfusa:req REQ-ADC-044
+//cfusa:req REQ-ADC-045
+//cfusa:req REQ-ADC-046
 rcp_ep_adc_errc_t rcp_ep_adc_decode_read_request(const uint8_t *b, size_t len,
                                                   rcp_byte_bus_id_t expected_bus_id,
                                                   uint16_t *out_read_size,
@@ -522,9 +529,8 @@ rcp_ep_adc_errc_t rcp_ep_adc_decode_read_request(const uint8_t *b, size_t len,
 
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
-//cfusa:req REQ-ADC-027
-//cfusa:req REQ-ADC-028
-//cfusa:req REQ-ADC-030
+//cfusa:req REQ-ADC-011
+//cfusa:req REQ-ADC-042
 rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint16_t *values,
                                        size_t value_count, uint8_t transaction_num, bool timed,
                                        uint64_t timestamp)
@@ -580,6 +586,7 @@ rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint
 //cfusa:req REQ-ADC-028
 //cfusa:req REQ-ADC-029
 //cfusa:req REQ-ADC-030
+//cfusa:req REQ-ADC-047
 rcp_ep_adc_errc_t rcp_ep_adc_decode_response(const uint8_t *b, size_t len,
                                               rcp_byte_bus_id_t expected_bus_id,
                                               uint16_t *out_values, size_t max_values,
