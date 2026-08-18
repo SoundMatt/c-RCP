@@ -218,6 +218,7 @@ DEFINE_APPEND(append_stream, rcp_config_stream_t)
 
 /* ── "server" object: scanned across the whole document (see file header) ─── */
 
+//cfusa:req REQ-CFG-007
 static void parse_server_fields(const char *json, rcp_config_server_t *out)
 {
     const char *k;
@@ -283,6 +284,7 @@ static bool parse_pin_entry(const char *open, const char *close, rcp_config_hw_p
 }
 
 //cfusa:req REQ-CFG-004
+//cfusa:req REQ-CFG-014
 //cfusa:req REQ-CFG-005
 static bool parse_endpoint_entry(const char *open, const char *close, rcp_config_endpoint_t *out,
                                   char *err_msg, size_t err_msg_cap)
@@ -314,6 +316,7 @@ static bool parse_endpoint_entry(const char *open, const char *close, rcp_config
 }
 
 //cfusa:req REQ-CFG-006
+//cfusa:req REQ-CFG-015
 static bool parse_stream_entry(const char *open, const char *close, rcp_config_stream_t *out,
                                 char *err_msg, size_t err_msg_cap)
 {
@@ -350,6 +353,7 @@ static bool parse_stream_entry(const char *open, const char *close, rcp_config_s
  * out of rcp_config_parse_json() itself purely to keep that function
  * under this project's own max_function_lines convention (CFUSA-L001) --
  * no behavior change, same fields read/appended in the same order. */
+//cfusa:req REQ-CFG-016
 static bool parse_config_object(const char *open, const char *close,
                                  rcp_config_hw_pin_t **pins, size_t *pins_len, size_t *pins_cap,
                                  rcp_config_endpoint_t **endpoints, size_t *eps_len, size_t *eps_cap,
@@ -399,7 +403,7 @@ static bool parse_config_object(const char *open, const char *close,
     return true;
 }
 
-//cfusa:req REQ-CFG-007
+//cfusa:req REQ-CFG-016
 int rcp_config_parse_json(const char *json, rcp_config_manifest_t *out, char *err_msg, size_t err_msg_cap)
 {
     size_t pos = 0;
@@ -446,7 +450,10 @@ fail:
 }
 
 //cfusa:req REQ-CFG-008
+//cfusa:req REQ-CFG-017
+//cfusa:req REQ-CFG-018
 //cfusa:req REQ-CFG-009
+//cfusa:req REQ-CFG-019
 rcp_mock_errc_t rcp_config_apply_to_mock(const rcp_config_manifest_t *m, rcp_mock_server_t *srv)
 {
     rcp_regmap_general_t *map = rcp_mock_server_regmap(srv);
@@ -485,6 +492,7 @@ rcp_mock_errc_t rcp_config_apply_to_mock(const rcp_config_manifest_t *m, rcp_moc
 }
 
 //cfusa:req REQ-CFG-010
+//cfusa:req REQ-CFG-020
 int rcp_config_load(const char *json, rcp_mock_server_t *srv, char *err_msg, size_t err_msg_cap)
 {
     rcp_config_manifest_t m;

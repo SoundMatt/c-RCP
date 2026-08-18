@@ -974,8 +974,18 @@
     },
     {
       "id": "REQ-CFG-004",
-      "title": "endpoint entries require numeric byte_bus_id and ep_type",
-      "text": "rcp_config_parse_json() shall reject an endpoints entry missing a numeric byte_bus_id or ep_type field with RCP_CFG_ERR_PARSE. Fixed: rcp_config_parse_json()'s endpoint entry-sniffing dispatch now routes on \"byte_bus_id\" OR \"ep_type\" (previously \"byte_bus_id\" alone), same dual-sniff-key fix as REQ-CFG-001's hw_pin_map branch, mirroring the stream branch's own pre-existing \"rx_stream_id\" OR \"configured\" pattern.",
+      "title": "endpoint entries require a numeric byte_bus_id",
+      "text": "rcp_config_parse_json() shall reject an endpoints entry missing a numeric byte_bus_id field with RCP_CFG_ERR_PARSE. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from a prior single id that bundled this with the ep_type check below (now REQ-CFG-014) -- same twin-required-field split pattern REQ-CFG-001/REQ-CFG-002 already use for hw_pin_map's own two required fields; both clauses were already independently tested (test_parse_endpoint_missing_byte_bus_id_fails / test_parse_endpoint_missing_ep_type_fails), just not separately id'd. Fixed: rcp_config_parse_json()'s endpoint entry-sniffing dispatch now routes on \"byte_bus_id\" OR \"ep_type\" (previously \"byte_bus_id\" alone), same dual-sniff-key fix as REQ-CFG-001's hw_pin_map branch, mirroring the stream branch's own pre-existing \"rx_stream_id\" OR \"configured\" pattern.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-014",
+      "title": "endpoint entries require a numeric ep_type",
+      "text": "rcp_config_parse_json() shall reject an endpoints entry missing a numeric ep_type field with RCP_CFG_ERR_PARSE. Split 2026-08-18 (issue #533) from REQ-CFG-004 -- see that id for the split rationale and the dual-sniff-key fix note shared by both clauses.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -994,8 +1004,18 @@
     },
     {
       "id": "REQ-CFG-006",
-      "title": "stream entries require rx_stream_id; configured defaults to true",
-      "text": "rcp_config_parse_json() shall reject a streams entry missing a numeric rx_stream_id field with RCP_CFG_ERR_PARSE, and shall set its configured field from the optional configured boolean, defaulting to true for an entry that is otherwise present.",
+      "title": "stream entries require a numeric rx_stream_id",
+      "text": "rcp_config_parse_json() shall reject a streams entry missing a numeric rx_stream_id field with RCP_CFG_ERR_PARSE. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from a prior single id that also bundled the \"configured defaults to true\" clause (now REQ-CFG-015) -- the confirmed example #519's own manual review named: both clauses were already independently tested in tests/test_config.c (test_parse_stream_missing_rx_stream_id_fails / test_parse_stream_entries), just not separately id'd or tagged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-015",
+      "title": "stream entries default configured to true when absent",
+      "text": "rcp_config_parse_json() shall set a streams entry's configured field from the optional configured boolean, defaulting to true for an entry that is otherwise present (i.e. rx_stream_id was found). Split 2026-08-18 (issue #533) from REQ-CFG-006 -- see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9109,8 +9129,18 @@
     },
     {
       "id": "REQ-CFG-007",
-      "title": "parse_json parses the optional server object plus zero or more entry-list sections",
-      "text": "rcp_config_parse_json() shall populate out->server from an optional top-level server object's vendor_id/device_id/magic/svr_implemented_options fields, and shall parse an arbitrary number of hw_pin_map/endpoints/streams entries (each recognized by its own required key) from anywhere in the document, succeeding (RCP_OK) for an empty object.",
+      "title": "parse_json populates out->server from the optional top-level server object",
+      "text": "rcp_config_parse_json() shall populate out->server from an optional top-level server object's vendor_id/device_id/magic/svr_implemented_options fields. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit, proxy-flagged 2+ \"shall\") from a prior single id that also bundled the hw_pin_map/endpoints/streams entry-list dispatch loop's own separate behaviour (now REQ-CFG-016) -- two different scanning mechanisms of the same function (parse_server_fields()'s whole-document field scan vs. the object-loop dispatch parse_config_object() drives), not one behaviour.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-016",
+      "title": "parse_json parses an arbitrary number of hw_pin_map/endpoints/streams entries",
+      "text": "rcp_config_parse_json() shall parse an arbitrary number of hw_pin_map/endpoints/streams entries (each recognized by its own required key) from anywhere in the document, succeeding (RCP_OK) for an empty object. Split 2026-08-18 (issue #533) from REQ-CFG-007 -- see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9119,8 +9149,28 @@
     },
     {
       "id": "REQ-CFG-008",
-      "title": "apply_to_mock sets the mock server's regmap general fields from the manifest",
-      "text": "rcp_config_apply_to_mock() shall set srv's own rcp_mock_server_regmap() vendor_id/device_id fields, OR its svr_implemented_options field, from m->server, leaving magic unchanged when m->server.magic is 0.",
+      "title": "apply_to_mock sets the mock server's regmap vendor_id/device_id from the manifest",
+      "text": "rcp_config_apply_to_mock() shall set srv's own rcp_mock_server_regmap() vendor_id and device_id fields directly from m->server. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from a prior single id that also bundled the svr_implemented_options OR-merge (now REQ-CFG-017, a different mechanism -- bitwise-OR-in, not overwrite) and the magic conditional preserve-or-set (now REQ-CFG-018, a different mechanism -- an if-branch, not an unconditional copy) under one id; the test that added the latter two clauses later (test_apply_to_mock_sets_options_and_preserves_magic_when_manifest_magic_is_zero) already named them \"clauses\" (plural) in its own doc comment, the same silent-bundling signature #519 flagged for REQ-CFG-006. vendor_id/device_id stay one id: identical unconditional-overwrite mechanism, a compound object joined by \"and\", not a second independently-divergent behaviour.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-017",
+      "title": "apply_to_mock ORs svr_implemented_options into the regmap from the manifest",
+      "text": "rcp_config_apply_to_mock() shall OR m->server.svr_implemented_options into srv's own rcp_mock_server_regmap() svr_implemented_options field (merging with, not overwriting, whatever bits the regmap already had). Split 2026-08-18 (issue #533) from REQ-CFG-008 -- see that id for the split rationale.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-018",
+      "title": "apply_to_mock leaves the regmap's magic unchanged when the manifest's magic is 0",
+      "text": "rcp_config_apply_to_mock() shall leave srv's own rcp_mock_server_regmap() magic field unchanged when m->server.magic is 0, and set it from m->server.magic otherwise. Split 2026-08-18 (issue #533) from REQ-CFG-008 -- see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9130,7 +9180,17 @@
     {
       "id": "REQ-CFG-009",
       "title": "apply_to_mock registers one mock endpoint per manifest endpoint entry",
-      "text": "rcp_config_apply_to_mock() shall call rcp_mock_server_add_endpoint() once per m->endpoints entry (byte_bus_id/ep_type/ep_enable, handler NULL) and shall return the first non-RCP_MOCK_OK result encountered without registering any later entry.",
+      "text": "rcp_config_apply_to_mock() shall call rcp_mock_server_add_endpoint() once per m->endpoints entry (byte_bus_id/ep_type/ep_enable, handler NULL). Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit, proxy-flagged 2+ \"shall\") from a prior single id that also bundled the \"stop on first non-OK result, without registering any later entry\" error-handling clause (now REQ-CFG-019) -- the main per-entry registration loop and its short-circuit error path are two independently-testable behaviours of the same loop, both already separately proven by test_apply_to_mock_registers_endpoints (this clause) and test_apply_to_mock_duplicate_byte_bus_id_returns_dup (the short-circuit clause).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-019",
+      "title": "apply_to_mock returns the first non-RCP_MOCK_OK add_endpoint result and stops",
+      "text": "rcp_config_apply_to_mock() shall return the first non-RCP_MOCK_OK result rcp_mock_server_add_endpoint() returns, without registering any later m->endpoints entry. Split 2026-08-18 (issue #533) from REQ-CFG-009 -- see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9139,8 +9199,18 @@
     },
     {
       "id": "REQ-CFG-010",
-      "title": "load() parses then applies a manifest document in one call",
-      "text": "rcp_config_load() shall parse json with rcp_config_parse_json() and, on success, apply the result to srv with rcp_config_apply_to_mock(), returning RCP_CFG_ERR_PARSE (with err_msg filled) for a parse failure or the apply step's own rcp_mock_errc_t (cast to int) otherwise.",
+      "title": "load() propagates a parse failure as RCP_CFG_ERR_PARSE without applying",
+      "text": "rcp_config_load() shall return RCP_CFG_ERR_PARSE (with err_msg filled) for a parse failure, without calling rcp_config_apply_to_mock(). Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from a prior single id that also bundled the success-path apply-delegation clause (now REQ-CFG-020) -- two different branches of the same combinator function, the same shape #519's own REQ-DL-001 finding described (reset-timer branch bundled with the return-false-for-unregistered-stream branch); both already separately proven by test_load_propagates_parse_error (this clause) and test_apply_to_mock_duplicate_byte_bus_id_returns_dup (the delegation clause, exercised via rcp_config_load()).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-CFG-020",
+      "title": "load() returns apply_to_mock()'s own result on a successful parse",
+      "text": "rcp_config_load() shall, on a successful parse, call rcp_config_apply_to_mock() and return its own rcp_mock_errc_t (cast to int). Split 2026-08-18 (issue #533) from REQ-CFG-010 -- see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

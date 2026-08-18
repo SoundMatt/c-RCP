@@ -1,18 +1,16 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-CFG-001
-//cfusa:test REQ-CFG-002
-//cfusa:test REQ-CFG-003
-//cfusa:test REQ-CFG-004
-//cfusa:test REQ-CFG-005
-//cfusa:test REQ-CFG-006
-//cfusa:test REQ-CFG-007
-//cfusa:test REQ-CFG-008
-//cfusa:test REQ-CFG-009
-//cfusa:test REQ-CFG-010
-//cfusa:test REQ-CFG-013
 /* Tests the RC-Server/endpoint manifest loader (ROADMAP.md milestone 77).
  * Replaces the old zone-manifest schema's own test_config.c entirely --
- * see config.h's file header for the new schema. */
+ * see config.h's file header for the new schema.
+ *
+ * Each REQ-CFG-* requirement's own test-trace marker sits directly
+ * above the specific test function that proves it (CONTRIBUTING.md's
+ * "Writing a requirement" convention, c-RCP-18/#519/#533) -- this file
+ * used to stack all of them once here at the file header instead, the
+ * same blind spot #519 documented for REQ-DL-001's own test file: a
+ * file-header block satisfies cfusa's coverage gate for every
+ * requirement in the file regardless of which test function (if any)
+ * actually exercises each one. */
 #include "unity.h"
 
 #include <rcp/config.h>
@@ -27,6 +25,7 @@ void tearDown(void) {}
 
 /* ── parse_json: server fields ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-CFG-016
 static void test_parse_empty_object_succeeds(void)
 {
     rcp_config_manifest_t m;
@@ -40,6 +39,7 @@ static void test_parse_empty_object_succeeds(void)
     rcp_config_manifest_free(&m);
 }
 
+//cfusa:test REQ-CFG-007
 static void test_parse_server_fields(void)
 {
     const char *json =
@@ -59,6 +59,7 @@ static void test_parse_server_fields(void)
  * matching TC18 Table 18 exactly (formerly two paired bits each, an
  * invented design REQ-RMAP-004..008 described and this milestone
  * retired -- see test_regmap.c's own retirement note). */
+//cfusa:test REQ-CFG-007
 static void test_parse_server_implemented_options(void)
 {
     const char *json =
@@ -81,6 +82,7 @@ static void test_parse_server_implemented_options(void)
 
 /* REQ-RMAP-030: "trigger" and "chained" are new, previously-unparseable
  * names -- proves the parser now accepts both. */
+//cfusa:test REQ-CFG-007
 static void test_parse_server_implemented_options_trigger_and_chained(void)
 {
     const char *json =
@@ -128,6 +130,7 @@ static void test_manifest_free_zeroes_the_struct_and_tolerates_double_free(void)
     rcp_config_manifest_free(&m); /* double free of the now-zeroed struct: must not crash */
 }
 
+//cfusa:test REQ-CFG-003
 static void test_parse_hw_pin_map_entries(void)
 {
     const char *json =
@@ -157,6 +160,7 @@ static void test_parse_hw_pin_map_entries(void)
     rcp_config_manifest_free(&m);
 }
 
+//cfusa:test REQ-CFG-002
 static void test_parse_hw_pin_map_missing_hw_ep_pin_nr_fails(void)
 {
     const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_nr\": 0 }] }";
@@ -178,6 +182,7 @@ static void test_parse_hw_pin_map_missing_hw_ep_pin_nr_fails(void)
  * key (mirroring the pre-existing "configured" precedent for streams,
  * below) so an entry missing hw_ep_nr is still routed to
  * parse_pin_entry(), which correctly rejects it. */
+//cfusa:test REQ-CFG-001
 static void test_parse_hw_pin_map_missing_hw_ep_nr_fails(void)
 {
     const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_pin_nr\": 3 }] }";
@@ -191,6 +196,7 @@ static void test_parse_hw_pin_map_missing_hw_ep_nr_fails(void)
 
 /* ── parse_json: endpoints ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CFG-005
 static void test_parse_endpoint_entries(void)
 {
     const char *json =
@@ -213,6 +219,7 @@ static void test_parse_endpoint_entries(void)
     rcp_config_manifest_free(&m);
 }
 
+//cfusa:test REQ-CFG-014
 static void test_parse_endpoint_missing_ep_type_fails(void)
 {
     const char *json = "{ \"endpoints\": [{ \"byte_bus_id\": 1 }] }";
@@ -229,6 +236,7 @@ static void test_parse_endpoint_missing_ep_type_fails(void)
  * entirely (even with ep_type present) matched none of the dispatch
  * loop's own sniff conditions and was silently skipped instead of
  * rejected. Fixed by adding "ep_type" as a second sniff key. */
+//cfusa:test REQ-CFG-004
 static void test_parse_endpoint_missing_byte_bus_id_fails(void)
 {
     const char *json = "{ \"endpoints\": [{ \"ep_type\": 5 }] }";
@@ -242,6 +250,7 @@ static void test_parse_endpoint_missing_byte_bus_id_fails(void)
 
 /* ── parse_json: streams ───────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CFG-015
 static void test_parse_stream_entries(void)
 {
     const char *json =
@@ -263,6 +272,7 @@ static void test_parse_stream_entries(void)
     rcp_config_manifest_free(&m);
 }
 
+//cfusa:test REQ-CFG-006
 static void test_parse_stream_missing_rx_stream_id_fails(void)
 {
     const char *json = "{ \"streams\": [{ \"configured\": true }] }";
@@ -276,6 +286,7 @@ static void test_parse_stream_missing_rx_stream_id_fails(void)
 
 /* ── apply_to_mock / load ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CFG-008
 static void test_apply_to_mock_sets_regmap_fields(void)
 {
     const char *json = "{ \"server\": { \"vendor_id\": 3, \"device_id\": 4 } }";
@@ -289,26 +300,54 @@ static void test_apply_to_mock_sets_regmap_fields(void)
     rcp_mock_server_destroy(srv);
 }
 
-/* REQ-CFG-008's own remaining, previously-untested clauses: (a)
- * svr_implemented_options is ORed in from the manifest, and (b) magic is
- * left unchanged when m->server.magic == 0, even if the regmap already
- * had a nonzero magic before apply_to_mock() ran. */
-static void test_apply_to_mock_sets_options_and_preserves_magic_when_manifest_magic_is_zero(void)
+/* REQ-CFG-017 (split 2026-08-18, issue #533, from a prior REQ-CFG-008
+ * that also bundled this with the magic-preservation clause below --
+ * see REQ-CFG-008's own .fusa-reqs.json text for the split rationale):
+ * svr_implemented_options is ORed into whatever the regmap already
+ * carried, not overwritten -- a pre-existing bit the manifest doesn't
+ * name must survive alongside the newly-named one. */
+//cfusa:test REQ-CFG-017
+static void test_apply_to_mock_ors_options_into_regmap(void)
 {
     const char *json =
-        "{ \"server\": { \"vendor_id\": 3, \"svr_implemented_options\": [\"time_sync\"] } }";
+        "{ \"server\": { \"svr_implemented_options\": [\"time_sync\"] } }";
     rcp_mock_server_t *srv = rcp_mock_server_new();
 
-    rcp_mock_server_regmap(srv)->magic = 0xDEADBEEFu; /* pre-seeded, must survive */
+    rcp_mock_server_regmap(srv)->svr_implemented_options = RCP_REGMAP_OPT_TRIGGER;
 
     TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_config_load(json, srv, NULL, 0));
-    TEST_ASSERT_EQUAL_UINT16(3, rcp_mock_server_regmap(srv)->vendor_id);
-    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, rcp_mock_server_regmap(srv)->magic);
-    TEST_ASSERT_TRUE(rcp_mock_server_regmap(srv)->svr_implemented_options != 0);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)(RCP_REGMAP_OPT_TRIGGER | RCP_REGMAP_OPT_TIME_SYNC),
+                            rcp_mock_server_regmap(srv)->svr_implemented_options);
 
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-CFG-018 (split 2026-08-18, issue #533, from REQ-CFG-008 -- see
+ * that id's own text for the split rationale): magic is left unchanged
+ * when the manifest's magic is 0 (even over a pre-existing nonzero
+ * regmap value), and is set from the manifest otherwise. Both branches
+ * of that one if/else are proven here. */
+//cfusa:test REQ-CFG-018
+static void test_apply_to_mock_magic_preserved_when_zero_else_set(void)
+{
+    const char *json_zero    = "{ \"server\": { \"vendor_id\": 3 } }";
+    const char *json_nonzero = "{ \"server\": { \"magic\": 999 } }";
+    rcp_mock_server_t *srv_a = rcp_mock_server_new();
+    rcp_mock_server_t *srv_b = rcp_mock_server_new();
+
+    rcp_mock_server_regmap(srv_a)->magic = 0xDEADBEEFu; /* pre-seeded, must survive */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_config_load(json_zero, srv_a, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, rcp_mock_server_regmap(srv_a)->magic);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_config_load(json_nonzero, srv_b, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT32(999, rcp_mock_server_regmap(srv_b)->magic);
+
+    rcp_mock_server_destroy(srv_a);
+    rcp_mock_server_destroy(srv_b);
+}
+
+//cfusa:test REQ-CFG-009
 static void test_apply_to_mock_registers_endpoints(void)
 {
     const char *json =
@@ -325,6 +364,8 @@ static void test_apply_to_mock_registers_endpoints(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-CFG-019
+//cfusa:test REQ-CFG-020
 static void test_apply_to_mock_duplicate_byte_bus_id_returns_dup(void)
 {
     const char *json =
@@ -342,6 +383,7 @@ static void test_apply_to_mock_duplicate_byte_bus_id_returns_dup(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-CFG-010
 static void test_load_propagates_parse_error(void)
 {
     const char *json = "{ \"endpoints\": [{ \"byte_bus_id\": 1 }] }"; /* missing ep_type */
@@ -355,6 +397,7 @@ static void test_load_propagates_parse_error(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-CFG-016
 static void test_full_manifest_round_trip(void)
 {
     const char *json =
@@ -402,7 +445,8 @@ int main(void)
     RUN_TEST(test_parse_stream_missing_rx_stream_id_fails);
 
     RUN_TEST(test_apply_to_mock_sets_regmap_fields);
-    RUN_TEST(test_apply_to_mock_sets_options_and_preserves_magic_when_manifest_magic_is_zero);
+    RUN_TEST(test_apply_to_mock_ors_options_into_regmap);
+    RUN_TEST(test_apply_to_mock_magic_preserved_when_zero_else_set);
     RUN_TEST(test_apply_to_mock_registers_endpoints);
     RUN_TEST(test_apply_to_mock_duplicate_byte_bus_id_returns_dup);
     RUN_TEST(test_load_propagates_parse_error);
