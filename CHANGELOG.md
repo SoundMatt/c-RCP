@@ -34,6 +34,78 @@ the rationale.
 
 ## Releases
 
+### v0.425.0 -- 2026-08-18 (c-RCP-19: mock.c TSCF/fragment E2E dispatch fault-injection coverage)
+
+Continues issue #520's category 2 backlog after the `adapt.c`/`ep_can.c`/
+`loan.c`/`tsn.c`/`shmem.c` batches (v0.410.0/PR #526, v0.423.0/PR #540,
+v0.422.0/PR #543): closes the largest remaining single-file gap,
+`src/mock.c`'s CRC-mismatch/fault-injection paths in its TSCF and
+fragment-mode E2E dispatch functions.
+
+`src/mock.c`'s plain, non-fragmented NTSCF dispatch path
+(`rcp_mock_server_dispatch_e2e()`) already had thorough CRC-mismatch/
+stream-fault-tracker/safe-state-broadcast test coverage. Its three
+newer siblings -- `rcp_mock_server_dispatch_e2e_tscf()` (issue #462,
+TSCF presentation-time gating) and `rcp_mock_server_dispatch_e2e_
+fragment()`/`_fragment_tscf()` (issues #336/#445, fragmented dispatch)
+-- are each documented as "a full, separate copy" of an already-tested
+function's body, but only their happy-path and `tv=true` postponement
+behavior had ever been exercised; their own copies of the CRC-mismatch/
+fault-tracker-latch/safe-state-broadcast logic, the `stream_fault_
+tracker`-already-faulted early-reject branch, and (for the fragment
+functions) the entire ACF_GBB message-type branch of the reassembly-
+completion logic were never reached by any test.
+
+`tests/test_tc18_gaps_e2e.c` only -- no source change. One new helper
+(`make_gbb()`, mirrors the existing `make_abb()`) plus 14 new test
+cases: `dispatch_e2e_tscf()`'s own CRC-mismatch+safe-state-broadcast
+test (mirroring `dispatch_e2e()`'s established one); five new
+`dispatch_e2e_fragment()` tests (already-faulted-stream early reject,
+plain-command-mode fallback, too-short-header rejection, a genuine
+2-fragment ACF_GBB round trip -- previously entirely untested, only
+ACF_ABB was ever exercised here -- and a GBB fragmented-CRC mismatch
+that broadcasts safe state to a stream sibling); and eight new
+`dispatch_e2e_fragment_tscf()` tests mirroring `dispatch_e2e_
+fragment()`'s own established suite (single-fragment match, 3-fragment
+ABB round trip, GBB round trip, CRC-mismatch+safe-state-broadcast,
+out-of-order-segment rejection+reset, too-large-reassembly rejection,
+unresolvable-stream fallback, already-faulted-stream rejection).
+Mutation-tested two representative sites (temporarily broke
+`dispatch_e2e_tscf()`'s safe-state-broadcast condition and
+`dispatch_e2e_fragment()`'s GBB `got != want` CRC check; both new
+tests failed as expected with the exact assertion they were written to
+prove, both reverted).
+
+**Measured impact** (local coverage build matching `ci.yml`'s
+`coverage` job's `lcov --capture`/`--remove` invocation; this session's
+toolchain used AppleClang + `llvm-cov gcov` rather than gcc-12, so
+branch-count granularity may differ slightly from the CI runner's own
+number -- treat the branch delta as directional, the actual CI
+`Coverage (LCOV)` job is authoritative):
+- `src/mock.c`: line 77.7% -> 88.6%, branch 62.5% -> 70.6%, function
+  100% (unchanged)
+- project-wide: line 94.4% -> 95.7%, branch 81.1% -> 82.1%
+
+Full 67-test suite (`test_tc18_gaps_e2e` 50 -> 64 cases) + ASan/UBSan
+(`ASAN_OPTIONS=detect_leaks=0`) both clean. `cfusa check` (v0.5.54):
+0 errors. `cfusa trace --req-coverage 100 --sec-tested 100`: 100%/100%
+(unchanged -- every function touched here was already `cfusa:test`-
+tagged, requirement traceability is a separate metric from code
+coverage per issue #520's own scope note).
+
+**Remaining for issue #520**: `src/mock.c`'s multi-member frame
+wrappers (`rcp_mock_server_dispatch_frame_e2e()`/`_frame_e2e_tscf()`)
+still have their own untested chained-member (`RCP_CHAINED_MEMBER_
+CHAIN_ERROR`/`CHAIN_ABORTED`) branches -- ~55 lines combined, a
+distinct malformed-multi-member-frame test pattern from this batch's
+single-message/fragment focus -- plus a handful of smaller per-function
+gaps elsewhere in `mock.c` (`apply_cancellation()`, `peek_member_
+byte_bus_id()`, `is_chained_member()`, `rcp_mock_server_tick_on_
+stream()`). `src/relay.c`/`src/regmap.c` and similar per-file
+long-tail gaps are a separate, ongoing hygiene backlog. The
+branch-coverage floor (issue's own step 5) stays blocked on
+SoundMatt/c-FuSa#137, not on further work in this repo.
+
 ### v0.424.0 -- 2026-08-17 (c-RCP-165: unify the 5-file conditional-request split into `request.h`/`request.c`)
 
 Purely organizational, zero-behavior-change refactor closing issue #165
