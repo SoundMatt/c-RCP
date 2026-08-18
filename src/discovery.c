@@ -290,6 +290,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
 
     if (rcp_fragment_plan((size_t)read_size, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
         rcp_free(segs);
+        segs = NULL;
         return 0;
     }
 
@@ -312,6 +313,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
             rcp_free(segs);
+            segs = NULL;
             return 0;
         }
 
@@ -326,6 +328,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
             rcp_free(segs);
+            segs = NULL;
             return 0;
         }
 
@@ -333,6 +336,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
     }
 
     rcp_free(segs);
+    segs = NULL;
     return count;
 }
 

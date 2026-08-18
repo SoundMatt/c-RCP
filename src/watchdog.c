@@ -177,6 +177,7 @@ rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
         if (!k->states) {
             rcp_mutex_destroy(&k->mu);
             rcp_free(k);
+            k = NULL;
             return NULL;
         }
     }
@@ -261,8 +262,12 @@ void rcp_watchdog_keeper_destroy(rcp_watchdog_keeper_t *k)
     rcp_watchdog_keeper_close(k);
 
     rcp_free(k->states);
+    k->states = NULL;
     rcp_free(k->callbacks);
+    k->callbacks = NULL;
     rcp_free(k->callback_ctx);
+    k->callback_ctx = NULL;
     rcp_mutex_destroy(&k->mu);
     rcp_free(k);
+    k = NULL;
 }

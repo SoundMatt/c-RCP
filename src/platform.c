@@ -44,6 +44,7 @@ static DWORD WINAPI thread_trampoline(LPVOID param)
     void (*fn)(void *) = t->fn;
     void *arg = t->arg;
     rcp_free(t);
+    t = NULL;
     fn(arg);
     return 0;
 }
@@ -59,6 +60,7 @@ int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
     h = CreateThread(NULL, 0, thread_trampoline, t, 0, NULL);
     if (!h) {
         rcp_free(t);
+        t = NULL;
         return -1;
     }
     CloseHandle(h); /* detach: we never join, just don't leak the handle */
@@ -75,6 +77,7 @@ int rcp_thread_start(rcp_thread_t *out, void (*fn)(void *arg), void *arg)
     h = CreateThread(NULL, 0, thread_trampoline, t, 0, NULL);
     if (!h) {
         rcp_free(t);
+        t = NULL;
         return -1;
     }
     *out = h;
@@ -154,6 +157,7 @@ static void *thread_trampoline(void *param)
     void (*fn)(void *) = t->fn;
     void *arg = t->arg;
     rcp_free(t);
+    t = NULL;
     fn(arg);
     return NULL;
 }
@@ -170,6 +174,7 @@ int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
     rc = pthread_create(&tid, NULL, thread_trampoline, t);
     if (rc != 0) {
         rcp_free(t);
+        t = NULL;
         return -1;
     }
     pthread_detach(tid);
@@ -186,6 +191,7 @@ int rcp_thread_start(rcp_thread_t *out, void (*fn)(void *arg), void *arg)
     rc = pthread_create(out, NULL, thread_trampoline, t);
     if (rc != 0) {
         rcp_free(t);
+        t = NULL;
         return -1;
     }
     return 0;

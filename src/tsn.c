@@ -140,6 +140,7 @@ static void tsn_destroy(rcp_avtp_transport_t *self)
     tsn_transport_t *t = (tsn_transport_t *)self;
     rcp_avtp_transport_release(t->inner);
     rcp_free(t);
+    t = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t tsn_vtable = {

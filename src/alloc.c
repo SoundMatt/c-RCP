@@ -56,4 +56,5 @@ void rcp_free(void *ptr)
         return;
     }
     free(ptr);
+    ptr = NULL;
 }

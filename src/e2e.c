@@ -249,6 +249,7 @@ rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
      * sit. */
     if (!adapt_acf_msg_length(data, real_len, 1)) {
         rcp_free(data);
+        data = NULL;
         return out;
     }
 
