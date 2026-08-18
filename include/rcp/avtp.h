@@ -22,6 +22,17 @@
 //cfusa:req REQ-AVTP-021
 //cfusa:req REQ-AVTP-022
 //cfusa:req REQ-AVTP-023
+//cfusa:req REQ-AVTP-024
+//cfusa:req REQ-AVTP-025
+//cfusa:req REQ-AVTP-026
+//cfusa:req REQ-AVTP-027
+//cfusa:req REQ-AVTP-028
+//cfusa:req REQ-AVTP-029
+//cfusa:req REQ-AVTP-030
+//cfusa:req REQ-AVTP-031
+//cfusa:req REQ-AVTP-032
+//cfusa:req REQ-AVTP-033
+//cfusa:req REQ-AVTP-034
 /*
  * avtp.h -- IEEE 1722 AVTPDU framing for the TC18 Remote Control Protocol
  * wire layer (ROADMAP.md Phase 13, "Wire Format Core", milestone 59).

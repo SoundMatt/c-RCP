@@ -25,9 +25,10 @@
 //cfusa:test REQ-MOCK-033
 //cfusa:test REQ-RMAP-054
 //cfusa:test REQ-WDG-010
-//cfusa:test REQ-AVTP-021
-//cfusa:test REQ-AVTP-022
-//cfusa:test REQ-AVTP-023
+//cfusa:test REQ-AVTP-030
+//cfusa:test REQ-AVTP-032
+//cfusa:test REQ-AVTP-033
+//cfusa:test REQ-AVTP-034
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
@@ -672,6 +673,7 @@ static void test_dispatch_tscf_drops_without_time_sync_and_policy_is_drop(void)
  * PENDING the way test_dispatch_tscf_with_tv_true_postpones_a_standard_
  * request() proves this exact same tv/avtp_timestamp pair produces when
  * time_sync_supported is true instead. */
+//cfusa:test REQ-AVTP-030
 static void test_dispatch_tscf_executes_immediately_without_time_sync_when_policy_is_ignore(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -722,6 +724,7 @@ static void test_dispatch_tscf_policy_is_ignore_irrelevant_when_time_sync_suppor
  * frame outright, exactly reproducing this library's pre-issue-#431
  * disposition (no such parameter existed at all before this fix) for a
  * caller that never opts in. */
+//cfusa:test REQ-AVTP-032
 static void test_dispatch_tscf_drops_when_reserved_all_zero_and_policy_is_drop(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -747,6 +750,7 @@ static void test_dispatch_tscf_drops_when_reserved_all_zero_and_policy_is_drop(v
  * test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch() above
  * already proves for a genuinely-NTSCF-equivalent request, isolating
  * this rule's own IGNORE-side effect from every other behavior. */
+//cfusa:test REQ-AVTP-033
 static void test_dispatch_tscf_processes_as_ntscf_when_reserved_all_zero_and_policy_is_ignore(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -771,6 +775,7 @@ static void test_dispatch_tscf_processes_as_ntscf_when_reserved_all_zero_and_pol
  * (test_dispatch_tscf_with_tv_true_postpones_a_standard_request above)
  * is disregarded once tscf_reserved_all_zero triggers the substitution:
  * the request still executes immediately, not RCP_MOCK_DISPATCH_PENDING. */
+//cfusa:test REQ-AVTP-033
 static void test_dispatch_tscf_reserved_all_zero_ignore_forces_tv_false(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -822,6 +827,7 @@ static void test_dispatch_tscf_unaffected_when_reserved_not_all_zero(void)
  * tv/avtp_timestamp fields (never tu) -- both produce the identical
  * outcome, proving tu=1 really is executed as if tu=0, TC18 §13.3's own
  * third rule, not merely assumed to be from tu's absence as a parameter. */
+//cfusa:test REQ-AVTP-034
 static void test_dispatch_tscf_tu_one_and_tu_zero_produce_identical_outcome(void)
 {
     uint8_t                 wire_tu0[RCP_AVTP_TSCF_HEADER_LEN] = {0};
