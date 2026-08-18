@@ -19106,6 +19106,58 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.431.0 -- 2026-08-19 ([c-RCP-17] round 4, final pass: exhaustive
+Phase (c) re-audit, discovery.c fragment-plan conversion, Phase (b)
+closed)
+
+Final pass on issue #521. Round 3's own "no further work remains"
+close-out rested on illustrative examples, not a fresh, exhaustive
+re-enumeration of every current `rcp_malloc`/`rcp_calloc`/
+`rcp_realloc(` call site in `src/*.c` -- this round did that
+re-enumeration from scratch and found one genuine Phase (b) oversight:
+`discovery.c`'s own fragment-plan segment array
+(`rcp_discovery_encode_response_fragmented()`). Unlike `ep_uart.c`'s/
+`ep_iseled.c`'s already-documented "no small bound" fragment arrays,
+`discovery.c`'s `read_size` parameter is genuinely typed `uint8_t`, so
+its payload can never exceed 255 octets regardless of
+`max_fragment_payload` -- the same already-bounded-by-a-real-field
+shape `ep_can.c`'s conversion (round 3) used, not `ep_iseled.c`'s
+unbounded one. Converted to a fixed stack array (new
+`RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS` = 255, a mathematically exact
+ceiling, not merely a realistic one), with a defensive (provably
+unreachable, but mutation-tested against a narrowed constant) bounds
+guard and a new boundary test exercising the true worst case
+(`read_size` = 255, `max_fragment_payload` = 1, count = 255 exactly).
+
+Also investigated and confirmed NOT a Phase (b) gap:
+`request_sequencer.c`'s `rcp_sequencer_table_new(uint16_t count)`,
+whose `count` genuinely IS bounded by a real protocol constant
+(`regmap.h`'s 8-bit `svr_sequencers_max` register) but whose
+`state`/`owner` fields carry a public, test-pinned "NULL means
+unallocated" API contract that fixed-array conversion would break --
+documented in AUDIT_PACK.md as a precise exception, not silently
+folded into the general "no bound exists" reasoning the way most other
+Phase (c) cases are.
+
+`AUDIT_PACK.md`'s "Dynamic Allocation Posture" section rewritten for
+exhaustive, checkable coverage: re-derives the current total (90 real
+call sites / 39 files, reconciled against a literal, re-runnable `grep`
+command), expands the old five illustrative categories to six precise
+shapes with every one of the 39 files named explicitly under whichever
+shape(s) it belongs to, and reconciles the six shapes' site counts back
+to 90 exactly. Phase (b)'s status line changes from "IN PROGRESS" to
+"CLOSED".
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors, `trace --req-coverage 100 --sec-tested 100` 100%/100%,
+unchanged.
+
+**Issue #521 status**: every genuinely boundable call site is now
+converted; every remaining one is individually, explicitly justified
+in AUDIT_PACK.md against the real current file list. Closing on this
+basis -- see CHANGELOG.md's own entry for this version for the full
+per-file accounting.
+
 ### v0.430.0 -- 2026-08-18 (c-RCP-17 round 3: respqueue.c/loan.c
 fixed-capacity redesigns, ep_can.c fragment-plan conversion, Phase (c)
 dynamic-allocation posture write-up)

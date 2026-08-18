@@ -595,6 +595,73 @@ static void test_fragment_deliberately_small_cap_round_trip(void)
     for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
 }
 
+/* Issue #521 round 4: rcp_discovery_encode_response_fragmented()'s own
+ * fragment-plan array (src/discovery.c) is now a fixed
+ * RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS-capacity (255) stack array, not
+ * heap-allocated -- see that constant's own doc comment (discovery.h) for
+ * why 255 is a mathematically exact ceiling given read_size's uint8_t
+ * width. This test exercises the actual worst case the ceiling is sized
+ * against: read_size = 255 (its own max value) with
+ * max_fragment_payload = 1, so rcp_fragment_plan_count() returns exactly
+ * 255 -- the ceiling itself, not merely "some large count under it". */
+static void test_fragment_max_read_size_min_payload_hits_ceiling_exactly(void)
+{
+    rcp_regmap_general_t       map    = sample_map();
+    rcp_stream_id_t             server = rcp_stream_id_make(SERVER_MAC, 3);
+    uint8_t                     read_size = 255;
+    size_t                      max_fragment_payload = 1;
+    size_t                      count;
+    static rcp_bytes_t          frames[RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS];
+    rcp_fragment_reassembler_t  reasm;
+    size_t                      i;
+
+    count = rcp_discovery_response_fragment_count(read_size, max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS, count);
+
+    count = rcp_discovery_encode_response_fragmented(&map, read_size, 7, server,
+                                                       max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS, count);
+
+    rcp_fragment_reassembler_init(&reasm, read_size);
+    for (i = 0; i < count; i++) {
+        rcp_stream_id_t              from_stream;
+        bool                          ms;
+        uint8_t                      segnum;
+        const uint8_t                *payload;
+        size_t                        payload_len;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_DISCOVERY_OK,
+            rcp_discovery_decode_response_fragment(frames[i].data, frames[i].len, &from_stream,
+                                                     &ms, &segnum, &payload, &payload_len));
+        TEST_ASSERT_TRUE(rcp_stream_id_equal(server, from_stream));
+
+        rc = rcp_fragment_reassembler_feed(&reasm, ms, segnum, payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t          *reassembled;
+        size_t                   reassembled_len;
+        rcp_discovery_result_t   result;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(read_size, reassembled_len);
+
+        TEST_ASSERT_EQUAL(RCP_DISCOVERY_OK,
+            rcp_discovery_decode_reassembled_response(reassembled, reassembled_len, server,
+                                                        &result));
+        TEST_ASSERT_TRUE(result.valid);
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
 static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -931,6 +998,7 @@ int main(void)
     RUN_TEST(test_fragment_count_one_when_unfragmented);
     RUN_TEST(test_fragment_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_deliberately_small_cap_round_trip);
+    RUN_TEST(test_fragment_max_read_size_min_payload_hits_ceiling_exactly);
     RUN_TEST(test_fragment_encode_disabled_when_zero_cap_and_oversized);
     RUN_TEST(test_fragment_decode_rejects_wrong_byte_bus_id);
     RUN_TEST(test_decode_reassembled_response_rejects_short_buffer);

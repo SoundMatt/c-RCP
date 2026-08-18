@@ -34,6 +34,124 @@ the rationale.
 
 ## Releases
 
+### v0.431.0 -- 2026-08-19 ([c-RCP-17] round 4, final pass: exhaustive Phase (c) re-audit, discovery.c fragment-plan conversion, Phase (b) closed)
+
+Final pass on issue #521. Round 3's own status comment closed with "No
+further 'convert this to fixed-capacity' work remains identified" --
+a claim resting on illustrative examples, not a fresh, exhaustive
+re-enumeration of every current `rcp_malloc`/`rcp_calloc`/
+`rcp_realloc(` call site in `src/*.c`. This round did that
+re-enumeration from scratch (ignoring every prior round's counts) and
+re-verified each file's disposition against the actual current source,
+rather than trusting AUDIT_PACK.md's prior categorization at face
+value.
+
+**Finding: `discovery.c`'s own fragment-plan segment array
+(`rcp_discovery_encode_response_fragmented()`) was a genuine Phase (b)
+oversight.** Its shape looks, at a glance, like `ep_iseled.c`'s/
+`ep_uart.c`'s already-documented "no small bound" fragment-plan arrays
+(`discovery.h`'s own file comment even draws that analogy for
+real-world traffic patterns), but its actual worst-case bound differs:
+`read_size` here is genuinely typed `uint8_t` (unlike `ep_uart.c`'s
+plain-`size_t` `rx_len`, which REQ-UART-034/issue #201 established can
+legitimately reach 4095 octets), so the payload this function ever
+fragments cannot exceed 255 octets by the parameter's own type,
+regardless of `max_fragment_payload` -- exactly the same
+"already-bounded-by-a-real-fixed-width-field" shape `ep_can.c`'s
+`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS` (round 3) was converted against, not
+`ep_iseled.c`'s "no small ceiling exists" one.
+
+**`discovery.c`/`discovery.h`: fragment-plan `segs[]` -> fixed stack
+array, new `RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS` (255).** Unlike
+`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS` (a "realistic ceiling chosen on top
+of" a hard payload-length constant, per that constant's own comment),
+255 here is a *mathematically exact* ceiling, not merely a realistic
+one: `rcp_fragment_plan_count(payload_len, max_fragment_payload)` never
+returns more than `payload_len` segments for any
+`max_fragment_payload >= 1`, and `payload_len` is `read_size`, an
+actual `uint8_t`. A defensive `count > RCP_DISCOVERY_MAX_FRAGMENT_
+SEGMENTS` guard is kept anyway (provably unreachable given the proof
+above, but a real bounds check on `segs[]` -- now a stack array, unlike
+the heap array it replaces -- rather than trusting the proof silently
+at runtime); mutation-tested by temporarily narrowing the constant to
+254, which the new boundary test below caught immediately (the guard
+tripped, `rcp_discovery_encode_response_fragmented()` returned 0
+instead of the expected 255) -- confirming the guard is load-bearing
+under a wrong constant, not dead code, even though it is unreachable
+under the correct one.
+
+**Investigated and confirmed NOT a Phase (b) gap:
+`request_sequencer.c`'s `rcp_sequencer_table_new(uint16_t count)`.**
+This one is worth recording precisely because it looked, on first
+read, like it might be a second `discovery.c`-shaped oversight:
+`count` genuinely IS bounded by a real protocol constant in legitimate
+use (`regmap.h`'s `svr_sequencers_max`, REQ-RMAP-028, is an 8-bit wire
+field, 0..255 -- `request_sequencer.h`'s own file header already
+documents that a table is always sized from that register's value, and
+a sibling constant for a *different* code path,
+`RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES` = 0xFF, already exists
+recognizing the same bound). What rules this out as a Phase (b)
+conversion is not the bound -- it exists -- but that
+`rcp_sequencer_table_t.state`/`.owner` are public, tested heap-pointer
+fields with a documented "NULL means `count == 0` / allocation
+failure" sentinel API contract: `tests/test_request_sequencer.c`
+asserts `TEST_ASSERT_NULL(table.state)` six times, and `mock.c` checks
+`srv->sequencers.state != NULL` directly. Embedding fixed arrays in
+`state`/`.owner`'s place to close this out would change both fields'
+own C type and silently change that sentinel's meaning for every
+existing caller -- a breaking public API/ABI change, not a mechanical,
+behavior-preserving one, so this stays open as a documented Phase (c)
+exception (AUDIT_PACK.md category 4) rather than being converted.
+
+**`AUDIT_PACK.md`: Dynamic Allocation Posture rewritten for exhaustive,
+checkable coverage.** The previous revision's five Phase (c) categories
+were accurate as far as they went but illustrative ("dozens of
+functions... across every `ep_*.c` endpoint module") rather than a
+provably complete accounting. The rewrite: re-derives the current
+total (90 real call sites across 39 files, reconciled against a
+literal `grep -nE` command a reader can re-run), expands to six
+precise shapes (splitting the old "variable-length output buffer"
+catch-all into its actual constituent shapes: owned output buffers,
+fragment-plan arrays, deployment-scale tables, one-time setup
+allocations, and -- new, previously undocumented -- the opaque-handle/
+object-constructor idiom nearly every stateful module uses), names
+every one of the 39 files explicitly under whichever shape(s) it
+belongs to (several files, like `avtp.c`/`relay.c`/`l2.c`/`udp.c`/
+`mdns.c`, span more than one shape and are listed under each with the
+specific site distinguished), and reconciles the six shapes' site
+counts back to the 90-site total exactly (34+2+4+22+6+22). Phase (b)'s
+own status line changes from "IN PROGRESS" to "CLOSED", with an
+explicit accounting of why (this round's re-audit found exactly one
+real remaining gap, converted above, and confirmed no others remain)
+rather than a bare status flip.
+
+Mutation-tested: `discovery.c`'s new `RCP_DISCOVERY_MAX_FRAGMENT_
+SEGMENTS` bound (narrowed 255 -> 254, confirmed the new boundary test
+fails as expected -- the guard trips and the function returns 0
+instead of 255 -- reapplied). New `test_discovery.c` boundary test
+(`test_fragment_max_read_size_min_payload_hits_ceiling_exactly`)
+exercises the actual worst case the ceiling is sized against:
+`read_size = 255`, `max_fragment_payload = 1`, asserting
+`rcp_discovery_response_fragment_count()`/`rcp_discovery_encode_
+response_fragmented()` both return exactly 255, full fragment/
+reassemble/decode round trip.
+
+Full 67-test suite: 100% passing. ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS locally / CI's own Linux
+config): clean. Pinned `cfusa` v0.5.54: `check` 0 errors, PASS; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (1095/1095 reqs,
+512/512 functions), unchanged from baseline.
+
+**Issue #521 status**: every genuinely boundable dynamic-allocation
+call site identified across a fresh, exhaustive audit is now converted
+(Phase (a) and (b) both CLOSED); every remaining call site is
+explicitly, individually accounted for in AUDIT_PACK.md's Phase (c)
+section, verified against the real current file list rather than
+asserted from a prior round's summary. Closing issue #521 on this
+basis.
+
+[c-RCP-17]
+
 ### v0.430.0 -- 2026-08-18 (c-RCP-17 round 3: respqueue.c/loan.c fixed-capacity redesigns, ep_can.c fragment-plan/scratch-buffer conversion, Phase (c) dynamic-allocation posture write-up)
 
 Round 3 on issue #521, picking up exactly where PR #547's status

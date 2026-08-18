@@ -106,93 +106,272 @@ phased order the issue itself defines:
   monitoring or fault-injection hook, regardless of which category it
   falls into.
 - **Phase (b) — convert boundable cases to fixed-capacity storage,
-  IN PROGRESS.** Converted so far: `l2.c`/`udp.c` receive buffers,
-  `watchdog.c`/`deadline.c` stream tables and callback lists,
+  CLOSED.** Converted across rounds 1–4: `l2.c`/`udp.c` receive
+  buffers, `watchdog.c`/`deadline.c` stream tables and callback lists,
   `powerstate.c`/`admin.c` endpoint/subscriber/counter tables,
   `respqueue.c`'s `entries[]`/`entries_seq[]` free/FIFO-order
   bookkeeping (`RCP_RESPQUEUE_MAX_ENTRIES`, now a universal bound, not
   only a `capacity_octets == 0` fallback), `loan.c`'s pool free-list
-  bookkeeping (`RCP_LOAN_POOL_MAX_ENTRIES`), and `ep_can.c`'s
+  bookkeeping (`RCP_LOAN_POOL_MAX_ENTRIES`), `ep_can.c`'s
   prefix-then-data scratch buffer and fragment-plan segment array
-  (`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`) — every one of these was a case
-  where the array's true worst-case size was already a small,
+  (`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`), and — round 4, closing this
+  phase out — `discovery.c`'s own fragment-plan segment array
+  (`RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS`, 255). Every one of these was
+  a case where the array's true worst-case size was already a small,
   real compile-time protocol constant, so a fixed embedded array is a
   behavior-preserving (mutation-tested) drop-in.
-- **Phase (c) — document/justify what remains genuinely dynamic.**
-  What is left, after (a) and (b), falls into a small number of
-  distinct shapes, none of which is a small-fixed-array oversight —
-  each would require either an unbounded compile-time reservation (not
-  actually safer) or a breaking public-API redesign to eliminate:
 
-  1. **Variable-length owned output buffers (`rcp_bytes_t`).** The
-     dozens of `rcp_*_encode_*()`/`_decode_*()` functions across every
-     `ep_*.c` endpoint module, `acf.c`, `avtp.c`, and `e2e.c` return a
-     caller-owned `rcp_bytes_t` (`rcp.h`) sized to that specific call's
-     own input (a payload, a data buffer, a symbol count) — not to a
-     small fixed protocol maximum in every case (e.g.
-     `rcp_ep_iseled_encode_bitframe()`/`_decode_bitframe()`,
+  **Why CLOSED, not merely "no further items found this round" again:**
+  round 3's own status comment made exactly that claim ("No further
+  'convert this to fixed-capacity' work remains identified") without
+  a fresh, exhaustive re-enumeration of every current call site behind
+  it — round 4 did that re-enumeration (every `rcp_malloc`/`rcp_calloc`/
+  `rcp_realloc(` call site in `src/*.c`, grepped fresh rather than
+  trusted from a prior count) and it found exactly one real remaining
+  oversight: `discovery.c`'s fragment-plan array, converted above. The
+  file-by-file classification in Phase (c) below is that same
+  enumeration's complete result, not a curated illustrative sample —
+  see its own opening paragraph for the reconciliation that makes this
+  checkable rather than asserted.
+
+  **The one call site that turned out to be real-constant-bounded but
+  is deliberately NOT converted** (`request_sequencer.c`'s
+  `rcp_sequencer_table_new(uint16_t count)`, see Phase (c) category 4
+  below) is not a Phase (b) gap: converting it would require changing
+  `rcp_sequencer_table_t.state`/`.owner` from heap pointers to embedded
+  fixed arrays, which breaks that struct's own documented and
+  test-pinned "NULL means `count == 0` / allocation failure" public API
+  contract (`tests/test_request_sequencer.c` asserts
+  `TEST_ASSERT_NULL(table.state)` six times; `mock.c` checks
+  `srv->sequencers.state != NULL` directly) — exactly the "different,
+  breaking API contract Phase (b)'s mechanical, behavior-preserving
+  scope does not license" reasoning already established for `loan.c`
+  and `relay.c` below, not a case Phase (b) left on the table by
+  oversight.
+- **Phase (c) — document/justify what remains genuinely dynamic.**
+  Every dynamic-allocation call site remaining in `src/*.c` after
+  Phase (b) — **90 real call sites across 39 files**, as of this PR —
+  falls into exactly one of the six shapes below. This count is
+  mechanically reproducible and was re-verified against the actual
+  current tree for this pass, not carried forward from an earlier
+  round's number:
+
+  ```
+  grep -nE '\brcp_(malloc|calloc|realloc)\s*\(' src/*.c | grep -v '/alloc\.c:'
+  ```
+
+  returns 95 lines (`alloc.c` itself is excluded: it only *defines*
+  `rcp_malloc`/`rcp_calloc`/`rcp_realloc`, and a naive grep matches
+  those three definition lines too). Of those 95, five are source
+  comments that merely mention the function names in prose rather than
+  call them (`admin.c:44`, `admin.c:153`, `l2.c:125`, `udp.c:126`,
+  `request_sequencer.c:9` — each citable by line number and readable in
+  context) and are not call sites at all. **95 − 5 = 90**, the number
+  the categories below sum to exactly. `config.c`'s one grep hit is a
+  three-way `#define DEFINE_APPEND(...)` macro body (`append_pin`/
+  `append_endpoint`/`append_stream`), counted once here as one textual
+  call site, matching how the grep above counts it.
+
+  | # | Shape | Sites | Files |
+  |---|---|---|---|
+  | 1 | `rcp_bytes_t`/`relay_bytes_t` owned output buffer, sized to that call's own input | 34 | 19 |
+  | 2 | Fragment-plan segment array, no small compile-time bound | 2 | 2 (subset of row 1's files) |
+  | 3 | `loan.c` pooled buffer data + per-acquire control blocks | 4 | 1 |
+  | 4 | Deployment/config-scale table or capacity, no protocol-defined bound | 22 | 12 |
+  | 5 | One-time, setup-path allocation | 6 | 2 |
+  | 6 | Opaque-handle/object constructor (`_new()`'s own `sizeof(*handle)`) | 22 | 18 (+ `loan.c`, tallied under row 3) |
+  | | **Total** | **90** | **39 distinct files** |
+
+  The 39-file union across all six rows is exactly: `acf.c`, `adapt.c`,
+  `admin.c`, `authz.c`, `avtp.c`, `config.c`, `deadline.c`,
+  `discovery.c`, `e2e.c`, `ep_adc.c`, `ep_gpio.c`, `ep_i2c.c`,
+  `ep_iseled.c`, `ep_lin.c`, `ep_mdio.c`, `ep_pwm.c`, `ep_spi.c`,
+  `ep_uart.c`, `ep_wakeup.c`, `faultinject.c`, `fragment.c`, `l2.c`,
+  `loan.c`, `mdns.c`, `mock.c`, `observe.c`, `platform.c`,
+  `powerstate.c`, `ratelimit.c`, `rcp.c`, `recorder.c`, `relay.c`,
+  `request.c`, `request_sequencer.c`, `server.c`, `shmem.c`, `tsn.c`,
+  `udp.c`, `watchdog.c` — the same 39 files `grep -l` returns against
+  the pattern above (minus `alloc.c`). `ep_can.c` and `respqueue.c`
+  appear in neither list: both were fully converted (Phase (b)) and
+  carry zero dynamic allocation of their own today.
+
+  1. **Variable-length owned output buffers (`rcp_bytes_t`/
+     `relay_bytes_t`).** One `malloc()` per call, sized to that
+     specific call's own input (a payload, a data buffer, a symbol
+     count, a frame length) and freed by the caller — this codebase's
+     single foundational "variable-length owned buffer" convention,
+     used by essentially every public encode/decode API and by
+     `rcp_bytes_dup()`/`relay_bytes_dup()` themselves (`rcp.c`,
+     `relay.c`), not a small fixed protocol maximum in every case
+     (e.g. `rcp_ep_iseled_encode_bitframe()`/`_decode_bitframe()`,
      `include/rcp/ep_iseled.h`, scale directly with a caller-supplied
      `data_len`/`symbol_count` with no small compile-time ceiling of
      their own — ISELED chain length is a deployment property, not a
-     TC18 wire constant). `rcp_bytes_t` being heap-based is this
-     codebase's single foundational "variable-length owned buffer"
-     convention, used by essentially every public encode API; replacing
-     it everywhere would mean redesigning that entire public surface to
-     a caller-supplied-buffer-and-capacity shape, a breaking API change
+     TC18 wire constant). Replacing this convention everywhere would
+     mean redesigning that entire public surface to a
+     caller-supplied-buffer-and-capacity shape, a breaking API change
      far outside this issue's own "convert boundable cases" phase (b)
      scope. `fragment.c`'s reassembly buffer (grows to a
      caller-configured `max_total_len`, `include/rcp/fragment.h`'s own
      file header) is the same shape: the reassembled message's true
      size is a deployment-configured ceiling, not a protocol constant.
-  2. **`ep_iseled.c`'s own fragment-plan array**
-     (`rcp_ep_iseled_encode_response_fragmented()`) is deliberately NOT
-     converted to a fixed array the way `ep_can.c`'s equivalent was:
-     unlike CAN XL's hard `RCP_EP_CAN_XL_MAX_ENCODED_LEN` (2058-octet)
-     ceiling, the ISELED response length this function fragments is
-     bounded only by `read_size` (a full 16-bit register, up to 65535)
-     and the caller's own `rx_len` — no small compile-time constant
-     exists to size a fixed array against without either rejecting
-     legitimate large ISELED reads or reserving an array too large to
-     put on a call stack safely. This is the same "no small ceiling
-     exists" reasoning as category 1, applied to one more call site.
+     Files (34 sites / 19 files): `acf.c` (2), `avtp.c` (2), `e2e.c`
+     (2), `ep_adc.c` (2), `ep_gpio.c` (1), `ep_i2c.c` (1), `ep_iseled.c`
+     (3), `ep_lin.c` (1), `ep_mdio.c` (5), `ep_pwm.c` (2), `ep_spi.c`
+     (1), `ep_uart.c` (1), `ep_wakeup.c` (1), `fragment.c` (1), `l2.c`
+     (1), `rcp.c` (1, the `rcp_bytes_dup()` definition itself), `relay.c`
+     (1, `relay_bytes_dup()`), `request.c` (5), `udp.c` (1).
+  2. **Fragment-plan segment arrays with no small compile-time
+     bound.** `ep_iseled.c`'s (`rcp_ep_iseled_encode_response_
+     fragmented()`) and `ep_uart.c`'s (`rcp_ep_uart_encode_read_
+     response_fragmented()`) own internal `rcp_fragment_segment_t`
+     arrays are deliberately NOT converted to fixed arrays the way
+     `ep_can.c`'s and (round 4) `discovery.c`'s equivalents were: both
+     plan against a length with no small type-derived ceiling —
+     ISELED's is bounded only by `read_size` (a full 16-bit register,
+     up to 65535) and the caller's own `rx_len`; UART's `rx_len` is a
+     plain `size_t` with no narrower parameter type at all, and
+     `ep_uart.h`'s own file comment (REQ-UART-034, issue #201) records
+     that a conforming UART read response can genuinely carry up to
+     4095 octets, not merely a handful — a fragment count in the
+     thousands is possible via `fragment.h`'s own global
+     `RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS` (4096) ceiling, but an
+     array that size (well over 90KB at `sizeof(rcp_fragment_segment_t)`
+     per entry) is not safe to put on a call stack. This is genuinely
+     different from `discovery.c`'s case (round 4, now converted, Phase
+     (b) above): `discovery.c`'s `read_size` parameter is actually typed
+     `uint8_t`, a hard compile-time guarantee its payload never exceeds
+     255 octets regardless of `max_fragment_payload` — `ep_uart.h`'s own
+     file header draws an analogy between the two endpoints'
+     real-world traffic patterns ("like ep_uart.h's read responses,
+     never actually needs fragment.h's ms/segment_num mechanism... in
+     real-world use"), but that analogy is about typical traffic, not
+     about the two functions' actual worst-case bounds, which differ —
+     see `RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS`'s own doc comment
+     (`discovery.h`) for the distinction spelled out in full. Files (2
+     sites / 2 files, both already counted under row 1 above for their
+     own separate encode-buffer sites): `ep_iseled.c`, `ep_uart.c`.
   3. **`loan.c`'s pooled buffers and per-acquire control blocks.** The
-     free-list bookkeeping array is now fixed-capacity (Phase (b)
-     above), but each pooled buffer's own DATA bytes, and the small
-     `rcp_loan_t`/`loan_release_ctx_t` control structs
-     `rcp_loan_pool_acquire()` allocates per call, remain heap-based —
-     the module's entire documented purpose (`loan.h`'s own file
-     header) is caching reuse of buffers whose size is a caller-chosen,
-     runtime `size` argument, not a compile-time constant; eliminating
-     that would mean redesigning the pool into fixed-size-slab
-     semantics (reject any `size` above one fixed slot size), a
-     different, breaking API contract this issue's phase (b) — mechanical,
-     behavior-preserving conversion — does not license.
-  4. **`relay.c`'s message metadata** (`relay_meta_entry_t` key/value
-     string copies and the growable `meta[]` array). This is
-     RELAY-envelope glue this library defines for its own integration
-     surface, not a TC18 wire structure — TC18 gives no bound to cite
-     for how many metadata entries or how long a key/value string a
-     RELAY message may carry, so there is no non-arbitrary compile-time
-     ceiling to pick here the way `RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`
-     above could cite a real protocol constant underneath its own
-     realistic bound.
-  5. **`mdns.c`'s config-time string duplication** and **`platform.c`'s
-     thread-thunk allocation** are both one-time, setup-path allocations
-     (service/hostname/thread-argument strings whose length is
-     deployment configuration, not a per-message hot path) — the same
-     "one-time control block, not a repeated per-message allocation"
-     shape ISO 26262-6's dynamic-allocation concern (mission-length
-     heap fragmentation from repeated alloc/free cycles) is centrally
-     about, and is a materially different risk profile than the
-     per-message paths Phase (b) targeted first.
+     free-list bookkeeping array is fixed-capacity (Phase (b)), but
+     each pooled buffer's own DATA bytes, the pool object itself
+     (`rcp_loan_pool_new()`), and the small `rcp_loan_t`/
+     `loan_release_ctx_t` control structs `rcp_loan_pool_acquire()`
+     allocates per call, remain heap-based — the module's entire
+     documented purpose (`loan.h`'s own file header) is caching reuse
+     of buffers whose size is a caller-chosen, runtime `size` argument,
+     not a compile-time constant; eliminating that would mean
+     redesigning the pool into fixed-size-slab semantics (reject any
+     `size` above one fixed slot size), a different, breaking API
+     contract this issue's phase (b) — mechanical, behavior-preserving
+     conversion — does not license. Files (4 sites / 1 file): `loan.c`.
+  4. **Deployment/config-scale tables and capacities, no
+     protocol-defined bound.** A growable table (realloc-doubling, the
+     same `entries_len == entries_cap` pattern throughout) or a single
+     allocation sized once to a caller-chosen "how many"/"how deep"
+     parameter at construction time, in every case for a quantity TC18
+     itself gives no bound for because the thing being counted is not a
+     TC18 wire structure at all — an access-control rule, a discovered
+     peer, a rate-limited address, a fault-injection rule, a captured
+     trace frame, a pending request queued for a disabled endpoint, a
+     RELAY metadata entry or channel's queue depth, a manifest-declared
+     hardware pin/endpoint/stream, a shared-memory or loopback
+     transport's own queue capacity. This is `relay.c`'s
+     `relay_meta_entry_t` key/value table and its message channel's
+     `items[]` queue (channel depth is this library's own
+     `relay_subscriber_options_t.channel_depth`/`relay_message_channel_
+     new(capacity)` design, not a TC18 field) generalized to every
+     structurally identical table elsewhere: `authz.c`'s policy
+     `entries[]` (an ACL, not wire state), `discovery.c`'s client-side
+     result `cache` (how many servers a client has seen, not a
+     register), `ratelimit.c`'s per-address `buckets[]` (grows per
+     distinct peer address actually seen — closer to a hot path than
+     the others in this row, but still bounded only by how many
+     distinct addresses a deployment's traffic contains, not a protocol
+     constant), `observe.c`'s in-memory span log and `recorder.c`'s
+     trace-capture log (both diagnostic/tooling sinks whose whole
+     purpose is recording everything that happens), `faultinject.c`'s
+     rule table, `server.c`'s per-endpoint pending-request queue,
+     `config.c`'s build-time manifest scan (`hw_pin_map`/`endpoints`/
+     `streams`, a local integration file, not wire traffic), `shmem.c`'s
+     and `avtp.c`'s (loopback transport) own queue-capacity buffers.
+     `request_sequencer.c`'s `rcp_sequencer_table_new(uint16_t count)`
+     is a documented exception worth naming precisely rather than
+     folding in silently: unlike every other file in this row, `count`
+     genuinely IS bounded by a real protocol constant in legitimate use
+     — `regmap.h`'s `svr_sequencers_max` (REQ-RMAP-028) is an 8-bit wire
+     field (0..255), and `request_sequencer.h`'s own file header
+     documents that a table is always "sized at runtime from a server's
+     own `svr_sequencers_max` register value" (a sibling constant,
+     `RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES` = 0xFF, already exists and
+     is used for a *different* code path's own stack-local copy,
+     `regmap.h`'s own comment there). What keeps this a Phase (c) case
+     rather than a Phase (b) conversion is not the bound (it exists) but
+     that `rcp_sequencer_table_t.state`/`.owner` are public, tested
+     heap-pointer fields with a documented "NULL means unallocated"
+     sentinel contract (six `TEST_ASSERT_NULL(table.state)` assertions
+     in `tests/test_request_sequencer.c`, a direct `!= NULL` check in
+     `mock.c`) that embedding fixed arrays in their place would break —
+     see the Phase (b) bullet above for this same point stated from the
+     "why this isn't a Phase (b) gap" side. Files (22 sites / 12 files):
+     `relay.c` (6), `authz.c` (3), `shmem.c` (2), `recorder.c` (2),
+     `request_sequencer.c` (2), `discovery.c` (1), `ratelimit.c` (1),
+     `observe.c` (1), `faultinject.c` (1), `server.c` (1), `config.c`
+     (1), `avtp.c` (1).
+  5. **One-time, setup-path allocations.** `mdns.c`'s config-time
+     string duplication (`dup_cstr()`) and static discovery-record
+     table (sized once, at construction, to a caller-supplied `count` —
+     never regrown), and `platform.c`'s thread-thunk allocation (one
+     tiny fixed-size struct per `rcp_thread_start()`/
+     `_start_detached()` call, freed by the thread trampoline itself
+     before the user function runs) — both are service/hostname/
+     thread-argument allocations whose frequency is deployment
+     configuration or thread-launch count, not a per-message hot path.
+     This is the same "one-time control block, not a repeated
+     per-message allocation" shape ISO 26262-6's dynamic-allocation
+     concern (mission-length heap fragmentation from repeated
+     alloc/free cycles) is centrally about, and is a materially
+     different risk profile than the per-message paths Phase (b)
+     targeted first. Files (6 sites / 2 files): `mdns.c` (2, plus one
+     more site — its own discoverer object constructor — tallied under
+     row 6), `platform.c` (4).
+  6. **Opaque-handle/object constructors.** The C opaque-pointer
+     object-lifecycle idiom this codebase uses for nearly every
+     stateful module: `X_new()`/`_create()`/`_avtp_pair_new()` allocates
+     its own top-level instance struct exactly once, sized to a
+     compile-time-constant `sizeof(*handle)` (never proportional to any
+     message or hot-path input), and the matching `_free()`/`_destroy()`/
+     `_release()` frees it exactly once. `admin.c`, `deadline.c`,
+     `powerstate.c`, and `watchdog.c` each look, from their single
+     remaining `rcp_calloc(1, sizeof(*x))` call, like they might still
+     have unconverted state — they do not: Phase (b) already made every
+     *internal* table in each of these four structs (endpoints/
+     subscribers/counters, stream tables, callback lists) a fixed
+     embedded array; the one call site left in each file is this
+     row's shape, the struct's own handle allocation, not a leftover
+     internal array. Files (22 sites / 18 files, `loan.c`'s own pool
+     constructor is the same shape but already tallied under row 3 to
+     avoid double-counting): `shmem.c` (3), `l2.c` (2), `udp.c` (2),
+     `admin.c`, `adapt.c`, `authz.c`, `avtp.c` (the loopback transport
+     constructor — separate from row 1's two encode-buffer sites in the
+     same file), `deadline.c`, `faultinject.c`, `mdns.c` (its
+     discoverer object, distinct from row 5's two sites in the same
+     file), `mock.c`, `observe.c`, `powerstate.c`, `ratelimit.c`,
+     `recorder.c`, `relay.c` (its message-channel struct — separate
+     from row 4's six metadata/queue-items sites in the same file),
+     `tsn.c`, `watchdog.c`.
 
-  None of category 1–5 is a case this issue's own phase (b) scope
-  ("convert boundable cases") actually covers — each is either
-  unbounded by any small real constant, or would require a breaking
-  public API redesign to bound. All of them are already on the
-  `alloc.h` seam (Phase (a)), so an integrator wanting stricter,
-  ASIL-D-tier control over any of them today can install
-  `rcp_malloc`/`rcp_calloc`/`rcp_realloc` hooks that route to a
+  **Reconciliation:** 34 + 2 + 4 + 22 + 6 + 22 = **90**, matching the
+  grep-derived total above exactly, across the same 39 files listed
+  above — every number in this section is mechanically checkable
+  against the current tree, not asserted. None of these six shapes is
+  a case this issue's own phase (b) scope ("convert boundable cases")
+  actually covers — each is either unbounded by any small real
+  constant, bounded but not convertible without a breaking public API
+  change (row 4's `request_sequencer.c` exception), or would require a
+  breaking public API redesign more generally (rows 1 and 3). All of
+  them are already on the `alloc.h` seam (Phase (a)), so an integrator
+  wanting stricter, ASIL-D-tier control over any of them today can
+  install `rcp_malloc`/`rcp_calloc`/`rcp_realloc` hooks that route to a
   static/pool allocator of their own choosing without this library
   changing at all.
 
