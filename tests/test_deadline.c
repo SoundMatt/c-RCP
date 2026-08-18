@@ -211,6 +211,62 @@ static void test_alive_returns_false_before_first_heartbeat(void)
     rcp_deadline_monitor_destroy(mon);
 }
 
+/* ── [c-RCP-17] Fixed-capacity stream table / callback list ─────────────────── */
+
+//cfusa:test REQ-DL-010
+static void test_monitor_new_at_max_streams_succeeds(void)
+{
+    rcp_deadline_stream_cfg_t streams[RCP_DEADLINE_MAX_STREAMS];
+    rcp_deadline_config_t     cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t   *mon;
+    size_t                    i;
+
+    for (i = 0; i < RCP_DEADLINE_MAX_STREAMS; i++) {
+        streams[i].stream_id   = (uint64_t)i + 1;
+        streams[i].deadline_ms = 5000;
+    }
+
+    mon = rcp_deadline_monitor_new(cfg, streams, RCP_DEADLINE_MAX_STREAMS);
+    TEST_ASSERT_NOT_NULL(mon);
+    /* Last-registered stream is reachable -- confirms the fixed array was
+     * fully populated, not silently truncated below capacity. */
+    TEST_ASSERT_FALSE(rcp_deadline_monitor_alive(mon, RCP_DEADLINE_MAX_STREAMS));
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_heartbeat(mon, RCP_DEADLINE_MAX_STREAMS));
+
+    rcp_deadline_monitor_destroy(mon);
+}
+
+//cfusa:test REQ-DL-010
+static void test_monitor_new_over_max_streams_returns_null(void)
+{
+    rcp_deadline_stream_cfg_t streams[RCP_DEADLINE_MAX_STREAMS + 1];
+    rcp_deadline_config_t     cfg = rcp_deadline_default_config();
+    size_t                    i;
+
+    for (i = 0; i < RCP_DEADLINE_MAX_STREAMS + 1; i++) {
+        streams[i].stream_id   = (uint64_t)i + 1;
+        streams[i].deadline_ms = 5000;
+    }
+
+    TEST_ASSERT_NULL(rcp_deadline_monitor_new(cfg, streams, RCP_DEADLINE_MAX_STREAMS + 1));
+}
+
+//cfusa:test REQ-DL-012
+static void test_subscribe_at_max_callbacks_succeeds_then_next_fails(void)
+{
+    rcp_deadline_config_t   cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t *mon = rcp_deadline_monitor_new(cfg, NULL, 0);
+    size_t                  i;
+
+    for (i = 0; i < RCP_DEADLINE_MAX_CALLBACKS; i++) {
+        TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+    }
+    /* One more, at capacity: rejected, not silently grown. */
+    TEST_ASSERT_FALSE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+
+    rcp_deadline_monitor_destroy(mon);
+}
+
 /* ── Close ────────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-DL-007
@@ -241,6 +297,9 @@ int main(void)
     RUN_TEST(test_notify_overflow_immediately_declares_dead);
     RUN_TEST(test_notify_overflow_unknown_stream_returns_false);
     RUN_TEST(test_alive_returns_false_before_first_heartbeat);
+    RUN_TEST(test_monitor_new_at_max_streams_succeeds);
+    RUN_TEST(test_monitor_new_over_max_streams_returns_null);
+    RUN_TEST(test_subscribe_at_max_callbacks_succeeds_then_next_fails);
     RUN_TEST(test_close_stops_background_thread);
 
     return UNITY_END();

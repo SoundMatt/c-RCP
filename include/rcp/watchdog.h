@@ -96,6 +96,19 @@ typedef struct {
 /* { poll_interval_ms = 10 }. */
 rcp_watchdog_config_t rcp_watchdog_default_config(void);
 
+/* [c-RCP-17] Fixed capacities for rcp_watchdog_keeper_t's internal
+ * stream table and callback list -- this module's own chosen capacities,
+ * not spec-derived (TC18 does not bound how many request streams' rx_wd_*
+ * state or how many event subscribers one Keeper may hold). Matches
+ * e2e.h's RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS precedent/rationale
+ * (RCP_MOCK_MAX_ENDPOINTS' scale as a plausible real-device ceiling)
+ * rather than inventing an unrelated number. Backs a compile-time-sized
+ * embedded array, not a heap allocation -- see rcp_watchdog_keeper_new()'s
+ * and rcp_watchdog_keeper_subscribe()'s own doc comments for the resulting
+ * capacity-exceeded failure modes. */
+#define RCP_WATCHDOG_MAX_STREAMS   ((size_t)16u)
+#define RCP_WATCHDOG_MAX_CALLBACKS ((size_t)16u)
+
 /* User-supplied callback fired on every rcp_e2e_wd_result_t change, across
  * all streams. user_data is the opaque pointer passed to
  * rcp_watchdog_keeper_subscribe(). */
@@ -106,7 +119,10 @@ typedef struct rcp_watchdog_keeper rcp_watchdog_keeper_t;
 /* Creates a Keeper over the given streams (copied by value) and starts its
  * background re-evaluation thread immediately, treating construction time
  * as an implicit initial kick for every stream. streams/n_streams may
- * describe zero streams. Returns NULL on allocation failure. */
+ * describe zero streams. Returns NULL on allocation failure, or if
+ * n_streams exceeds RCP_WATCHDOG_MAX_STREAMS (the stream table is a
+ * fixed-capacity embedded array, not a heap allocation growable to fit
+ * any n_streams -- see that constant's own doc comment). */
 rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
                                                 const rcp_watchdog_stream_cfg_t *streams,
                                                 size_t n_streams);
@@ -124,7 +140,9 @@ rcp_e2e_wd_result_t rcp_watchdog_keeper_status(rcp_watchdog_keeper_t *k, uint64_
 
 /* Registers cb to be invoked on every result change, across all streams.
  * Not thread-safe with close()/destroy(); register before handing k to
- * other threads. Returns false on allocation failure (cb not added). */
+ * other threads. Returns false if k already holds RCP_WATCHDOG_MAX_CALLBACKS
+ * subscribers (cb not added; the callback list is a fixed-capacity
+ * embedded array, not a heap allocation growable without bound). */
 bool rcp_watchdog_keeper_subscribe(rcp_watchdog_keeper_t *k, rcp_watchdog_event_fn cb, void *user_data);
 
 /* Stops the background re-evaluation thread. Idempotent; safe to call

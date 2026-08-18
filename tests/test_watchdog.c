@@ -296,6 +296,58 @@ static void test_subscribe_fires_on_overflow(void)
     TEST_ASSERT_TRUE(g_last_overflowed);
 }
 
+/* ── [c-RCP-17] Fixed-capacity stream table / callback list ─────────────────── */
+
+//cfusa:test REQ-WDG-009
+static void test_keeper_new_at_max_streams_succeeds(void)
+{
+    rcp_watchdog_stream_cfg_t streams[RCP_WATCHDOG_MAX_STREAMS];
+    rcp_watchdog_config_t     cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t    *k;
+    size_t                    i;
+
+    for (i = 0; i < RCP_WATCHDOG_MAX_STREAMS; i++) {
+        streams[i] = make_cfg((uint64_t)i + 1, false, 1000, true, true);
+    }
+
+    k = rcp_watchdog_keeper_new(cfg, streams, RCP_WATCHDOG_MAX_STREAMS);
+    TEST_ASSERT_NOT_NULL(k);
+    /* Last-registered stream is reachable -- confirms the fixed array was
+     * fully populated, not silently truncated below capacity. */
+    TEST_ASSERT_TRUE(rcp_watchdog_keeper_kick(k, RCP_WATCHDOG_MAX_STREAMS));
+    rcp_watchdog_keeper_destroy(k);
+}
+
+//cfusa:test REQ-WDG-009
+static void test_keeper_new_over_max_streams_returns_null(void)
+{
+    rcp_watchdog_stream_cfg_t streams[RCP_WATCHDOG_MAX_STREAMS + 1];
+    rcp_watchdog_config_t     cfg = rcp_watchdog_default_config();
+    size_t                    i;
+
+    for (i = 0; i < RCP_WATCHDOG_MAX_STREAMS + 1; i++) {
+        streams[i] = make_cfg((uint64_t)i + 1, false, 1000, true, true);
+    }
+
+    TEST_ASSERT_NULL(rcp_watchdog_keeper_new(cfg, streams, RCP_WATCHDOG_MAX_STREAMS + 1));
+}
+
+//cfusa:test REQ-WDG-006
+static void test_subscribe_at_max_callbacks_succeeds_then_next_fails(void)
+{
+    rcp_watchdog_config_t  cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k   = rcp_watchdog_keeper_new(cfg, NULL, 0);
+    size_t                 i;
+
+    for (i = 0; i < RCP_WATCHDOG_MAX_CALLBACKS; i++) {
+        TEST_ASSERT_TRUE(rcp_watchdog_keeper_subscribe(k, count_events, NULL));
+    }
+    /* One more, at capacity: rejected, not silently grown. */
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_subscribe(k, count_events, NULL));
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
 /* ── Close ─────────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-WDG-007
@@ -330,6 +382,9 @@ int main(void)
     RUN_TEST(test_notify_only_when_safestate_disabled);
     RUN_TEST(test_safestate_only_when_info_disabled);
     RUN_TEST(test_subscribe_fires_on_overflow);
+    RUN_TEST(test_keeper_new_at_max_streams_succeeds);
+    RUN_TEST(test_keeper_new_over_max_streams_returns_null);
+    RUN_TEST(test_subscribe_at_max_callbacks_succeeds_then_next_fails);
     RUN_TEST(test_close_stops_background_thread);
 
     return UNITY_END();

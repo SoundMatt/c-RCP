@@ -19106,6 +19106,53 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.427.0 -- 2026-08-18 (c-RCP-17 Phase (b), partial: fixed-capacity
+`l2.c`/`udp.c` recv scratch buffers, `watchdog.c`/`deadline.c` stream
+tables + callback lists)
+
+Continues c-RCP-17 (issue #521) past Phase (a)'s alloc.h-seam routing
+(v0.412.0). `l2.c`/`udp.c`'s per-`recv()`-call scratch buffer is now an
+embedded struct member sized once at construction (the size was always
+a compile-time constant, `RCP_L2_MAX_FRAME`/`RCP_UDP_AVTP_MAX_FRAME`);
+`watchdog.c`/`deadline.c`'s `states[]` table and `callbacks[]`/
+`callback_ctx[]` list are now fixed-capacity embedded arrays
+(`RCP_WATCHDOG_MAX_STREAMS`/`_MAX_CALLBACKS`,
+`RCP_DEADLINE_MAX_STREAMS`/`_MAX_CALLBACKS`, 16 each -- this module's
+own chosen capacity, matching `e2e.h`'s
+`RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS` precedent, not spec-derived).
+`_new()` now also returns `NULL` past the cap and `_subscribe()` now
+also returns `false` at capacity -- both already-existing failure
+channels, no new ones. New boundary tests both modules; the
+capacity-guard change is mutation-tested (temporarily widened past the
+real constant, confirmed the new over-capacity test fails, reverted).
+The `l2.c`/`udp.c` change is a pure storage-location swap with no new
+branch to mutate -- verified instead by the unchanged recv-path tests
+passing plus a clean ASan/UBSan build (would catch a wrong embedded
+buffer size as a stack overflow).
+
+Also found, on closer reading, that the issue's own "near-mechanical"
+categorization of three ACF scratch-buffer sites
+(`request_triggered.c`/`e2e.c`/`ep_can.c`'s `build_payload()`) was
+wrong: each returns a caller-owned buffer via the same
+`rcp_bytes_t`-by-value convention every `rcp_*_encode_*()` function in
+this codebase uses, not confined scratch space -- fixing that category
+means redesigning that entire function family's public calling
+convention, not a per-site swap. Recorded in CHANGELOG.md so a future
+pass doesn't re-attempt it as quick. `powerstate.c`/`admin.c` (same
+fixed-capacity shape as watchdog/deadline), `respqueue.c`/`loan.c`
+(real redesign, not mechanical), fragment-plan segment arrays, and
+Phase (c)'s "document what stays dynamic" pass are all left open for a
+future pass.
+
+Full 67-test suite: 100% passing. ASan/UBSan clean. `cfusa
+check`/`trace` (v0.5.54): 0 errors, 100%/100%, unchanged from
+baseline. Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.427.0` to match `CMakeLists.txt`, per
+the `version-sources-agree` gate (c-RCP-09, PR #529). Rebased onto
+main twice past PRs #528-#545 landing during this branch's review
+cycle; version bumped from this branch's original `0.419.0` slot to
+`0.427.0` to land after all of them. Issue #521 stays open.
+
 ### v0.426.0 -- 2026-08-18 (c-RCP-21 L001 sub-effort: split 3
 over-length src/ functions, all real src/ candidates closed)
 
