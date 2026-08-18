@@ -9,12 +9,16 @@
 //cfusa:test REQ-ADMIN-008
 //cfusa:test REQ-ADMIN-009
 //cfusa:test REQ-ADMIN-010
+//cfusa:test REQ-ADMIN-011
+//cfusa:test REQ-ADMIN-012
 #include "unity.h"
 
 #include <rcp/admin.h>
+#include <rcp/alloc.h>
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -42,7 +46,7 @@ static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
 #endif
 
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a fault-injection hook across tests */
 
 static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 {
@@ -67,10 +71,72 @@ static void test_new_returns_a_server_with_no_endpoints_registered(void)
     rcp_admin_server_destroy(srv);
 }
 
+/* REQ-ADMIN-011's own clause, split out of what was REQ-ADMIN-009: forces
+ * rcp_admin_server_new()'s internal rcp_calloc() to fail via this project's
+ * fault-injection hook (alloc.h), the same technique test_loan.c's
+ * test_acquire_returns_null_when_loan_struct_allocation_fails() uses --
+ * distinct from test_new_returns_a_server_with_no_endpoints_registered()
+ * above, which never exercises this branch at all. */
+static void *admin_test_failing_calloc(size_t nmemb, size_t size)
+{
+    (void)nmemb; (void)size;
+    return NULL;
+}
+
+//cfusa:test REQ-ADMIN-011
+static void test_new_returns_null_when_allocation_fails(void)
+{
+    rcp_alloc_hooks_t hooks = {0};
+
+    hooks.calloc_fn = admin_test_failing_calloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    TEST_ASSERT_NULL(rcp_admin_server_new());
+
+    rcp_alloc_reset_hooks();
+}
+
 //cfusa:test REQ-ADMIN-010
 static void test_destroy_tolerates_null(void)
 {
     rcp_admin_server_destroy(NULL); /* must not crash */
+}
+
+/* REQ-ADMIN-012's own clause, split out of what was REQ-ADMIN-010: proves
+ * destroy() actually frees srv (not just "doesn't crash", which
+ * test_destroy_tolerates_null above already covers for the NULL case) by
+ * installing a counting rcp_free() hook and checking it fires exactly once,
+ * with srv's own pointer -- every other test in this file also calls
+ * rcp_admin_server_destroy() at teardown, but none of them assert anything
+ * about that call, so this is the first test that would actually fail if
+ * destroy() stopped freeing srv. */
+static int   g_admin_free_calls;
+static void *g_admin_last_freed;
+
+static void admin_test_counting_free(void *ptr)
+{
+    g_admin_free_calls++;
+    g_admin_last_freed = ptr;
+    free(ptr);
+}
+
+//cfusa:test REQ-ADMIN-012
+static void test_destroy_frees_srv_when_non_null(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    rcp_alloc_hooks_t   hooks = {0};
+
+    g_admin_free_calls = 0;
+    g_admin_last_freed = NULL;
+    hooks.free_fn = admin_test_counting_free;
+    rcp_alloc_set_hooks(&hooks);
+
+    rcp_admin_server_destroy(srv);
+
+    TEST_ASSERT_EQUAL_INT(1, g_admin_free_calls);
+    TEST_ASSERT_EQUAL_PTR(srv, g_admin_last_freed);
+
+    rcp_alloc_reset_hooks();
 }
 
 /* ── Endpoint registration ────────────────────────────────────────────────── */
@@ -388,7 +454,9 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_new_returns_a_server_with_no_endpoints_registered);
+    RUN_TEST(test_new_returns_null_when_allocation_fails);
     RUN_TEST(test_destroy_tolerates_null);
+    RUN_TEST(test_destroy_frees_srv_when_non_null);
     RUN_TEST(test_register_and_deregister_report_membership_changes);
     RUN_TEST(test_endpoints_returns_a_snapshot_of_registered_endpoints);
     RUN_TEST(test_subscribe_and_emit_deliver_the_correct_event);

@@ -19106,6 +19106,53 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.436.0 -- 2026-08-21 ([c-RCP-18] issue #533 batch REQ-ADMIN-*:
+requirement-atomicity audit, Group 3 server/dispatch)
+
+First landed batch of #533, the requirement-atomicity audit tracker
+established by #519/PR #525's `CONTRIBUTING.md` "Writing a
+requirement" convention. Scope: all 10 `REQ-ADMIN-*` entries
+(2 proxy-flagged), read against `src/admin.c`/`include/rcp/admin.h`/
+`tests/test_admin.c`.
+
+8 confirmed atomic despite the proxy's shape (`REQ-ADMIN-001`
+through `-008`, not split): `-002` and `-008` each name multiple
+functions in one shall-statement, but both assert one behaviour
+applied uniformly across that compound subject (membership-change
+reporting; shared-mutex thread-safety), not several distinct
+contracts sharing an id -- the convention's "and"-joined-compound-
+object case, not the `REQ-AUTH-009` bundling pattern.
+
+2 genuinely bundled, both split: `REQ-ADMIN-009` (success path vs.
+NULL-on-allocation-failure of `rcp_admin_server_new()`) into
+`REQ-ADMIN-009`/new `REQ-ADMIN-011`; `REQ-ADMIN-010` (NULL-tolerance
+vs. real destroy behaviour of `rcp_admin_server_destroy()`) into
+`REQ-ADMIN-010`/new `REQ-ADMIN-012`. `REQ-ADMIN-011`'s clause had no
+test at all before this batch; new
+`test_new_returns_null_when_allocation_fails` uses this project's
+`rcp_alloc_set_hooks()` fault-injection technique (`test_loan.c`'s
+precedent). New `test_destroy_frees_srv_when_non_null` installs a
+counting `rcp_free()` hook, distinct from the NULL-only
+`test_destroy_tolerates_null` and from every other test's untested
+teardown-only `destroy()` call. `REQ-ADMIN-012`'s text also corrected
+a drift from the c-RCP-17 fixed-capacity conversion: the old bundled
+text described freeing separately-heap-allocated endpoint/subscriber/
+counter arrays, which no longer exist as separate allocations.
+
+Both splits' tags placed directly above the exact function/test each
+covers, not just the file header. Both new tests mutation-tested:
+temporarily reverted the production NULL-check and `rcp_free()` call
+in turn, confirmed each new test independently catches the
+regression (a SIGSEGV and an assertion failure respectively) while
+every other test in the file stays green, then restored.
+
+Built and re-verified on top of #554 (REQ-OBS batch), #555 (REQ-REC
+batch), and #553 (REQ-AUTH batch), all also #533. Full 67-test suite
++ ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100 --sec-tested 100`: 100%/100%
+(1104/1104 reqs -- 1102 after #554/#555/#553 plus 2 from this batch's
+split; 512/512 functions).
+
 ### v0.435.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-AUTH-*: requirement-atomicity audit, Group 3 server/dispatch)
 
@@ -19152,9 +19199,8 @@ suite + ASan/UBSan (CI's exact flags, `ASAN_OPTIONS=detect_leaks=0` on
 macOS) clean; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
 --req-coverage 100 --sec-tested 100`: 100%/100%.
 
-**Next**: remaining `REQ-SRV-*`/`REQ-DL-*`/`REQ-ADMIN-*`/`REQ-CFG-*`
-batches of issue #533's Group 3, in flight concurrently by other
-agents.
+**Next**: remaining `REQ-SRV-*`/`REQ-DL-*`/`REQ-CFG-*` batches of
+issue #533's Group 3, in flight concurrently by other agents.
 
 ### v0.434.0 -- 2026-08-20 ([c-RCP-18-tracker] issue #533 batch
 REQ-REC-*: requirement-atomicity audit, Group 3 server/dispatch)
@@ -19216,9 +19262,8 @@ suite + ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54:
 baseline.
 
 **Next**: continuing issue #533's Group 3 batches --
-`REQ-SRV-*`/`REQ-DL-*`/`REQ-ADMIN-*`/`REQ-CFG-*` are tracked as
-separate concurrent batches by other sessions against the same
-tracker.
+`REQ-SRV-*`/`REQ-DL-*`/`REQ-CFG-*` are tracked as separate concurrent
+batches by other sessions against the same tracker.
 
 ### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS:
 requirement-atomicity audit, Group 3 server/dispatch)
