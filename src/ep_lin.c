@@ -33,8 +33,15 @@ bool rcp_ep_lin_response_matches(const uint8_t *tx_data, size_t tx_len,
 
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
 
-//cfusa:req REQ-LINEP-006
+/* REQ-LINEP-023 RETIRED (c-RCP-18-tracker, REQ-LINEP-* atomicity audit,
+ * issue #533): duplicated REQ-LINEP-030's own TX_DONE AND-of-both-
+ * conditions rule under a separate id -- see .fusa-reqs.json for the
+ * full retirement text. This vestigial tag keeps the retired id
+ * traceable to the code it used to describe, the same convention
+ * src/regmap.c's own REQ-RMAP-004..008 retirement uses. */
 //cfusa:req REQ-LINEP-023
+//cfusa:req REQ-LINEP-006
+//cfusa:req REQ-LINEP-030
 bool rcp_ep_lin_trigger_fires(rcp_ep_lin_trigger_t trigger, bool tx_done_event,
                                bool trailing_time_expired)
 {
@@ -104,6 +111,7 @@ bool rcp_ep_lin_set_trigger(rcp_ep_lin_functional_cfg_t *cfg, rcp_ep_lin_trigger
 #define LIN_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
 
 //cfusa:req REQ-LINEP-028
+//cfusa:req REQ-LINEP-024
 void rcp_ep_lin_render_registers(const rcp_ep_lin_functional_cfg_t *cfg,
                                   uint8_t out[RCP_EP_LIN_EP_FUNC_LEN])
 {
@@ -159,7 +167,7 @@ static bool reg_offset_read_only(uint16_t addr)
            addr == (uint16_t)(RCP_EP_LIN_REG_BASE_CLK + 1u);
 }
 
-//cfusa:req REQ-LINEP-029
+//cfusa:req REQ-LINEP-039
 const char *rcp_ep_lin_reconfig_strerror(rcp_ep_lin_reconfig_errc_t e)
 {
     switch (e) {
@@ -174,8 +182,9 @@ const char *rcp_ep_lin_reconfig_strerror(rcp_ep_lin_reconfig_errc_t e)
     }
 }
 
-//cfusa:req REQ-LINEP-028
 //cfusa:req REQ-LINEP-029
+//cfusa:req REQ-LINEP-037
+//cfusa:req REQ-LINEP-038
 rcp_ep_lin_reconfig_errc_t rcp_ep_lin_apply_reconfig(rcp_ep_lin_functional_cfg_t *cfg,
                                                       const uint8_t *payload, size_t payload_len)
 {
@@ -214,7 +223,7 @@ rcp_ep_lin_reconfig_errc_t rcp_ep_lin_apply_reconfig(rcp_ep_lin_functional_cfg_t
     return RCP_EP_LIN_RECONFIG_OK;
 }
 
-//cfusa:req REQ-LINEP-028
+//cfusa:req REQ-LINEP-036
 rcp_bytes_t rcp_ep_lin_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                 uint16_t start_address, const uint8_t *data,
                                                 size_t data_len, uint8_t transaction_num)
@@ -271,7 +280,14 @@ const char *rcp_ep_lin_strerror(rcp_ep_lin_errc_t e)
 
 /* ── Command request ───────────────────────────────────────────────────────── */
 
+/* REQ-LINEP-026 RETIRED (c-RCP-18-tracker, REQ-LINEP-* atomicity audit,
+ * issue #533): duplicated REQ-LINEP-016's own "evt = 0" encoding fact
+ * under a separate id -- see .fusa-reqs.json for the full retirement
+ * text. This vestigial tag keeps the retired id traceable to the code
+ * it used to describe, the same convention src/regmap.c's own
+ * REQ-RMAP-004..008 retirement uses. */
 //cfusa:req REQ-LINEP-026
+//cfusa:req REQ-LINEP-016
 rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
                                                const uint8_t *tx_data, size_t tx_len,
                                                uint8_t transaction_num)
@@ -298,6 +314,9 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
 //cfusa:req REQ-LINEP-017
 //cfusa:req REQ-LINEP-018
 //cfusa:req REQ-LINEP-027
+//cfusa:req REQ-LINEP-031
+//cfusa:req REQ-LINEP-032
+//cfusa:req REQ-LINEP-033
 rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      const uint8_t **out_tx_data,
@@ -331,6 +350,7 @@ rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-LINEP-019
+//cfusa:req REQ-LINEP-034
 rcp_bytes_t rcp_ep_lin_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint8_t *rx_data,
                                         size_t rx_len, uint8_t transaction_num, bool timed,
                                         uint64_t timestamp)
@@ -363,6 +383,7 @@ rcp_bytes_t rcp_ep_lin_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint
 //cfusa:req REQ-LINEP-020
 //cfusa:req REQ-LINEP-021
 //cfusa:req REQ-LINEP-022
+//cfusa:req REQ-LINEP-035
 rcp_ep_lin_errc_t rcp_ep_lin_decode_response(const uint8_t *b, size_t len,
                                               rcp_byte_bus_id_t expected_bus_id,
                                               const uint8_t **out_rx_data, size_t *out_rx_len,

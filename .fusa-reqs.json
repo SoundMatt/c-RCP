@@ -7445,10 +7445,22 @@
       "status": "implemented",
       "tc18": "\u00a712.7.7 Table 24; NOTE: rx_wd_info_enable (formerly 0x000D.7) is REPLACED in RC5 by rx_stream_status, a different mechanism (a passive aggregate status bit reacting to any of 4 fault causes) with no clean 1:1 mapping back to the old per-cause active notification concept -- already investigated, genuinely ambiguous, left open in regmap.h's own file header (task #97); see also REQ-E2E-046 (the new bit's own, separately-tracked requirement). TC18.txt L2889-2891 reflects the superseded 0.5.1_RC (RC1) wording."
     },
-    {
+        {
       "id": "REQ-LINEP-006",
-      "title": "rcp_ep_lin_trigger_fires() evaluates the transmission-done trigger",
-      "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event and trailing_time_expired, and shall return true for trigger RCP_EP_LIN_TRIGGER_TX_DONE if and only if both tx_done_event and trailing_time_expired are true (false otherwise). Corrected 2026-08-13: this entry's own text previously described a 'tx_done_event unchanged' result for TX_DONE and omitted trailing_time_expired entirely, which went stale when REQ-LINEP-023 (issue #201) added trailing_time_expired as a second, caller-classified boolean input and changed TX_DONE's evaluation to an AND of both conditions per TC18 \u00a713.7.10.1 ('a transmission has been finalized, AND the configured trailing time has expired'); the code and its test (test_trigger_fires, tests/test_ep_lin.c) were already correct -- only this entry's own text had gone stale.",
+      "title": "rcp_ep_lin_trigger_fires() never fires for trigger RCP_EP_LIN_TRIGGER_NONE",
+      "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event and trailing_time_expired. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted RCP_EP_LIN_TRIGGER_TX_DONE's own AND-of-both-conditions outcome -- a second, independently-testable switch-arm behavior of the same function, the same per-switch-arm-per-id pattern REQ-PWM-002 through REQ-PWM-009 already establish for evt[2:0] write semantics. That clause is now REQ-LINEP-030's own id, which also absorbs REQ-LINEP-023 (RETIRED -- see that entry): -023's own text, added when issue #201 introduced trailing_time_expired, described the identical TX_DONE AND-of-both-conditions rule this entry's own now-removed TX_DONE clause already restated after its 2026-08-13 correction, both citing the same TC18-13.7.10.1-002 master id. This entry keeps only the NONE case.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.1 (\"The LIN EP issues a trigger when a transmission has been finalized, and the configured trailing time has expired.\"), TC18.txt L5694-5695",
+      "tc18_master_id": "TC18-13.7.10.1-002"
+    },
+    {
+      "id": "REQ-LINEP-030",
+      "title": "rcp_ep_lin_trigger_fires() fires for RCP_EP_LIN_TRIGGER_TX_DONE iff both tx_done_event and trailing_time_expired are true",
+      "text": "rcp_ep_lin_trigger_fires() shall return true for trigger RCP_EP_LIN_TRIGGER_TX_DONE if and only if both tx_done_event and trailing_time_expired are true, and false otherwise -- TC18 \u00a713.7.10.1's own text: \"The LIN EP issues a trigger when a transmission has been finalized, and the configured trailing time has expired.\" SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-006, which previously bundled this TX_DONE outcome together with RCP_EP_LIN_TRIGGER_NONE's own separate always-false outcome under one id -- two independently-testable switch-arm behaviors of the same function. This id also absorbs REQ-LINEP-023 (RETIRED -- see that entry), whose own text -- added when issue #201 introduced trailing_time_expired as a second, caller-classified boolean input -- described this exact same AND-of-both-conditions rule from a different angle (design-history narrative rather than a formal shall-statement), duplicating what REQ-LINEP-006's own text already restated after its 2026-08-13 correction. Table 55 (\u00a713.7.10.2) defines no dedicated wire register for \"the configured trailing time\" itself -- like this endpoint type's own trigger concept as a whole (no TC18 basis at all, entirely this module's own original design -- see ep_lin.h's own file header), a wire-configurable duration was never something TC18 gives this codebase a register to model; the caller classifying trailing_time_expired is this module's established architecture, not a remaining gap.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7561,10 +7573,10 @@
       "scope": "tc18",
       "status": "implemented"
     },
-    {
+        {
       "id": "REQ-LINEP-016",
       "title": "rcp_ep_lin_encode_command_request() encodes the read direction, evt=0, and carries the raw payload unmodified",
-      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 33 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
+      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 33 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte. MERGED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): REQ-LINEP-026 (RETIRED -- see that entry) duplicated this entry's own \"evt = 0\" fact under a separate id, both citing the same TC18-13.5-001 master id; that entry is now retired, this one remains the canonical home for this function's whole encode contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7585,10 +7597,10 @@
       "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (\u00a713.7.10.1), TC18.txt L5691-5693; evt[2:0] plain-request rule per \u00a713.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-    {
+        {
       "id": "REQ-LINEP-018",
-      "title": "rcp_ep_lin_decode_command_request() rejects a malformed, misaddressed, or non-plain frame",
-      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_LIN_ERR_BAD_MSG_TYPE when the frame is not an ACF_ABB message, RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_LIN_ERR_WRONG_OP when op is not RCP_ACF_OP_READ, and RCP_EP_LIN_ERR_BAD_EVT when evt[2:0] != 000b (REQ-LINEP-027).",
+      "title": "rcp_ep_lin_decode_command_request() rejects a frame too short for its ACF_ABB header or payload",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled four independently-testable rejection outcomes of the same function under one 'shall' clause joined by commas (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_command_request_rejects_short_frame, test_command_request_rejects_bad_msg_type, test_command_request_rejects_wrong_bus, test_command_request_rejects_wrong_op) -- the exact 2+-independently-testable-behaviors-under-one-id pattern this audit exists to close, missed by the '2+ shall' proxy because the whole rule was phrased as a single sentence. The RCP_EP_LIN_ERR_BAD_MSG_TYPE clause is now REQ-LINEP-031's own id, RCP_EP_LIN_ERR_WRONG_BUS is REQ-LINEP-032's, and RCP_EP_LIN_ERR_WRONG_OP is REQ-LINEP-033's; the RCP_EP_LIN_ERR_BAD_EVT clause had already been split out as REQ-LINEP-027 before this audit. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7598,9 +7610,57 @@
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
+      "id": "REQ-LINEP-031",
+      "title": "rcp_ep_lin_decode_command_request() rejects a non-ACF_ABB message",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_BAD_MSG_TYPE when the frame is not an ACF_ABB message. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-018 -- see that entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
+      "tc18_master_id": "TC18-13.7.10.3-001"
+    },
+    {
+      "id": "REQ-LINEP-032",
+      "title": "rcp_ep_lin_decode_command_request() rejects a mismatched byte_bus_id",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-018 -- see that entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
+      "tc18_master_id": "TC18-13.7.10.3-001"
+    },
+    {
+      "id": "REQ-LINEP-033",
+      "title": "rcp_ep_lin_decode_command_request() rejects a write-direction (non-READ) op",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_WRONG_OP when op is not RCP_ACF_OP_READ. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-018 -- see that entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
+      "tc18_master_id": "TC18-13.7.10.3-001"
+    },
+        {
       "id": "REQ-LINEP-019",
-      "title": "rcp_ep_lin_encode_response() selects ACF_ABB or ACF_GBB by the timed flag",
-      "text": "rcp_ep_lin_encode_response() shall encode an ACF_ABB message when timed is false, and an ACF_GBB message with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, in both cases with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte.",
+      "title": "rcp_ep_lin_encode_response() encodes an untimed response as ACF_ABB",
+      "text": "rcp_ep_lin_encode_response() shall encode an ACF_ABB message when timed is false, with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted the timed=true ACF_GBB encoding shape as a second, materially different (extra message_timestamp/mtv fields, different ACF message type entirely) independently-testable outcome of the same function -- for consistency with rcp_ep_lin_decode_response()'s own sibling untimed/timed split (REQ-LINEP-020/021), which already treats the two shapes as separate ids. That clause is now REQ-LINEP-034's own id. This entry keeps only the untimed (ACF_ABB) case.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736",
+      "tc18_master_id": "TC18-13.7.10.3-001"
+    },
+    {
+      "id": "REQ-LINEP-034",
+      "title": "rcp_ep_lin_encode_response() encodes a timed response as ACF_GBB",
+      "text": "rcp_ep_lin_encode_response() shall encode an ACF_GBB message with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-019 -- see that entry; mirrors REQ-LINEP-021's own timed decode counterpart.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7633,10 +7693,22 @@
       "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-    {
+        {
       "id": "REQ-LINEP-022",
-      "title": "rcp_ep_lin_decode_response() rejects a malformed or misaddressed frame",
-      "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "title": "rcp_ep_lin_decode_response() rejects a frame too short for its applicable ACF header",
+      "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two independently-testable rejection outcomes of the same function under one 'shall' clause joined by 'and' (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_response_decode_rejects_short_frame, test_response_decode_rejects_wrong_bus). The RCP_EP_LIN_ERR_WRONG_BUS clause is now REQ-LINEP-035's own id. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis for the response wire format",
+      "tc18_master_id": "TC18-13.7.10.3-001"
+    },
+    {
+      "id": "REQ-LINEP-035",
+      "title": "rcp_ep_lin_decode_response() rejects a mismatched byte_bus_id",
+      "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-022 -- see that entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -12657,17 +12729,16 @@
       "tc18": "\u00a713.5 Table 33 (evt[2:0]=000b legality), TC18.txt L4069-4116; \u00a713.7.12.3 Figure 41 (iseled request format), TC18.txt L5985-5995",
       "tc18_master_id": "TC18-13.7.12.3-001"
     },
-    {
+        {
       "id": "REQ-LINEP-023",
-      "title": "The LIN transmission-done trigger fires only after the configured trailing time has also expired",
-      "text": "FIXED 2026-08-11 (Phase 5e batch 2, issue #201): TC18 \u00a713.7.10.1 requires the LIN endpoint's trigger to fire when BOTH conditions hold \u2014 the transmission has been finalized AND the configured trailing time has expired. rcp_ep_lin_trigger_fires() (src/ep_lin.c) now takes trailing_time_expired as a second, caller-classified boolean parameter and ANDs it with tx_done_event for RCP_EP_LIN_TRIGGER_TX_DONE \u2014 the same caller-supplies-already-classified-inputs convention every endpoint module in this codebase already follows for its own trigger evaluation. Table 55 (\u00a713.7.10.2) defines no dedicated wire register for \"the configured trailing time\" itself \u2014 like this endpoint type's own trigger concept as a whole (no TC18 basis at all, entirely this module's own original design \u2014 see ep_lin.h's own file header), a wire-configurable duration was never something TC18 gives this codebase a register to model; the caller classifying trailing-time-expired is this module's established architecture, not a remaining gap.",
+      "title": "RETIRED -- duplicated REQ-LINEP-030's TX_DONE AND-of-both-conditions rule (near-duplicate ids describing the same rule)",
+      "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- added when issue #201 introduced trailing_time_expired as rcp_ep_lin_trigger_fires()'s second, caller-classified boolean parameter -- described the identical TX_DONE AND-of-both-conditions rule REQ-LINEP-006 (post its own 2026-08-13 correction) already restated in formal shall-statement form, both citing the same TC18-13.7.10.1-002 master id -- the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated into REQ-RMAP-085 by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is now REQ-LINEP-030; this entry's own design-rationale content (no dedicated Table 55 wire register for \"the configured trailing time\"; trailing_time_expired is caller-classified, not derived from a modeled clock) is preserved there. No code or test carries this id's tag any longer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "status": "implemented",
-      "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695",
-      "tc18_master_id": "TC18-13.7.10.1-002"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "\u00a713.7.10.1 (rule now owned by REQ-LINEP-030 -- see text), TC18.txt L5694-5695"
     },
     {
       "id": "REQ-LINEP-024",
@@ -12681,10 +12752,10 @@
       "tc18": "\u00a713.7.10.2 Table 55, TC18.txt L5697-5714",
       "tc18_master_id": "TC18-13.7.10.2-001"
     },
-    {
+        {
       "id": "REQ-LINEP-028",
-      "title": "rcp_ep_lin_render_registers()/_encode_reconfig_request() implement the generic \u00a712.7.1 configuration request for LIN",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. rcp_ep_lin_decode_command_request() already correctly rejected evt[2:0] = 111b as not a plain command request (RCP_EP_LIN_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart function implemented that path at all. rcp_ep_lin_render_registers() serializes cfg's whole Table 55 block; rcp_ep_lin_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's/SPI's/I2C's/UART's own encode_reconfig_request() shape.",
+      "title": "rcp_ep_lin_render_registers() serializes the EP_func register block per Table 55's offsets",
+      "text": "rcp_ep_lin_render_registers() shall serialize cfg's EP_func registers into out[0..RCP_EP_LIN_EP_FUNC_LEN) exactly as a configuration read of the whole block would report them, per Table 55's offsets. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two entirely different functions' behavior under one id -- rcp_ep_lin_render_registers()'s own serialization contract (already independently tested by test_render_registers_matches_table_offsets) and rcp_ep_lin_encode_reconfig_request()'s own separate wire-encoding contract (already independently tested by test_reconfig_request_round_trip / test_encode_reconfig_request_rejects_empty_data) -- the same class of violation REQ-AUTH-009 (#519's own seed example) demonstrated: multiple functions' behavior under one id, not one function's one switch/if-arm outcome. rcp_ep_lin_encode_reconfig_request()'s own contract is now REQ-LINEP-036's own id. This entry keeps only rcp_ep_lin_render_registers()'s own serialization contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -12694,9 +12765,57 @@
       "tc18_master_id": "TC18-12.7.1-002"
     },
     {
+      "id": "REQ-LINEP-036",
+      "title": "rcp_ep_lin_encode_reconfig_request() encodes an addressed EP_func configuration-write request",
+      "text": "rcp_ep_lin_encode_reconfig_request() shall encode an ACF_ABB configuration request (op=RCP_ACF_OP_WRITE, evt[2:0] = 111b) addressed to byte_bus_id, with payload equal to start_address (16-bit big-endian) followed by data[0..data_len). SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-028 -- see that entry; matches REQ-LINEP-016's own single-function, single-encode-contract shape for its sibling rcp_ep_lin_encode_command_request().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
+    },
+        {
       "id": "REQ-LINEP-029",
-      "title": "rcp_ep_lin_apply_reconfig()/_reconfig_strerror() apply the addressed configuration write and never return NULL for a status message",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_lin_apply_reconfig() decodes the address+data payload TC18 \u00a712.7.1 defines and patches cfg's Table 55 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_LIN_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE), matching \u00a712.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, the reserved octet, or base_clk) are silently skipped while the rest of the span is still applied. rcp_ep_lin_reconfig_strerror() never returns NULL, including for an unrecognized error code.",
+      "title": "rcp_ep_lin_apply_reconfig() rejects a write extending past the EP_func block, leaving cfg unchanged",
+      "text": "rcp_ep_lin_apply_reconfig() shall return RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE and leave cfg entirely unchanged when start_address + the payload's data length exceeds RCP_EP_LIN_EP_FUNC_LEN, matching \u00a712.7.1's own 'such a payload is to be ignored' rule. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled three of rcp_ep_lin_apply_reconfig()'s own independently-testable outcomes -- this out-of-range rejection (already tested by test_apply_reconfig_rejects_write_past_ep_len), the successful patch-and-adopt behavior including its read-only-register-skip rule (already tested by test_apply_reconfig_writes_clk_divider / test_apply_reconfig_writes_multi_register_span / test_apply_reconfig_ignores_read_only_registers) -- plus a wholly different function, rcp_ep_lin_reconfig_strerror()'s own never-NULL contract (already tested by test_reconfig_strerror_never_null), all under one id. The successful patch/read-only-skip clause is now REQ-LINEP-038's own id; rcp_ep_lin_reconfig_strerror()'s own contract is REQ-LINEP-039's own id. This entry also newly documents (previously untraced in any REQ-LINEP-* text, despite already being implemented and independently tested by test_apply_reconfig_rejects_payload_without_data) the function's third outcome, the too-short-payload rejection, now REQ-LINEP-037's own id. This entry keeps only the out-of-range rejection.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
+    },
+    {
+      "id": "REQ-LINEP-037",
+      "title": "rcp_ep_lin_apply_reconfig() rejects a payload with no address-and-data, leaving cfg unchanged",
+      "text": "rcp_ep_lin_apply_reconfig() shall return RCP_EP_LIN_RECONFIG_ERR_SHORT and leave cfg entirely unchanged when payload_len is not at least RCP_EP_LIN_RECONFIG_ADDR_LEN + 1 (no address prefix, or an address prefix with no data octet after it). SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-029 -- see that entry. Already implemented and tested (test_apply_reconfig_rejects_payload_without_data) but untraced by any REQ-LINEP-* requirement text before this split.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
+    },
+    {
+      "id": "REQ-LINEP-038",
+      "title": "rcp_ep_lin_apply_reconfig() patches the addressed span at octet granularity, skipping read-only registers",
+      "text": "rcp_ep_lin_apply_reconfig() shall, for an in-range payload, patch cfg's Table 55 register block at octet granularity over the addressed span and adopt the whole block atomically, silently skipping (leaving unchanged) any octet of the span landing on a read-only register (EP_LEN, the reserved octet, or base_clk) while the rest of the span is still applied. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-029 -- see that entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
+    },
+    {
+      "id": "REQ-LINEP-039",
+      "title": "rcp_ep_lin_reconfig_strerror() never returns NULL",
+      "text": "rcp_ep_lin_reconfig_strerror() shall never return NULL, including for an unrecognized rcp_ep_lin_reconfig_errc_t value. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533) out of REQ-LINEP-029, which bundled this wholly different function's own contract in with rcp_ep_lin_apply_reconfig()'s own separate behaviors -- see that entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -12717,17 +12836,16 @@
       "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695; \u00a713.5.1, TC18.txt L4134-4142",
       "tc18_master_id": "TC18-13.5.1-002"
     },
-    {
+        {
       "id": "REQ-LINEP-026",
-      "title": "rcp_ep_lin_encode_command_request() no longer accepts a client-selectable comparison mode",
-      "text": "rcp_ep_lin_encode_command_request() shall have no compare_mode parameter of any kind; it always encodes evt = 0. See REQ-LINEP-016.",
+      "title": "RETIRED -- duplicated REQ-LINEP-016's evt=0 encoding contract (near-duplicate ids describing the same rule)",
+      "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- \"rcp_ep_lin_encode_command_request() shall have no compare_mode parameter of any kind; it always encodes evt = 0\" -- explicitly cross-referenced REQ-LINEP-016 (\"See REQ-LINEP-016\") for the same rule, both citing the same TC18-13.5-001 master id. REQ-LINEP-016's own text already asserts the same 'evt = 0' encoding fact as part of that function's one full encode contract, independently tested (test_command_request_uses_read_direction_op / test_command_request_round_trip_carries_raw_bytes decode the encoded frame's evt field back). This entry's own remaining assertion -- the absence of a compare_mode parameter from the function's signature -- is a static API-shape fact, not a runtime behavior a test can independently verify beyond what REQ-LINEP-016 already covers; the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is REQ-LINEP-016. No code or test carries this id's tag any longer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
-      "tc18_master_id": "TC18-13.5-001"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "\u00a713.5 (rule now owned by REQ-LINEP-016 -- see text), TC18.txt reference for Table 33's plain-request row"
     },
     {
       "id": "REQ-LINEP-027",

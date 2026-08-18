@@ -1,26 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-LINEP-006
-//cfusa:test REQ-LINEP-007
-//cfusa:test REQ-LINEP-008
-//cfusa:test REQ-LINEP-009
-//cfusa:test REQ-LINEP-010
-//cfusa:test REQ-LINEP-011
-//cfusa:test REQ-LINEP-012
-//cfusa:test REQ-LINEP-013
-//cfusa:test REQ-LINEP-014
-//cfusa:test REQ-LINEP-015
-//cfusa:test REQ-LINEP-016
-//cfusa:test REQ-LINEP-017
-//cfusa:test REQ-LINEP-018
-//cfusa:test REQ-LINEP-019
-//cfusa:test REQ-LINEP-020
-//cfusa:test REQ-LINEP-021
-//cfusa:test REQ-LINEP-022
-//cfusa:test REQ-LINEP-025
-//cfusa:test REQ-LINEP-026
-//cfusa:test REQ-LINEP-027
-//cfusa:test REQ-LINEP-028
-//cfusa:test REQ-LINEP-029
+/* REQ-LINEP-* atomicity audit (c-RCP-18-tracker, issue #533): every
+ * requirement tag below is placed directly above the specific test
+ * function that proves it, per CONTRIBUTING.md's "Writing a requirement"
+ * convention -- no file-header stacked block any longer. */
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -36,6 +18,7 @@ void tearDown(void) {}
 
 /* ── evt[2:0]: exact-match response comparison ────────────────────────────── */
 
+//cfusa:test REQ-LINEP-025
 static void test_response_matches_exact(void)
 {
     uint8_t req[3] = {0x10, 0x20, 0x30};
@@ -50,6 +33,7 @@ static void test_response_matches_exact(void)
 /* TC18 §13.5.1's own length rule (see acf.h's rcp_acf_compound_wait_match()):
  * a shorter received message never matches; a longer one is compared only
  * up to the outgoing request's own length. */
+//cfusa:test REQ-LINEP-025
 static void test_response_matches_length_rule(void)
 {
     uint8_t req[3] = {0x10, 0x20, 0x30};
@@ -64,12 +48,24 @@ static void test_response_matches_length_rule(void)
 
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
 
-static void test_trigger_fires(void)
+/* REQ-LINEP-006: RCP_EP_LIN_TRIGGER_NONE never fires, regardless of either
+ * input -- independent of REQ-LINEP-030's own TX_DONE clause below (split
+ * 2026-08-18, c-RCP-18-tracker, issue #533; this used to be one shared
+ * test covering both switch arms). */
+//cfusa:test REQ-LINEP-006
+static void test_trigger_fires_none_case(void)
 {
-    /* REQ-LINEP-023: TC18 §13.7.10.1 requires BOTH conditions -- fires
-     * only when tx_done_event AND trailing_time_expired are true. */
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true, true));
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, false, false));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true, false));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, false, true));
+}
+
+/* REQ-LINEP-030: TC18 §13.7.10.1 requires BOTH conditions -- TX_DONE fires
+ * only when tx_done_event AND trailing_time_expired are true. */
+//cfusa:test REQ-LINEP-030
+static void test_trigger_fires_tx_done_case(void)
+{
     TEST_ASSERT_TRUE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true, true));
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false, true));
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true, false));
@@ -78,6 +74,7 @@ static void test_trigger_fires(void)
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-LINEP-007
 static void test_functional_cfg_init_zeroes(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -96,6 +93,7 @@ static void test_functional_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
 }
 
+//cfusa:test REQ-LINEP-008
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t writer = {0};
@@ -107,6 +105,7 @@ static void test_functional_cfg_writable_false_hw_unconfigured(void)
         RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
+//cfusa:test REQ-LINEP-009
 static void test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
     rcp_lifecycle_writer_ctx_t none          = {0};
@@ -128,6 +127,7 @@ static void test_functional_cfg_writable_hw_configured_requires_authorization_or
     TEST_ASSERT_TRUE(rcp_ep_lin_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
+//cfusa:test REQ-LINEP-010
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t none = {0};
@@ -145,6 +145,7 @@ static void test_functional_cfg_writable_rcp_configured_requires_authorization(v
         RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
+//cfusa:test REQ-LINEP-011
 static void test_set_clk_divider_rejects_unauthorized(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -157,6 +158,7 @@ static void test_set_clk_divider_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT32(0, cfg.lin_clk_divider);
 }
 
+//cfusa:test REQ-LINEP-012
 static void test_set_clk_divider_applies_when_authorized(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -170,6 +172,7 @@ static void test_set_clk_divider_applies_when_authorized(void)
     TEST_ASSERT_EQUAL_UINT32(42, cfg.lin_clk_divider);
 }
 
+//cfusa:test REQ-LINEP-013
 static void test_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -182,6 +185,7 @@ static void test_set_trigger_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_TRIGGER_NONE, cfg.trigger);
 }
 
+//cfusa:test REQ-LINEP-014
 static void test_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -197,6 +201,8 @@ static void test_set_trigger_applies_when_authorized(void)
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
 
+//cfusa:test REQ-LINEP-028
+//cfusa:test REQ-LINEP-024
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -221,6 +227,7 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT16(0x0009u, RCP_EP_LIN_EP_FUNC_LEN);
 }
 
+//cfusa:test REQ-LINEP-038
 static void test_apply_reconfig_writes_clk_divider(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -239,6 +246,7 @@ static void test_apply_reconfig_writes_clk_divider(void)
                                                            file header */
 }
 
+//cfusa:test REQ-LINEP-038
 static void test_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -257,6 +265,7 @@ static void test_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_UINT8(0x77, cfg.wire_clk_divider);
 }
 
+//cfusa:test REQ-LINEP-038
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -287,6 +296,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-LINEP-029
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -304,6 +314,7 @@ static void test_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
 }
 
+//cfusa:test REQ-LINEP-037
 static void test_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
@@ -317,6 +328,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_lin_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-LINEP-036
 static void test_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -342,6 +354,7 @@ static void test_reconfig_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-036
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_lin_encode_reconfig_request(0x00, 0, NULL, 0, 0);
@@ -349,6 +362,7 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-LINEP-039
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_lin_reconfig_errc_t codes[] = {
@@ -365,6 +379,7 @@ static void test_reconfig_strerror_never_null(void)
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-LINEP-015
 static void test_strerror_never_null_and_distinct(void)
 {
     rcp_ep_lin_errc_t codes[] = {
@@ -406,7 +421,15 @@ static void test_strerror_never_null_and_distinct(void)
  * received bytes back, so it is the op=0 (read) direction. Verified here
  * against the literal wire bit rather than against re-encoded output:
  * acf.h maps RCP_ACF_OP_READ onto wire op=0. This module previously
- * encoded op=1 and rejected op=0 -- exactly inverted. */
+ * encoded op=1 and rejected op=0 -- exactly inverted.
+ *
+ * REQ-LINEP-026 RETIRED (c-RCP-18-tracker, REQ-LINEP-* atomicity audit,
+ * issue #533): duplicated REQ-LINEP-016's own "evt = 0" encoding fact
+ * under a separate id -- see .fusa-reqs.json for the full retirement
+ * text. This vestigial tag keeps the retired id traceable to the test
+ * that used to prove it. */
+//cfusa:test REQ-LINEP-026
+//cfusa:test REQ-LINEP-016
 static void test_command_request_uses_read_direction_op(void)
 {
     uint8_t                     tx[1] = {0x55};
@@ -422,6 +445,8 @@ static void test_command_request_uses_read_direction_op(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-016
+//cfusa:test REQ-LINEP-017
 static void test_command_request_round_trip_carries_raw_bytes(void)
 {
     /* Bytes model a client-constructed LIN frame (identifier/PID plus data
@@ -443,6 +468,7 @@ static void test_command_request_round_trip_carries_raw_bytes(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-017
 static void test_command_request_round_trip_empty_payload(void)
 {
     rcp_bytes_t frame = rcp_ep_lin_encode_command_request(1, NULL, 0, 1);
@@ -458,6 +484,7 @@ static void test_command_request_round_trip_empty_payload(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-032
 static void test_command_request_rejects_wrong_bus(void)
 {
     uint8_t     tx[1] = {0xAB};
@@ -475,6 +502,7 @@ static void test_command_request_rejects_wrong_bus(void)
 /* TC18 §13.5 Table 30: evt[2:0] must be 000b for a plain LIN command
  * request; every other value (except 111b's out-of-scope config-write
  * shape) is reserved and shall be rejected with UNSUPPORTED_CMD. */
+//cfusa:test REQ-LINEP-027
 static void test_command_request_rejects_bad_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -497,6 +525,7 @@ static void test_command_request_rejects_bad_evt(void)
 /* The mirror of test_command_request_uses_read_direction_op(): a frame
  * carrying the write direction (§12.9.1's op=1, "no payload data
  * response") is not a LIN command request. */
+//cfusa:test REQ-LINEP-033
 static void test_command_request_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -515,6 +544,7 @@ static void test_command_request_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-031
 static void test_command_request_rejects_bad_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -533,6 +563,7 @@ static void test_command_request_rejects_bad_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-018
 static void test_command_request_rejects_short_frame(void)
 {
     uint8_t        too_short[3] = {0};
@@ -547,6 +578,43 @@ static void test_command_request_rejects_short_frame(void)
 
 /* ── Response round trip ───────────────────────────────────────────────────── */
 
+/* REQ-LINEP-019/034 (split 2026-08-18, c-RCP-18-tracker, issue #533): the
+ * round-trip tests below already exercise the untimed/timed encode shapes
+ * together with rcp_ep_lin_decode_response()'s own dispatch, but do not by
+ * themselves isolate encode_response()'s own message-type choice from
+ * decode_response()'s own type-dispatch correctness -- a bug in one could
+ * mask a matching bug in the other. These two tests check the wire
+ * message type directly, independent of decode_response(). */
+//cfusa:test REQ-LINEP-019
+static void test_encode_response_untimed_uses_abb_message_type(void)
+{
+    uint8_t     rx[2] = {0xAA, 0xBB};
+    rcp_bytes_t frame = rcp_ep_lin_encode_response(3, rx, sizeof(rx), 5, false, 0);
+    uint8_t     msg_type = 0xFFu;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_peek_msg_type(frame.data, frame.len, &msg_type));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_MSG_TYPE_ABB, msg_type);
+
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-LINEP-034
+static void test_encode_response_timed_uses_gbb_message_type(void)
+{
+    uint8_t     rx[2] = {0xAA, 0xBB};
+    rcp_bytes_t frame = rcp_ep_lin_encode_response(3, rx, sizeof(rx), 5, true, 0xABCDEF0102030405ull);
+    uint8_t     msg_type = 0xFFu;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_peek_msg_type(frame.data, frame.len, &msg_type));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_MSG_TYPE_GBB, msg_type);
+
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-LINEP-019
+//cfusa:test REQ-LINEP-020
 static void test_response_round_trip_untimed(void)
 {
     uint8_t     rx[4] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -570,6 +638,7 @@ static void test_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-021
 static void test_response_round_trip_timed(void)
 {
     uint8_t     rx[2] = {0x11, 0x22};
@@ -594,6 +663,7 @@ static void test_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-035
 static void test_response_decode_rejects_wrong_bus(void)
 {
     rcp_bytes_t frame = rcp_ep_lin_encode_response(2, NULL, 0, 0, false, 0);
@@ -610,6 +680,7 @@ static void test_response_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-LINEP-022
 static void test_response_decode_rejects_short_frame(void)
 {
     uint8_t  too_short[2] = {RCP_ACF_MSG_TYPE_ABB, 0};
@@ -631,7 +702,8 @@ int main(void)
     RUN_TEST(test_response_matches_exact);
     RUN_TEST(test_response_matches_length_rule);
 
-    RUN_TEST(test_trigger_fires);
+    RUN_TEST(test_trigger_fires_none_case);
+    RUN_TEST(test_trigger_fires_tx_done_case);
 
     RUN_TEST(test_functional_cfg_init_zeroes);
     RUN_TEST(test_functional_cfg_writable_false_hw_unconfigured);
@@ -664,6 +736,8 @@ int main(void)
     RUN_TEST(test_command_request_rejects_bad_msg_type);
     RUN_TEST(test_command_request_rejects_short_frame);
 
+    RUN_TEST(test_encode_response_untimed_uses_abb_message_type);
+    RUN_TEST(test_encode_response_timed_uses_gbb_message_type);
     RUN_TEST(test_response_round_trip_untimed);
     RUN_TEST(test_response_round_trip_timed);
     RUN_TEST(test_response_decode_rejects_wrong_bus);
