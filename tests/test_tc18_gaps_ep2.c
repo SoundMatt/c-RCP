@@ -64,6 +64,8 @@
  */
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/ep_adc.h>
 #include <rcp/ep_can.h>
@@ -164,7 +166,7 @@ static void test_uart_functional_block_now_has_full_register_coverage(void)
 
     TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
     rcp_ep_uart_functional_cfg_init(&cfg);
-    memcpy(before, &cfg, sizeof(before));
+    rcp_memcpy_bounded(before, sizeof(before), &cfg, sizeof(before));
 
     TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(&cfg, 0x11223344u,
                                                RCP_LIFECYCLE_HW_CONFIGURED, w));
@@ -483,7 +485,7 @@ static void test_adc_functional_cfg_has_clock_status_and_interval_fields(void)
     rcp_lifecycle_writer_ctx_t  w = any_writer();
 
     rcp_ep_adc_functional_cfg_init(&cfg);
-    memcpy(before, &cfg, sizeof(before));
+    rcp_memcpy_bounded(before, sizeof(before), &cfg, sizeof(before));
 
     TEST_ASSERT_TRUE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 0x1122u,
                                                              RCP_LIFECYCLE_HW_CONFIGURED, w));
@@ -801,7 +803,7 @@ static void adc_dispatch_handler(const uint8_t *request, size_t request_len,
     /* FIFO: shift the consumed prefix out, matching
      * rcp_ep_adc_collect_response_values()'s own "packs the FIRST
      * value_count... in capture order" convention. */
-    memmove(st->pending, &st->pending[st->combine_avg_values],
+    rcp_memmove_bounded(st->pending, sizeof(st->pending), &st->pending[st->combine_avg_values],
             (st->pending_count - st->combine_avg_values) * sizeof(st->pending[0]));
     st->pending_count -= st->combine_avg_values;
 }
@@ -881,7 +883,7 @@ static void test_lin_trigger_now_honours_trailing_time_and_block_has_registers(v
 
     TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
     rcp_ep_lin_functional_cfg_init(&cfg);
-    memcpy(before, &cfg, sizeof(before));
+    rcp_memcpy_bounded(before, sizeof(before), &cfg, sizeof(before));
 
     TEST_ASSERT_TRUE(rcp_ep_lin_set_clk_divider(&cfg, 0x11223344u,
                                                 RCP_LIFECYCLE_HW_CONFIGURED, w));
@@ -1063,7 +1065,7 @@ static void test_can_register_block_round_trips_ep_status_and_status_fields(void
 
         payload[0] = 0x00u;
         payload[1] = 0x06u; /* start_address = 0x0006 */
-        memcpy(&payload[RCP_EP_CAN_RECONFIG_ADDR_LEN], &block[0x0006],
+        rcp_memcpy_bounded(&payload[RCP_EP_CAN_RECONFIG_ADDR_LEN], sizeof(payload) - RCP_EP_CAN_RECONFIG_ADDR_LEN, &block[0x0006],
                RCP_EP_CAN_EP_FUNC_LEN - 0x0006u);
         TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
                           rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
@@ -1506,7 +1508,7 @@ static void test_iseled_dispatch_multi_fragment_response_round_trips(void)
                                                         &out_ts, &out_tn));
         TEST_ASSERT_EQUAL_UINT8(0x44u, out_tn);
         TEST_ASSERT_TRUE(reassembled_len + out_rx_len <= sizeof(reassembled));
-        memcpy(&reassembled[reassembled_len], out_rx_data, out_rx_len);
+        rcp_memcpy_bounded(&reassembled[reassembled_len], sizeof(reassembled) - reassembled_len, out_rx_data, out_rx_len);
         reassembled_len += out_rx_len;
     }
 

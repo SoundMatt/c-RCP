@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/mock.h"
 
+#include "mem_bounded.h"
+
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/e2e.h"
@@ -419,7 +421,7 @@ bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
 {
     if (len > RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES) return false;
 
-    if (len > 0) memcpy(srv->hw_pin_map, entries, len * sizeof(*entries));
+    if (len > 0) rcp_memcpy_bounded(srv->hw_pin_map, sizeof(srv->hw_pin_map), entries, len * sizeof(*entries));
     srv->hw_pin_map_len = len;
     /* REQ-RMAP-032: svr_io_pin_count (Table 20, wire-readable) is this
      * server's own report of how many HW pins it has -- previously never
@@ -447,7 +449,7 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
 {
     if (count > RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES) return false;
 
-    if (count > 0) memcpy(srv->request_stream_cfg, entries, count * sizeof(*entries));
+    if (count > 0) rcp_memcpy_bounded(srv->request_stream_cfg, sizeof(srv->request_stream_cfg), entries, count * sizeof(*entries));
     srv->request_stream_cfg_count = count;
     /* REQ-RMAP-034 (request-stream half): svr_request_stream_cfg_capacity
      * (Table 20, an entry count not a byte length) previously never set
@@ -466,7 +468,7 @@ bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
 {
     if (count > RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES) return false;
 
-    if (count > 0) memcpy(srv->response_queue_cfg, entries, count * sizeof(*entries));
+    if (count > 0) rcp_memcpy_bounded(srv->response_queue_cfg, sizeof(srv->response_queue_cfg), entries, count * sizeof(*entries));
     srv->response_queue_cfg_count = count;
     /* REQ-RMAP-034 (response-stream half): svr_response_stream_cfg_
      * capacity (Table 20, an entry count not a byte length) previously
@@ -567,7 +569,7 @@ bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
 {
     if (count > RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES) return false;
 
-    if (count > 0) memcpy(srv->ep_id_map, entries, count * sizeof(*entries));
+    if (count > 0) rcp_memcpy_bounded(srv->ep_id_map, sizeof(srv->ep_id_map), entries, count * sizeof(*entries));
     srv->ep_id_map_count = count;
     /* REQ-RMAP-037: svr_ep_bytebus_id_map_capacity (Table 20, an entry
      * count not a byte length) previously never set anywhere, staying 0
@@ -591,7 +593,7 @@ static bool optional_subsystem_cfg_set(rcp_regmap_optional_subsystem_cfg_t *cfg,
 {
     if (len > RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS) return false;
 
-    if (len > 0) memcpy(cfg->data, data, len);
+    if (len > 0) rcp_memcpy_bounded(cfg->data, sizeof(cfg->data), data, len);
     cfg->len     = len;
     *capacity_reg = (uint16_t)len; /* len is already bounds-checked above against
                                        RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS (256),
@@ -2255,7 +2257,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
              * encoded header bytes for REQ-E2E-038's eventual fragmented
              * CRC check. header_len <= fragment_len is already
              * guaranteed by the successful decode above. */
-            memcpy(srv->frag_first_header[stream_index - 1u], fragment, header_len);
+            rcp_memcpy_bounded(srv->frag_first_header[stream_index - 1u], sizeof(srv->frag_first_header[stream_index - 1u]), fragment, header_len);
             srv->frag_first_header_len[stream_index - 1u] = header_len;
         }
 
@@ -2582,7 +2584,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
              * encoded header bytes for REQ-E2E-038's eventual fragmented
              * CRC check. header_len <= fragment_len is already
              * guaranteed by the successful decode above. */
-            memcpy(srv->frag_first_header[stream_index - 1u], fragment, header_len);
+            rcp_memcpy_bounded(srv->frag_first_header[stream_index - 1u], sizeof(srv->frag_first_header[stream_index - 1u]), fragment, header_len);
             srv->frag_first_header_len[stream_index - 1u] = header_len;
         }
 

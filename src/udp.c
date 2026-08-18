@@ -6,6 +6,8 @@
 #include "rcp/udp.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "platform.h"
 
 #include <stdio.h>
@@ -59,7 +61,7 @@ rcp_bytes_t rcp_udp_annexj_wrap(uint32_t seq, const uint8_t *avtpdu, size_t avtp
     if (!buf) return out;
 
     put_u32(buf, seq);
-    if (avtpdu_len > 0) memcpy(buf + RCP_UDP_ANNEX_J_SEQ_LEN, avtpdu, avtpdu_len);
+    if (avtpdu_len > 0) rcp_memcpy_bounded(buf + RCP_UDP_ANNEX_J_SEQ_LEN, avtpdu_len, avtpdu, avtpdu_len);
 
     out.data = buf;
     out.len  = RCP_UDP_ANNEX_J_SEQ_LEN + avtpdu_len;
@@ -259,7 +261,7 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                 tmp = NULL;
                 return RCP_ERR_BUSY;
             }
-            if (payload_len > 0) memcpy(buf, payload, payload_len);
+            if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
             rcp_free(tmp);
             tmp = NULL;

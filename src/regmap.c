@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/regmap.h"
 
+#include "mem_bounded.h"
+
 #include <stdint.h>
 #include <string.h>
 
@@ -179,7 +181,7 @@ rcp_bytes_t rcp_regmap_general_encode_read_response(const rcp_regmap_general_t *
     memset(payload, 0, sizeof(payload));
     copy_len = ((size_t)read_size < RCP_REGMAP_GENERAL_LEN) ? (size_t)read_size
                                                              : RCP_REGMAP_GENERAL_LEN;
-    memcpy(payload, image, copy_len);
+    rcp_memcpy_bounded(payload, sizeof(payload), image, copy_len);
 
     hdr.byte_bus_id              = RCP_REGMAP_EP0_INDEX;
     hdr.op                       = RCP_ACF_OP_READ;
@@ -214,7 +216,7 @@ rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t 
      * fit are overwritten, matching this function's own doc comment. */
     memset(image, 0, sizeof(image));
     have = (payload_len < RCP_REGMAP_GENERAL_LEN) ? payload_len : RCP_REGMAP_GENERAL_LEN;
-    memcpy(image, payload, have);
+    rcp_memcpy_bounded(image, sizeof(image), payload, have);
 
     out_map->magic       = get_u32(&image[0x0000]);
     out_map->svr_version = get_u32(&image[0x0004]);
@@ -589,7 +591,7 @@ rcp_regmap_optional_subsystem_cfg_apply_reconfig(rcp_regmap_optional_subsystem_c
     /* No render-patch-reparse idiom needed here, unlike every row-typed
      * table's own apply_reconfig() -- cfg->data IS the wire image
      * already, a direct bounded memcpy. */
-    memcpy(&cfg->data[relative_start_address], data, data_len);
+    rcp_memcpy_bounded(&cfg->data[relative_start_address], cfg->len - relative_start_address, data, data_len);
     return RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK;
 }
 
@@ -1217,7 +1219,7 @@ static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size
     rcp_acf_byte_message_info_t hdr      = {0};
 
     memset(payload, 0, sizeof(payload));
-    if (copy_len > 0u) memcpy(payload, &table_image[offset], copy_len);
+    if (copy_len > 0u) rcp_memcpy_bounded(payload, sizeof(payload), &table_image[offset], copy_len);
 
     hdr.byte_bus_id              = RCP_REGMAP_EP0_INDEX;
     hdr.op                       = RCP_ACF_OP_READ;

@@ -2,6 +2,8 @@
 #include "rcp/ep_spi.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -411,7 +413,7 @@ rcp_bytes_t rcp_ep_spi_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     if (!payload) return empty;
 
     put_u16(payload, start_address);
-    memcpy(payload + RCP_EP_SPI_RECONFIG_ADDR_LEN, data, data_len);
+    rcp_memcpy_bounded(payload + RCP_EP_SPI_RECONFIG_ADDR_LEN, data_len, data, data_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE; /* §12.7.1 Figure 18: "the data

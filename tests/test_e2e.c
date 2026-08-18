@@ -32,6 +32,8 @@
 //cfusa:test REQ-E2E-046
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/e2e.h>
 #include <rcp/request_sequencer.h>
 
@@ -117,7 +119,7 @@ static void test_compute_crc_matches_manual_concatenation(void)
     concat[2] = tu ? 0x01u : 0x00u;
     for (i = 0; i < 8; i++) concat[3 + i]  = (uint8_t)(stream_id >> (56 - 8 * i));
     for (i = 0; i < 4; i++) concat[11 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat + 15, acf_frame, sizeof(acf_frame));
+    rcp_memcpy_bounded(concat + 15, sizeof(concat) - 15, acf_frame, sizeof(acf_frame));
 
     TEST_ASSERT_EQUAL_HEX32(rcp_e2e_crc32(concat, sizeof(concat)),
                              rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu,
@@ -142,8 +144,8 @@ static void test_compute_crc_zero_stream_and_timestamp_ntscf_standin(void)
     prefix[0] = avtp_subtype;
     prefix[1] = header_octet1;
     prefix[2] = 0x00u; /* tu = false */
-    memcpy(concat, prefix, sizeof(prefix));
-    memcpy(concat + sizeof(prefix), acf_frame, 3);
+    rcp_memcpy_bounded(concat, sizeof(concat), prefix, sizeof(prefix));
+    rcp_memcpy_bounded(concat + sizeof(prefix), sizeof(concat) - sizeof(prefix), acf_frame, 3);
 
     TEST_ASSERT_EQUAL_HEX32(
         rcp_e2e_crc32(concat, sizeof(concat)),
@@ -175,10 +177,10 @@ static void test_compute_crc_timestamp_is_4_octets_not_8(void)
     concat4[1] = concat8[1] = header_octet1;
     concat4[2] = concat8[2] = 0x00u; /* tu = false */
     for (i = 0; i < 4; i++) concat4[11 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat4 + 15, acf_frame, sizeof(acf_frame));
+    rcp_memcpy_bounded(concat4 + 15, sizeof(concat4) - 15, acf_frame, sizeof(acf_frame));
 
     for (i = 0; i < 4; i++) concat8[3 + 8 + 4 + i] = (uint8_t)(avtp_timestamp >> (24 - 8 * i));
-    memcpy(concat8 + 19, acf_frame, sizeof(acf_frame));
+    rcp_memcpy_bounded(concat8 + 19, sizeof(concat8) - 19, acf_frame, sizeof(acf_frame));
 
     TEST_ASSERT_EQUAL_HEX32(
         rcp_e2e_crc32(concat4, sizeof(concat4)),

@@ -2,6 +2,8 @@
 #include "rcp/ep_can.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "alloc_overflow.h"
 
 #include <stdlib.h>
@@ -316,7 +318,7 @@ static uint8_t *build_payload(rcp_ep_can_frame_format_t frame_format, uint32_t a
     if (!buf) return NULL;
 
     write_prefix(buf, frame_format, arbitration_id, xl_header);
-    if (data_len > 0) memcpy(&buf[prefix_len], data, data_len);
+    if (data_len > 0) rcp_memcpy_bounded(&buf[prefix_len], data_len, data, data_len);
 
     *out_len = total_len;
     return buf;

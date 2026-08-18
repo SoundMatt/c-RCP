@@ -55,6 +55,8 @@
  */
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/lifecycle.h>
@@ -1891,8 +1893,8 @@ static size_t concat2(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_
 {
     TEST_ASSERT_TRUE(a->len + b->len <= cap);
 
-    memcpy(out, a->data, a->len);
-    memcpy(out + a->len, b->data, b->len);
+    rcp_memcpy_bounded(out, cap, a->data, a->len);
+    rcp_memcpy_bounded(out + a->len, cap - a->len, b->data, b->len);
     return a->len + b->len;
 }
 
@@ -1902,9 +1904,9 @@ static size_t concat3(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_
 {
     TEST_ASSERT_TRUE(a->len + b->len + c->len <= cap);
 
-    memcpy(out, a->data, a->len);
-    memcpy(out + a->len, b->data, b->len);
-    memcpy(out + a->len + b->len, c->data, c->len);
+    rcp_memcpy_bounded(out, cap, a->data, a->len);
+    rcp_memcpy_bounded(out + a->len, cap - a->len, b->data, b->len);
+    rcp_memcpy_bounded(out + a->len + b->len, cap - a->len - b->len, c->data, c->len);
     return a->len + b->len + c->len;
 }
 
@@ -1913,10 +1915,10 @@ static size_t concat4(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_
 {
     TEST_ASSERT_TRUE(a->len + b->len + c->len + d->len <= cap);
 
-    memcpy(out, a->data, a->len);
-    memcpy(out + a->len, b->data, b->len);
-    memcpy(out + a->len + b->len, c->data, c->len);
-    memcpy(out + a->len + b->len + c->len, d->data, d->len);
+    rcp_memcpy_bounded(out, cap, a->data, a->len);
+    rcp_memcpy_bounded(out + a->len, cap - a->len, b->data, b->len);
+    rcp_memcpy_bounded(out + a->len + b->len, cap - a->len - b->len, c->data, c->len);
+    rcp_memcpy_bounded(out + a->len + b->len + c->len, cap - a->len - b->len - c->len, d->data, d->len);
     return a->len + b->len + c->len + d->len;
 }
 

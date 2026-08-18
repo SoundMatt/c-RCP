@@ -19106,7 +19106,7 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
-### v0.419.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL
+### v0.421.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL
 hygiene batch 2 of N, 94/94 remaining real sites)
 
 Continuation of issue #522's `cfusa check`-driven `free()`-without-NULL
@@ -19185,6 +19185,31 @@ raw-`free()`/`rcp_free()` CY006 candidates identified from a fresh
 batch 1 + concurrent #521 work), fixed this batch (94), or
 individually justified as already-safe-without-a-change (11, listed
 above). Issue #522 is closed as fully resolved by this release.
+
+### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half:
+memcpy/memmove/strncpy explicit-size-bounded wrappers -- CY001 fully closed)
+
+Third sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532) and CY001's `src/` half
+(PR #537, v0.419.0). Resolves the `tests/` half of **CY001**: all 66
+remaining findings across 10 test files. **`CFUSA-CY001` is now
+fully closed: 140 -> 0 project-wide.** See `CHANGELOG.md`'s matching
+entry for full detail (per-site capacity derivation, the relative
+`"../src/mem_bounded.h"` include, and the mutation test run). Issue
+#523 stays open for L001/L008/A003.
+
+### v0.419.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, src/ half:
+memcpy/memmove/strncpy explicit-size-bounded wrappers)
+
+Second sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532, v0.417.0's predecessor).
+Resolves the `src/` half of **CY001** (CERT-C STR31-C, CWE-120): all
+74 `src/` findings across 31 files. See `CHANGELOG.md`'s matching
+entry for full detail (the `mem_bounded.h` wrapper design, per-site
+capacity derivation, the disclosed `CFUSA-L008` +4 trade-off, and
+the two mutation tests run). `tests/`'s remaining 66 findings are the
+next sub-effort; issue #523 stays open until CY001, L001, L008, and
+A003 are all resolved or explicitly dispositioned.
 
 ### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID
 pass + FTTI cross-check test)

@@ -2,6 +2,8 @@
 #include "rcp/mdns.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "platform.h"
 
 #include <inttypes.h>
@@ -59,7 +61,7 @@ static char *dup_cstr(const char *s)
     len = strlen(s);
     copy = (char *)rcp_malloc(len + 1);
     if (!copy) return NULL;
-    memcpy(copy, s, len + 1);
+    rcp_memcpy_bounded(copy, len + 1, s, len + 1);
     return copy;
 }
 

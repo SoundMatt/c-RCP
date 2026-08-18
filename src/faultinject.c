@@ -2,6 +2,8 @@
 #include "rcp/faultinject.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "alloc_overflow.h"
 #include "platform.h"
 
@@ -74,7 +76,7 @@ static bool fi_pick(rcp_faultinject_t *fi, rcp_fi_rule_t *out)
     if (fi->rules[0].count > 0) {
         fi->rules[0].count--;
         if (fi->rules[0].count == 0) {
-            memmove(&fi->rules[0], &fi->rules[1], (fi->rules_len - 1) * sizeof(*fi->rules));
+            rcp_memmove_bounded(&fi->rules[0], fi->rules_cap * sizeof(*fi->rules), &fi->rules[1], (fi->rules_len - 1) * sizeof(*fi->rules));
             fi->rules_len--;
         }
     }

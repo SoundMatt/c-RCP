@@ -61,6 +61,8 @@
  */
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
@@ -730,8 +732,8 @@ static void test_standby_is_classified_hot_so_configuration_is_retained(void)
     map.svr_ep_count = 4u;
     rcp_ep_wakeup_functional_cfg_init(&wake);
     wake.sources[0].enabled = true;
-    memcpy(&before, &map, sizeof(before));
-    memcpy(&wake_before, &wake, sizeof(wake_before));
+    rcp_memcpy_bounded(&before, sizeof(before), &map, sizeof(before));
+    rcp_memcpy_bounded(&wake_before, sizeof(wake_before), &wake, sizeof(wake_before));
 
     /* REQ-PWRMODE-015 (TC18 §12.4, §12.4.1): "only a transition classified
      * RCP_PWRMODE_START_COLD may discard configuration." power.h owns no

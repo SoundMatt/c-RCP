@@ -15,6 +15,8 @@
 //cfusa:test REQ-REC-014
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/clock.h>
 #include <rcp/recorder.h>
 
@@ -99,7 +101,7 @@ static void test_capture_copies_frame_bytes_by_value(void)
     uint8_t frame[4];
     rcp_recorder_entry_t out;
 
-    memcpy(frame, "\x01\x02\x03\x04", 4);
+    rcp_memcpy_bounded(frame, sizeof(frame), "\x01\x02\x03\x04", 4);
     TEST_ASSERT_TRUE(rcp_recorder_capture(r, 1, make_addr(1, 0), true, frame, 4));
 
     /* Mutating the caller's own buffer after capture() must not affect

@@ -34,6 +34,8 @@
  * copy of this file's own old content) now tests that instead. */
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
@@ -308,7 +310,7 @@ static void echo_handler(const uint8_t *request, size_t request_len, rcp_bytes_t
     g_seen_request_len  = request_len;
     g_seen_user_data    = user_data;
     if (request_len > 0 && request_len <= sizeof(g_seen_request)) {
-        memcpy(g_seen_request, request, request_len);
+        rcp_memcpy_bounded(g_seen_request, sizeof(g_seen_request), request, request_len);
     }
     *out_response = rcp_bytes_dup(request, request_len);
 }
@@ -1718,8 +1720,8 @@ static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
     TEST_ASSERT_NOT_NULL(frame2.data);
     TEST_ASSERT_TRUE(frame1.len + frame2.len <= sizeof(combined));
 
-    memcpy(combined, frame1.data, frame1.len);
-    memcpy(combined + frame1.len, frame2.data, frame2.len);
+    rcp_memcpy_bounded(combined, sizeof(combined), frame1.data, frame1.len);
+    rcp_memcpy_bounded(combined + frame1.len, sizeof(combined) - frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
     dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, combined,
@@ -1861,8 +1863,8 @@ static void test_dispatch_frame_truncates_at_out_cap(void)
     frame1 = rcp_acf_encode_abb(&hdr1, NULL, 0);
     frame2 = rcp_acf_encode_abb(&hdr2, NULL, 0);
 
-    memcpy(combined, frame1.data, frame1.len);
-    memcpy(combined + frame1.len, frame2.data, frame2.len);
+    rcp_memcpy_bounded(combined, sizeof(combined), frame1.data, frame1.len);
+    rcp_memcpy_bounded(combined + frame1.len, sizeof(combined) - frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
     dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, combined,
