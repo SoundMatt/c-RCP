@@ -2,6 +2,7 @@
 //cfusa:test REQ-SRV-001
 //cfusa:test REQ-SRV-002
 //cfusa:test REQ-SRV-003
+//cfusa:test REQ-SRV-023
 #include "unity.h"
 
 #include <rcp/rcp.h>
@@ -46,6 +47,14 @@ static void test_enabled_endpoint_reports_immediate_execution(void)
     rcp_server_endpoint_destroy(&ep);
 }
 
+/* REQ-SRV-003 (FIFO drain once re-enabled) and REQ-SRV-023 (refuses while
+ * disabled) were split from one bundled requirement by the c-RCP-18
+ * requirement-atomicity audit (issue #533): a bug that let drain_one()
+ * dequeue while disabled would fail only the test below, while a bug that
+ * broke FIFO ordering or the empty-queue sentinel once re-enabled would
+ * fail only test_reenable_drains_queue_in_fifo_order() -- distinct failure
+ * modes, each with its own id and its own assertion. */
+//cfusa:test REQ-SRV-023
 static void test_drain_one_refuses_while_disabled(void)
 {
     rcp_server_endpoint_t ep;
@@ -61,6 +70,7 @@ static void test_drain_one_refuses_while_disabled(void)
     rcp_server_endpoint_destroy(&ep);
 }
 
+//cfusa:test REQ-SRV-003
 static void test_reenable_drains_queue_in_fifo_order(void)
 {
     rcp_server_endpoint_t ep;

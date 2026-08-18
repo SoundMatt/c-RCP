@@ -34,6 +34,127 @@ the rationale.
 
 ## Releases
 
+### v0.439.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-SRV-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+
+This batch covers the `REQ-SRV-*` prefix (`src/server.c`,
+`include/rcp/server.h`, `tests/test_server.c`,
+`tests/test_conditional_dispatch.c`) -- all 22 requirements read in
+full against their actual `//cfusa:req`/`//cfusa:test`-tagged code and
+tests, not just the 2+-"shall" proxy (which flagged 11 of the 22).
+
+9 of the 11 proxy-flagged ids were genuinely bundled and split into 20
+new ids (`REQ-SRV-023` through `REQ-SRV-042`); the other 2
+(`REQ-SRV-011`, `REQ-SRV-020`) were confirmed atomic despite the flag
+("offer to every request, return the count" and "each pending
+COMPOUND_WAIT evaluated independently" are each one observable
+behaviour, expressed with a compound object rather than a bundle of
+distinct behaviours). All 11 not proxy-flagged ids were reviewed too
+and confirmed genuinely single-behaviour.
+
+Split ids and their own function:
+- `REQ-SRV-003` (drain FIFO on re-enable) -> new `REQ-SRV-023`
+  (refuses while disabled), both on `rcp_server_endpoint_drain_one()`.
+- `REQ-SRV-004` (classify + standard-request path) -> new
+  `REQ-SRV-024` (cancellation opcode reported, not stored),
+  `REQ-SRV-025` (every other conditional kind decoded and stored),
+  `REQ-SRV-026` (`*out_request_type` always written), all on
+  `rcp_server_endpoint_admit_with_ack()`.
+- `REQ-SRV-006` (bundled all five request kinds' own due-condition
+  under one id) -> narrowed to the Compound kind alone; new
+  `REQ-SRV-027` (Compound Wait, no idle gate), `REQ-SRV-028`
+  (Triggered, idle gate), `REQ-SRV-029` (Timed, gPTP-locked gate),
+  `REQ-SRV-030` (Chained, idle gate), `REQ-SRV-031` (reports nothing
+  due when none qualifies), all on `rcp_server_endpoint_select_due()`.
+- `REQ-SRV-007` (safety-tagged gate) -> new `REQ-SRV-032`
+  (non-safety-tagged due-ness unaffected by `in_safe_state`), both on
+  `rcp_server_endpoint_select_due()`.
+- `REQ-SRV-009` (compound + compound-wait tick, "no sequencer touch"
+  for the rest) -> narrowed to the Compound tick alone; new
+  `REQ-SRV-033` (Compound Wait tick), `REQ-SRV-034` (Triggered/
+  Timed/Chained never touch a sequencer), all on
+  `rcp_server_endpoint_complete()`.
+- `REQ-SRV-010` (the whole repetition rule) -> narrowed to the finite
+  non-zero decrement-and-re-arm case; new `REQ-SRV-035` (infinite
+  sentinel unchanged), `REQ-SRV-036` (zero removes), `REQ-SRV-037`
+  (Timed/Chained always removed), all on
+  `rcp_server_endpoint_complete()`.
+- `REQ-SRV-012` (starts the delay timer + "never restarts" + invalid
+  index) -> narrowed to starting the timer; new `REQ-SRV-038` (the
+  timer is never restarted by a later evaluation -- this clause's own
+  function is actually `arm_if_startable()`'s CHAINED-kind exclusion,
+  not `rcp_server_endpoint_chain_predecessor_done()` itself, so its
+  tag moved there), `REQ-SRV-039` (returns false, changing nothing,
+  for a non-chained-request index), both split ids' own function
+  otherwise still `rcp_server_endpoint_chain_predecessor_done()`.
+  This function had **zero direct unit test** before this audit --
+  every existing chained-request test only exercised it indirectly
+  through `src/mock.c`'s own end-to-end dispatch. Two brand-new
+  direct-call tests close that gap.
+- `REQ-SRV-013` (all three cancellation functions under one id) ->
+  narrowed to `rcp_server_endpoint_cancel_all()` alone; new
+  `REQ-SRV-040` (`rcp_server_endpoint_cancel_single()`, including its
+  own no-cascade-to-chained-successors note) and `REQ-SRV-041`
+  (`rcp_server_endpoint_cancel_non_safestate()`).
+- `REQ-SRV-019` (reject reserved evt + store independently) -> new
+  `REQ-SRV-042` (store each Compound Wait request's own evt/payload
+  independently of every other pending request), both on
+  `rcp_server_endpoint_admit_with_ack()`.
+
+Tag placement was also corrected, not just added, per
+`CONTRIBUTING.md`'s "tags sit directly above the specific function"
+rule: `REQ-SRV-004`/`019`/`024`/`025`/`026`/`042`'s tags now also sit
+above `rcp_server_endpoint_admit_with_ack()` itself (the function that
+actually implements the classify/route/decode-and-store logic they
+describe), not only above `admit_under_tscf_gate()` (a shared helper
+that function calls for two of its own branches, where the whole
+stack had previously been placed) -- duplicated there, not moved, so
+nothing this batch doesn't own is disturbed. `REQ-SRV-013`'s tag was
+narrowed off `rcp_server_endpoint_cancel_single()`/
+`rcp_server_endpoint_cancel_non_safestate()` entirely (replaced by
+`REQ-SRV-040`/`041`) since it no longer describes those functions.
+
+Nine brand-new tests were written for splits with no adequate existing
+coverage (not a re-tagged shared assertion): `REQ-SRV-024`/`025`/`026`
+(`test_admit_reports_cancellation_and_conditional_with_request_type`,
+calling `rcp_server_endpoint_admit()` directly rather than inferring
+through `rcp_mock_server_dispatch()`'s translated result codes),
+`REQ-SRV-027` (`test_compound_wait_fires_while_endpoint_busy` --
+Compound Wait's own row has no idle gate, unlike Compound, and no
+existing test ever set `ctx.endpoint_idle = false` for a pending
+Compound Wait request), `REQ-SRV-030`
+(`test_chained_never_fires_while_endpoint_busy`), `REQ-SRV-031`
+(`test_select_due_reports_nothing_due_with_an_empty_store`),
+`REQ-SRV-032` (`test_non_safety_request_unaffected_by_in_safe_state`),
+`REQ-SRV-034`
+(`test_triggered_completion_does_not_touch_any_sequencer_state`),
+`REQ-SRV-038` (`test_chained_delay_not_restarted_by_an_earlier_evaluation`),
+`REQ-SRV-012`/`039` (`test_chain_predecessor_done_marks_finalized_and_starts_timer`,
+`test_chain_predecessor_done_returns_false_for_non_chained_index`).
+
+Every one of these nine was mutation-tested against a real injected
+defect in `src/server.c` (not mere tag/test deletion), confirming each
+new test's own assertion actually catches the regression it exists
+for -- reintroducing the exact idle-gate/sequencer/timer/output-param
+bug each split id now names, one at a time, confirming the targeted
+test (and only the tests genuinely dependent on that code path) fails,
+then reverting. `REQ-SRV-041`'s re-tagged (not new) test was also
+spot-checked the same way, confirming the moved tag still traces to a
+real, currently-passing, mutation-sensitive assertion.
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's exact
+flags, `ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67 passing;
+pinned `cfusa` v0.5.54: `check` 0 errors (555 warnings/1435 infos,
+unchanged from baseline); `trace --req-coverage 100 --sec-tested 100`:
+100%/100% (1120/1120 reqs, 512/512 functions), gates unregressed.
+
+Part of #533. Not closing it -- other prefixes (`REQ-DL-*`,
+`REQ-AUTH-*`, `REQ-ADMIN-*`, `REQ-CFG-*`, `REQ-OBS-*`, `REQ-REC-*`) are
+tracked as separate concurrent batches against the same tracker.
+
 ### v0.438.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch: REQ-CFG-* requirement-atomicity audit)
 
 Group 3 (server/dispatch) batch of #533's requirement-atomicity audit
@@ -205,6 +326,7 @@ functions) -- neither gate regressed.
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
 issue #533 (mirrors #256's pattern), executing the convention #519/PR
 #525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+
 This batch covers the `REQ-AUTH-*` prefix (`src/authz.c`,
 `tests/test_authz.c`) -- 11 requirements triaged, all read in full
 against their actual `//cfusa:req`/`//cfusa:test`-tagged code and
