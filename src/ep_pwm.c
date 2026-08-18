@@ -40,6 +40,7 @@ static rcp_ep_pwm_value_t get_pwm_value(const uint8_t *p)
  * _SUB field application below -- see the file header. Both saturate
  * rather than wrap, per the specification's own no-overflow/no-wrap-around
  * rule for these two operations (extraction §4.5 Group C). */
+//cfusa:req REQ-PWM-006
 static uint16_t saturating_add_u16(uint16_t current, uint16_t request)
 {
     uint32_t sum = (uint32_t)current + (uint32_t)request;
@@ -56,6 +57,7 @@ static uint16_t saturating_add_u16(uint16_t current, uint16_t request)
  * 0x0000 on the low side (issue: this was inverted before -- it computed
  * current minus request, which produces a different value for every
  * request where the two operands differ). */
+//cfusa:req REQ-PWM-007
 static uint16_t saturating_sub_u16(uint16_t current, uint16_t request)
 {
     return (current > request) ? (uint16_t)0u : (uint16_t)(request - current);
@@ -123,6 +125,8 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
 }
 
 //cfusa:req REQ-PWM-057
+//cfusa:req REQ-PWM-068
+//cfusa:req REQ-PWM-069
 rcp_ep_pwm_out_generation_state_t rcp_ep_pwm_out_generation_state(rcp_ep_pwm_value_t value)
 {
     if (value.period == 0u) return RCP_EP_PWM_OUT_GEN_STOPPED;
@@ -226,6 +230,7 @@ const char *rcp_ep_pwm_out_reconfig_strerror(rcp_ep_pwm_out_reconfig_errc_t e)
 
 //cfusa:req REQ-PWM-010
 //cfusa:req REQ-PWM-011
+//cfusa:req REQ-PWM-060
 rcp_ep_pwm_out_reconfig_errc_t
 rcp_ep_pwm_out_apply_reconfig(rcp_ep_pwm_out_functional_cfg_t *cfg,
                                const uint8_t *payload, size_t payload_len)
@@ -317,6 +322,7 @@ bool rcp_ep_pwm_out_trigger_fires(rcp_ep_pwm_out_trigger_t trigger, rcp_ep_pwm_o
 }
 
 //cfusa:req REQ-PWM-055
+//cfusa:req REQ-PWM-067
 uint8_t rcp_ep_pwm_out_trigger_events_at_tick(uint16_t period, uint16_t active_duration,
                                                uint8_t skew, uint32_t raw_tick)
 {
@@ -446,6 +452,9 @@ rcp_bytes_t rcp_ep_pwm_out_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-PWM-025
 //cfusa:req REQ-PWM-026
+//cfusa:req REQ-PWM-061
+//cfusa:req REQ-PWM-062
+//cfusa:req REQ-PWM-063
 rcp_ep_pwm_out_errc_t rcp_ep_pwm_out_decode_read_request(const uint8_t *b, size_t len,
                                                           rcp_byte_bus_id_t expected_bus_id,
                                                           uint8_t *out_transaction_num)
@@ -493,6 +502,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
 //cfusa:req REQ-PWM-027
 //cfusa:req REQ-PWM-028
 //cfusa:req REQ-PWM-008
+//cfusa:req REQ-PWM-064
 rcp_ep_pwm_out_errc_t rcp_ep_pwm_out_decode_write_request(const uint8_t *b, size_t len,
                                                            rcp_byte_bus_id_t expected_bus_id,
                                                            rcp_ep_pwm_value_t *out_value,
@@ -565,6 +575,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_response(rcp_byte_bus_id_t byte_bus_id, rcp_ep
 //cfusa:req REQ-PWM-029
 //cfusa:req REQ-PWM-030
 //cfusa:req REQ-PWM-031
+//cfusa:req REQ-PWM-065
 rcp_ep_pwm_out_errc_t rcp_ep_pwm_out_decode_response(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       rcp_ep_pwm_value_t *out_value,
@@ -746,6 +757,8 @@ const char *rcp_ep_pwm_in_reconfig_strerror(rcp_ep_pwm_in_reconfig_errc_t e)
 }
 
 //cfusa:req REQ-PWM-058
+//cfusa:req REQ-PWM-070
+//cfusa:req REQ-PWM-071
 rcp_ep_pwm_in_reconfig_errc_t
 rcp_ep_pwm_in_apply_reconfig(rcp_ep_pwm_in_functional_cfg_t *cfg,
                               const uint8_t *payload, size_t payload_len)
@@ -857,6 +870,7 @@ rcp_bytes_t rcp_ep_pwm_in_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-PWM-042
 //cfusa:req REQ-PWM-043
+//cfusa:req REQ-PWM-066
 rcp_ep_pwm_in_errc_t rcp_ep_pwm_in_decode_read_request(const uint8_t *b, size_t len,
                                                         rcp_byte_bus_id_t expected_bus_id,
                                                         uint8_t *out_transaction_num)
@@ -973,7 +987,10 @@ rcp_ep_pwm_in_errc_t rcp_ep_pwm_in_decode_response(const uint8_t *b, size_t len,
 
 /* ── PWM_IN: MAX_PERIOD timeout classification (REQ-PWM-058 remainder) ──────── */
 
-//cfusa:req REQ-PWM-058
+//cfusa:req REQ-PWM-072
+//cfusa:req REQ-PWM-073
+//cfusa:req REQ-PWM-074
+//cfusa:req REQ-PWM-075
 rcp_ep_pwm_in_max_period_outcome_t
 rcp_ep_pwm_in_max_period_outcome(uint16_t measured_period, uint16_t max_period,
                                   bool err_on_max_period, bool resp_on_err_enabled)

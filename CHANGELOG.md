@@ -34,6 +34,144 @@ the rationale.
 
 ## Releases
 
+### v0.451.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-PWM-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-PWM-*` prefix (`src/ep_pwm.c`, `include/rcp/ep_pwm.h`)
+-- Group 2's largest single prefix (59 requirements), lowest proxy-flag
+density among the batches run so far (2/59 flagged "2+ shall") --
+notably including `REQ-PWM-002..009`/`-056`, `CONTRIBUTING.md`'s own
+cited positive example of the atomic pattern. All 59 requirements read
+in full against their actual `text` and traced code/tests, not just
+the 2 flagged ones, per the tracker's own note that the proxy count
+misses real bundling with zero "shall" occurrences (confirmed again
+here: 12 of the 14 splits below carried only one "shall" each).
+
+14 ids split into 75 total (59 originals + 16 new, `REQ-PWM-060..075`):
+
+- `REQ-PWM-011` -> `-011`/`-060`: `rcp_ep_pwm_out_apply_reconfig()`'s
+  short-payload error (kept as `-011`) vs. its out-of-range error
+  (`-060`) -- two distinct malformed-input conditions under one id,
+  the exact `REQ-RMAP-*` "Split ... out of REQ-X" pattern this batch
+  reuses throughout.
+- `REQ-PWM-026` -> `-026`/`-061`/`-062`/`-063`:
+  `rcp_ep_pwm_out_decode_read_request()`'s SHORT_FRAME (kept as
+  `-026`), BAD_MSG_TYPE (`-061`), WRONG_BUS (`-062`), and WRONG_OP
+  (`-063`) rejections -- four independently-triggerable error
+  conditions bundled under one id. No test existed for BAD_MSG_TYPE;
+  added `test_out_read_request_rejects_bad_msg_type` (mirrors
+  `ep_gpio.c`'s identical GBB-vs-ABB technique).
+- `REQ-PWM-028` -> `-028`/`-064`: `rcp_ep_pwm_out_decode_write_request()`'s
+  BAD_PAYLOAD_LEN (kept as `-028`) vs. WRONG_OP (`-064`) rejections.
+  No test existed for WRONG_OP; added
+  `test_out_write_request_rejects_wrong_op`.
+- `REQ-PWM-031` -> `-031`/`-065`: `rcp_ep_pwm_out_decode_response()`'s
+  SHORT_FRAME (kept as `-031`) vs. WRONG_BUS (`-065`) rejections. No
+  test existed for WRONG_BUS -- PWM_OUT's own decode_response never
+  had the equivalent of PWM_IN's `test_in_response_decode_rejects_wrong_bus`,
+  exactly the silent-gap risk this audit exists to close; added
+  `test_out_response_decode_rejects_wrong_bus`.
+- `REQ-PWM-043` -> `-043`/`-066`: `rcp_ep_pwm_in_decode_read_request()`'s
+  SHORT_FRAME (kept as `-043`) vs. WRONG_BUS (`-066`) rejections; both
+  already separately tested, just mis-tagged.
+- `REQ-PWM-055` -> `-055`/`-067`: `rcp_ep_pwm_out_trigger_events_at_tick()`'s
+  skew-delayed-signal trigger-timing rule (kept as `-055`) vs. Table
+  45's separate "MID_PULSE fires even at 0% duty cycle" carve-out
+  (`-067`) -- two independently testable rules of the same function,
+  both already covered by dedicated tests in `test_tc18_gaps_ep.c`.
+- `REQ-PWM-057` -> `-057`/`-068`/`-069`: `rcp_ep_pwm_out_generation_state()`'s
+  three classifier outcomes (STOPPED kept as `-057`, OUTPUT_DISABLED
+  `-068`, RUNNING `-069`) -- the same per-outcome granularity
+  `REQ-PWM-002..009` already established, applied to a classifier this
+  codebase added after that convention was set. Split the single
+  combined `test_pwm_out_generation_state()` into three focused test
+  functions, one per outcome.
+- `REQ-PWM-058` -> `-058`/`-070..075`: the largest bundle found this
+  batch -- PWM_IN's MAX_PERIOD timeout classifier
+  (`rcp_ep_pwm_in_max_period_outcome()`'s four Table 48 outcomes: OK
+  `-072`, INVALIDATE `-073`, STOP `-074`, STOP_AND_ERROR `-075`) and
+  `rcp_ep_pwm_in_apply_reconfig()`'s two addressed-write error
+  conditions (SHORT `-070`, OUT_OF_RANGE `-071`, mirroring
+  `REQ-PWM-011`/`-060`'s identical PWM_OUT-side split) were both
+  narrated under one id alongside the register-block's own existence
+  claim, which `-058` now covers alone. Split the combined
+  `test_in_max_period_outcome_bit_set_stops_and_conditionally_errors()`
+  into `test_in_max_period_outcome_stop_without_error()`/
+  `_stop_and_error()`; the other four new ids' tests already existed,
+  just mis-tagged or untagged.
+
+**Known residual bundle, not fixed by this batch** (documented in
+`REQ-PWM-058`'s and `REQ-PWM-010`'s/`REQ-PWM-011`'s own text, mirroring
+#519's own documented-but-deferred treatment of the `--func-coverage`
+gap it found): both PWM_OUT's and PWM_IN's register-block quintets
+(`render_registers()`/`apply_reconfig()`/`reconfig_strerror()`/
+`encode_reconfig_request()`) still share `REQ-PWM-010`/`-011` and
+`REQ-PWM-058` respectively across multiple functions whose own
+distinct behaviour (register serialization, error-message lookup,
+frame encoding) none of those ids' text actually describes -- the same
+class of helper-hitchhikes-on-an-unrelated-id gap #519 documented for
+`saturating_add_u16`/`_sub_u16` (which this batch *did* fix: both now
+carry their own `REQ-PWM-006`/`-007` tags directly, per
+`CONTRIBUTING.md`'s own worked example). Left for a follow-up batch
+rather than expanded further here.
+
+**Confirmed atomic** (both proxy-flagged ids plus every other of the
+59, read in full): `REQ-PWM-010` (a single happy-path scenario: parse
+address+data, write applicable registers, preserve read-only ones,
+return OK -- not two separate outcomes despite three clauses joined by
+"and"). The other 50 non-split ids all matched the already-established
+good patterns this prefix pioneered (`REQ-PWM-002..009` per-branch
+switch arms, `REQ-PWM-012..015`/`-032..034` per-trigger selectors,
+`REQ-PWM-017..019`/`-036..038` per-lifecycle-state authorization,
+`REQ-PWM-020..023`/`-039..040` reject-unauthorized/apply-when-authorized
+pairs, `REQ-PWM-024`/`-041` exhaustive strerror invariants,
+`REQ-PWM-049..054` per-mode compound-wait branches) or the CONTRIBUTING.md
+"compound object joined by 'and'" exception (`REQ-PWM-016`/`-035`
+zero-init, `REQ-PWM-056` duty-cycle clamp).
+
+**Out of scope, noted but not fixed** (a completeness gap, not an
+atomicity one -- no existing requirement text ever named these
+clauses, so there was nothing to split): `rcp_ep_pwm_out_decode_write_request()`'s
+own SHORT_FRAME/BAD_MSG_TYPE/WRONG_BUS branches (only WRONG_OP/
+BAD_PAYLOAD_LEN are named in any `REQ-PWM-*` text) and
+`rcp_ep_pwm_in_decode_response()`'s own SHORT_FRAME/BAD_MSG_TYPE/
+BAD_PAYLOAD_LEN branches. `test_out_write_request_rejects_wrong_bus`
+already exists and passes but is left untagged for the same reason.
+
+All 16 new ids' `//cfusa:req`/`//cfusa:test` tags placed directly
+above the exact function/test each describes (not left at a file
+header only), per `CONTRIBUTING.md`. Also moved every *pre-existing*
+`REQ-PWM-*` `//cfusa:test` tag in `tests/test_ep_pwm.c` (57 tags) and
+`tests/test_tc18_gaps_ep.c` (6 tags) off those files' own file-header
+blocks down to the specific test function each proves -- both files
+had every PWM requirement's test tag stacked at the top, the exact
+`--sec-tested`-blind-spot anti-pattern `CONTRIBUTING.md` warns against.
+
+Every split mutation-tested against a real injected defect (reverted
+after confirming): `REQ-PWM-060`, `-069`, `-074`/`-075`, `-065`, and
+`-061` each independently caught their own clause's regression while
+sibling splits (including the PWM_IN counterpart, for the OUT/IN
+mirrored splits) stayed green.
+
+Full clean rebuild + 67/67 test suites passing (`test_ep_pwm`: 93
+Unity cases, `test_tc18_gaps_ep`: 62); ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67 passing; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100` / `trace
+--sec-tested 100` (run standalone, per the #533 REQ-CFG-* batch's
+combined-flag reporting-bug finding) each 100% (1190/1190
+requirements, 512/512 functions).
+
+Re-synced `AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s
+`.fusa-reqs.json` scope-count tables: 1190 total (1156 `tc18` [1043
+ASIL-B / 36 ASIL-A / 77 QM] / 21 `tc18-gap` / 7 `retired` / 6
+`internal`).
+
+Part of #533. Not closing it -- other Group 2/Group 4 prefixes and any
+remaining Group 1/Group 3 batches are separate, possibly concurrent,
+work against the same tracker.
+
 ### v0.450.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-UART-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
