@@ -34,6 +34,78 @@ the rationale.
 
 ## Releases
 
+### v0.434.0 -- 2026-08-20 ([c-RCP-18-tracker] issue #533 batch REQ-REC-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+This batch covers the `REQ-REC-*` prefix (`src/recorder.c`,
+`include/rcp/recorder.h`, `tests/test_recorder.c`) -- all 14
+requirements read in full against their actual
+`//cfusa:req`/`//cfusa:test`-tagged code and tests, not just the
+2+-"shall" proxy (which flagged exactly 2 of the 14).
+
+Both proxy-flagged ids were genuinely bundled and split:
+
+- `REQ-REC-006` ("`rcp_recorder_capture()` shall copy frame[0..frame_len)
+  into storage it owns; mutating the caller's buffer after the call
+  shall not affect the stored entry") bundled two distinct,
+  independently-falsifiable contracts of one function: byte-for-byte
+  copy correctness, and immunity of the stored copy to the caller
+  later mutating its own buffer. A truncated/off-by-one copy bug
+  fails only the first; an aliasing bug (storing a pointer into the
+  caller's buffer instead of duplicating it) fails only the second.
+  Split: `REQ-REC-006` keeps the (narrowed) copy-correctness contract,
+  new `REQ-REC-015` takes the mutation-immunity contract. Each got its
+  own `//cfusa:req` tag (both still directly above
+  `rcp_recorder_capture()`, the same function implements both) and its
+  own dedicated test function
+  (`test_capture_copies_frame_bytes_correctly`,
+  `test_capture_stored_entry_immune_to_caller_mutation`, split out of
+  the previously-combined `test_capture_copies_frame_bytes_by_value`)
+  with its own `//cfusa:test` tag.
+- `REQ-REC-009` ("`rcp_recorder_entries(r, out, cap)` shall write at
+  most cap entries into out but shall always return r's true total
+  entry count") bundled the write-bound contract with the
+  return-value contract of one function. A bug that ignores `cap` for
+  the write loop (buffer overflow) fails only the bound-check test; a
+  bug that caps the *returned* count instead of reporting the true
+  total fails only the count test. Split: `REQ-REC-009` keeps the
+  (narrowed) write-bound contract, new `REQ-REC-016` takes the
+  true-count-return contract. Both tags stay above
+  `rcp_recorder_entries()`; new dedicated tests
+  (`test_entries_writes_at_most_cap_entries`,
+  `test_entries_always_returns_true_total_count`, split out of the
+  previously-combined `test_entries_honors_cap_but_reports_true_total`)
+  each carry their own `//cfusa:test` tag.
+
+Every split was mutation-tested against a real injected defect (not
+just tag/function deletion): an aliasing-copy bug, an interior-byte
+copy-corruption bug, a cap-ignoring write-loop bug (caught by ASan as
+a precise `stack-buffer-overflow` at the exact write site, confirming
+a sentinel planted past the cap boundary), and a caller-count-capping
+bug -- each confirmed to fail exactly the one new test it targets and
+leave the other split's test passing, proving the two tests are
+independently meaningful rather than a shared shallow check inherited
+from the pre-split id.
+
+The other 12 `REQ-REC-*` requirements were reviewed and confirmed
+genuinely atomic despite some carrying a compound ("and"-joined or
+multi-field) object in a single shall-statement -- `REQ-REC-001`,
+`-002`, `-004`, `-007`, `-011`, `-012` in particular match the
+`REQ-AUTH-010`/`REQ-PWM-*` "one function's one contract, several
+facets of the same behaviour" pattern `CONTRIBUTING.md` describes as
+legitimate, not the "bundles several functions'/branches' behaviour"
+smell the two split ids above actually exhibited.
+
+`.fusa-reqs.json`: 1098 -> 1100 requirements (`REQ-REC-015`,
+`REQ-REC-016` added; base count reflects rebasing onto the concurrent
+REQ-OBS-* batch below, which is unrelated to and non-overlapping with
+this REQ-REC-* batch). Full 67-test suite + ASan/UBSan (CI's exact
+flags) clean; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (1100/1100 reqs,
+512/512 functions), gates unregressed.
+
 ### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS: 2 requirements split, atomicity audit)
 
 Group 3 (server/dispatch) batch of the issue #533 requirement-atomicity

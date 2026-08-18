@@ -19106,6 +19106,70 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.434.0 -- 2026-08-20 ([c-RCP-18-tracker] issue #533 batch
+REQ-REC-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-REC-*` prefix (`src/recorder.c`,
+`include/rcp/recorder.h`, `tests/test_recorder.c`) -- all 14
+requirements triaged; the 2+-"shall" proxy flagged exactly 2
+(`REQ-REC-006`, `REQ-REC-009`), both genuinely bundled.
+
+`REQ-REC-006` bundled `rcp_recorder_capture()`'s byte-for-byte
+copy-correctness contract with its separate mutation-immunity
+contract (the stored copy must be unaffected by the caller later
+mutating its own buffer) -- an off-by-one copy bug and an
+aliasing-instead-of-duplicating bug are distinct, independently
+provable failure modes. Split into `REQ-REC-006` (narrowed to
+copy-correctness) and new `REQ-REC-015` (mutation-immunity), each
+with its own `//cfusa:req` tag and its own dedicated test
+(`test_capture_copies_frame_bytes_correctly`,
+`test_capture_stored_entry_immune_to_caller_mutation`).
+
+`REQ-REC-009` bundled `rcp_recorder_entries()`'s write-bound contract
+("at most cap entries into out") with its true-total-return contract
+-- a cap-ignoring write-loop bug and a caller-count-capping return
+bug are likewise distinct. Split into `REQ-REC-009` (narrowed to the
+write bound) and new `REQ-REC-016` (true-count return), each with its
+own tag and dedicated test
+(`test_entries_writes_at_most_cap_entries`,
+`test_entries_always_returns_true_total_count`).
+
+Every split was mutation-tested against a real injected defect (not
+mere tag deletion): the cap-ignoring write-loop bug was caught by
+ASan as a precise `stack-buffer-overflow` at the exact write site in
+`rcp_recorder_entries()`, landing on a sentinel value planted past
+the cap boundary -- about as concrete a confirmation as this project's
+mutation-testing convention asks for. Each of the four injected bugs
+was confirmed to fail exactly the one new test targeting it and leave
+the sibling split's test passing, proving the two tests are
+independently meaningful, not a shared shallow check inherited from
+the pre-split id.
+
+The other 12 `REQ-REC-*` requirements were reviewed and confirmed
+genuinely atomic: several carry a compound ("and"-joined or
+multi-field) object inside a single shall-statement, matching the
+`REQ-AUTH-010`/`REQ-PWM-*` "one function's one contract, several
+facets of the same behaviour" pattern `CONTRIBUTING.md` calls
+legitimate -- not the "bundles several functions'/branches' behaviour"
+smell the two split ids above actually exhibited.
+
+`.fusa-reqs.json`-only change plus `src/recorder.c`/
+`tests/test_recorder.c` (tag placement + test split) -- no other
+source files touched (base count reflects rebasing onto the
+concurrent, non-overlapping REQ-OBS-* batch below). Full 67-test
+suite + ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100 --sec-tested 100`:
+100%/100% (1100/1100 reqs, 512/512 functions), unregressed from
+baseline.
+
+**Next**: continuing issue #533's Group 3 batches --
+`REQ-SRV-*`/`REQ-DL-*`/`REQ-AUTH-*`/`REQ-ADMIN-*`/`REQ-CFG-*` are
+tracked as separate concurrent batches by other sessions against the
+same tracker.
+
 ### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS:
 requirement-atomicity audit, Group 3 server/dispatch)
 

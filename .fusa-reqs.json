@@ -730,8 +730,8 @@
     },
     {
       "id": "REQ-REC-006",
-      "title": "capture() copies the frame bytes by value",
-      "text": "rcp_recorder_capture() shall copy frame[0..frame_len) into storage it owns; mutating the caller's buffer after the call shall not affect the stored entry.",
+      "title": "capture() copies the frame bytes into storage it owns",
+      "text": "rcp_recorder_capture() shall copy frame[0..frame_len) into storage it owns, matching the source bytes exactly.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -760,8 +760,8 @@
     },
     {
       "id": "REQ-REC-009",
-      "title": "entries() honors the cap parameter while reporting the true total",
-      "text": "rcp_recorder_entries(r, out, cap) shall write at most cap entries into out but shall always return r's true total entry count.",
+      "title": "entries() writes at most cap entries into out",
+      "text": "rcp_recorder_entries(r, out, cap) shall write at most cap entries into out, never past index cap-1, regardless of how many entries r actually holds.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -812,6 +812,26 @@
       "id": "REQ-REC-014",
       "title": "rcp_playback_default_config() returns the documented default",
       "text": "rcp_playback_default_config() shall return speed_factor = 1.0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-REC-015",
+      "title": "capture()'s stored entry is immune to later mutation of the caller's buffer",
+      "text": "Split from REQ-REC-006 (c-RCP-18 requirement-atomicity audit, issue #533): mutating the caller's frame buffer after rcp_recorder_capture() returns shall not affect the bytes already stored in the appended entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-REC-016",
+      "title": "entries() always returns the true total entry count",
+      "text": "Split from REQ-REC-009 (c-RCP-18 requirement-atomicity audit, issue #533): rcp_recorder_entries(r, out, cap) shall always return r's true total entry count, even when cap is less than that total.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
