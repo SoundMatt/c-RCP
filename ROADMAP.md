@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.457.0 -- 2026-08-18 (CI tooling: bump pinned `cfusa` v0.6.1 ->
+v0.6.2)
+
+User-requested update to the latest tagged c-FuSa release. Reviewed
+the full CHANGELOG entry before touching the pin: v0.6.2 is "eleven
+tracked improvement issues (#203-213), eight shipped across eight PRs
+(#215-#218, #220-#223)" -- a shared comment/string-aware line-stripping
+primitive, a single-pass walk-and-lex engine, `#if 0` preprocessor-lite
+awareness, `cfusa baseline`, `cfusa check --changed-since`, expanded
+`cfusa fix` remediation coverage plus a real CY006 autofix, `cfusa
+explain <RULE-ID>`, and a first-party GitHub Action -- all additive
+features/internal refactors, no behavior change to `check`/`trace`/
+`cyber` output documented or observed. Windows/MSVC support (issue
+#211) was audited and deliberately deferred, not implemented --
+doesn't affect this repo's Linux/macOS CI matrix.
+
+Neither of the two issues filed against c-FuSa during the v0.6.1
+upgrade (v0.455.0) -- SoundMatt/c-FuSa#214 (missing general "tested"
+CLI flag) and #219 (project_root/symlink `--dir` mismatch) -- is
+addressed by this release; both remain open, unrelated to v0.6.2's
+own issue range (#203-213). No change needed to this repo's own
+v0.455.0 JSON-based `--format json`/`jq` workaround for #214 (v0.456.0
+hardened it further) -- confirmed the `coverage` object's schema
+(`schemaVersion: "1.15.2"`, unchanged) and field names are identical
+under v0.6.2.
+
+Verified by building v0.6.2 from source and running it directly
+against this repo before touching the pin: `cfusa check` 0 errors
+(358 warnings/62 infos -- warnings dropped further from v0.6.1's 523,
+likely from the new shared lexer and `#if 0` awareness suppressing
+false positives on already-known-clean code, no regressions), `cfusa
+trace --req-coverage 100` genuinely 1271/1271, `cfusa trace
+--sec-tested 2` genuinely 37/1271 (identical to v0.6.1), the
+JSON-based "tested" gate step (v0.456.0) verified to still pass
+1271/1271 unchanged, full 67-test suite + ASan/UBSan clean
+(tooling-only change, no source edited). Spot-checked every
+`release.yml` cfusa subcommand (`fmea`, `safety-case`, `release`,
+`iso26262`, `iec61508`, `do178`, `iec62443`, `sas`, `sci`, `badge`)
+directly against v0.6.2 -- identical output/behavior to v0.6.1, no new
+regressions. Bumped `.github/workflows/ci.yml` and
+`.github/workflows/release.yml`.
+
 ### v0.456.0 -- 2026-08-18 (CI tooling: harden the "tested" metric gate
 to parse `cfusa trace --format json` instead of scraping the text
 summary line)
