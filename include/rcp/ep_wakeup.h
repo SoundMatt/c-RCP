@@ -27,6 +27,26 @@
 //cfusa:req REQ-WAKEUP-020
 //cfusa:req REQ-WAKEUP-021
 //cfusa:req REQ-WAKEUP-022
+/* REQ-WAKEUP-023 through -036 (issue #533 tracker, [c-RCP-18-tracker]
+ * REQ-WAKEUP atomicity-audit batch, 2026-08-18): split out of the ids
+ * above per CONTRIBUTING.md's "Writing a requirement" convention -- see
+ * the //cfusa:req tags directly above each split id's own function in
+ * src/ep_wakeup.c (and src/regmap.c for REQ-WAKEUP-026) for exactly
+ * which behaviour each one covers. */
+//cfusa:req REQ-WAKEUP-023
+//cfusa:req REQ-WAKEUP-024
+//cfusa:req REQ-WAKEUP-025
+//cfusa:req REQ-WAKEUP-026
+//cfusa:req REQ-WAKEUP-027
+//cfusa:req REQ-WAKEUP-028
+//cfusa:req REQ-WAKEUP-029
+//cfusa:req REQ-WAKEUP-030
+//cfusa:req REQ-WAKEUP-031
+//cfusa:req REQ-WAKEUP-032
+//cfusa:req REQ-WAKEUP-033
+//cfusa:req REQ-WAKEUP-034
+//cfusa:req REQ-WAKEUP-035
+//cfusa:req REQ-WAKEUP-036
 /*
  * ep_wakeup.h -- the dedicated power-management endpoint (ep_type=0x01)
  * for the TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 19,

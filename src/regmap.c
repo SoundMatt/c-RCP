@@ -618,6 +618,7 @@ rcp_regmap_optional_subsystem_cfg_apply_reconfig(rcp_regmap_optional_subsystem_c
  * RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE right after this
  * check, so skipping the fixed-ep_id check for it is safe: the write
  * never actually gets applied either way. */
+//cfusa:req REQ-WAKEUP-026
 static bool ep_id_map_write_keeps_fixed_ep_id(const rcp_regmap_ep_id_map_entry_t *entries,
                                                size_t count, const uint8_t *ep_types,
                                                uint8_t target_ep_type, uint16_t required_ep_id,

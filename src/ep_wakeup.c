@@ -84,14 +84,14 @@ bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcf
 
 /* ── Edge-triggered wake-source detection (REQ-WAKEUP-022) ──────────────────── */
 
-//cfusa:req REQ-WAKEUP-022
+//cfusa:req REQ-WAKEUP-032
 void rcp_ep_wakeup_source_edge_state_init(rcp_ep_wakeup_source_edge_state_t *s)
 {
     s->has_previous   = false;
     s->previous_level = false;
 }
 
-//cfusa:req REQ-WAKEUP-022
+//cfusa:req REQ-WAKEUP-033
 bool rcp_ep_wakeup_source_edge_asserted(rcp_ep_wakeup_source_cfg_t cfg,
                                          rcp_ep_wakeup_source_edge_state_t *state,
                                          bool pin_level)
@@ -121,7 +121,7 @@ bool rcp_ep_wakeup_source_edge_asserted(rcp_ep_wakeup_source_cfg_t cfg,
     return fired;
 }
 
-//cfusa:req REQ-WAKEUP-022
+//cfusa:req REQ-WAKEUP-034
 bool rcp_ep_wakeup_any_source_edge_asserted(const rcp_ep_wakeup_functional_cfg_t *fcfg,
                                              rcp_ep_wakeup_source_edge_state_t *states,
                                              const bool *pin_levels, size_t pin_level_count)
@@ -156,7 +156,6 @@ void rcp_ep_wakeup_wup_status_init(rcp_ep_wakeup_wup_status_t *s)
 }
 
 //cfusa:req REQ-WAKEUP-006
-//cfusa:req REQ-WAKEUP-021
 void rcp_ep_wakeup_wup_status_latch_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index)
 {
     if (source_index >= RCP_EP_WAKEUP_MAX_SOURCES) return;
@@ -169,7 +168,7 @@ void rcp_ep_wakeup_wup_status_clear(rcp_ep_wakeup_wup_status_t *s)
     s->mask = 0;
 }
 
-//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-027
 void rcp_ep_wakeup_wup_status_clear_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index)
 {
     if (source_index >= RCP_EP_WAKEUP_MAX_SOURCES) return;
@@ -182,7 +181,7 @@ bool rcp_ep_wakeup_wup_status_is_clear(const rcp_ep_wakeup_wup_status_t *s)
     return s->mask == 0;
 }
 
-//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-028
 bool rcp_ep_wakeup_wup_status_source_is_latched(const rcp_ep_wakeup_wup_status_t *s,
                                                   size_t source_index)
 {
@@ -276,7 +275,8 @@ rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id
 }
 
 //cfusa:req REQ-WAKEUP-013
-//cfusa:req REQ-WAKEUP-019
+//cfusa:req REQ-WAKEUP-023
+//cfusa:req REQ-WAKEUP-025
 rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_response(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t expected_bus_id,
                                                              rcp_pwrmode_entry_result_t *out_result,
@@ -390,7 +390,7 @@ rcp_bytes_t rcp_ep_wakeup_encode_wakeup_message_with_source(rcp_byte_bus_id_t by
     return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 }
 
-//cfusa:req REQ-WAKEUP-017
+//cfusa:req REQ-WAKEUP-024
 rcp_ep_wakeup_errc_t
 rcp_ep_wakeup_decode_wakeup_message_with_source(const uint8_t *b, size_t len,
                                                  rcp_byte_bus_id_t expected_bus_id,
@@ -479,6 +479,8 @@ void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
  * block image. The read-only offsets (EP_LEN, NR_IO_PINS_MAX) are
  * deliberately not read back -- rcp_ep_wakeup_apply_reconfig() re-renders
  * them from cfg before patching, so a write covering them is a no-op. */
+//cfusa:req REQ-WAKEUP-029
+//cfusa:req REQ-WAKEUP-035
 static void parse_wakeup_registers(rcp_ep_wakeup_functional_cfg_t *cfg,
                                     const uint8_t in[RCP_EP_WAKEUP_EP_FUNC_LEN])
 {
@@ -562,7 +564,7 @@ static bool wakeup_reg_offset_read_only(uint16_t addr)
            addr == RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX;
 }
 
-//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-030
 const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e)
 {
     switch (e) {
@@ -577,8 +579,7 @@ const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e)
     }
 }
 
-//cfusa:req REQ-WAKEUP-021
-//cfusa:req REQ-WAKEUP-022
+//cfusa:req REQ-WAKEUP-036
 rcp_ep_wakeup_reconfig_errc_t rcp_ep_wakeup_apply_reconfig(rcp_ep_wakeup_functional_cfg_t *cfg,
                                                             const uint8_t *payload,
                                                             size_t payload_len)
@@ -614,7 +615,7 @@ rcp_ep_wakeup_reconfig_errc_t rcp_ep_wakeup_apply_reconfig(rcp_ep_wakeup_functio
     return RCP_EP_WAKEUP_RECONFIG_OK;
 }
 
-//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-031
 rcp_bytes_t rcp_ep_wakeup_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                    uint16_t start_address, const uint8_t *data,
                                                    size_t data_len, uint8_t transaction_num)
