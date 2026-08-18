@@ -19106,6 +19106,52 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-ISELED-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-ISELED-*` (`src/ep_iseled.c`/
+`include/rcp/ep_iseled.h`), Group 2's densest sub-batch by proxy-flag
+density (8/31) -- triaged all 30 non-retired requirements in full
+(`-028` already retired by issue #552, skipped).
+
+10 ids split into 11 new ones (`REQ-ISELED-032..042`): `-002`
+(invalid-parity reject vs. valid-parity accept-and-decode), `-006`
+(determinism / zero-length base case / content-sensitivity, three
+ways), `-008` (`TRIGGER_NONE` vs. `TRIGGER_TX_COMPLETE` switch arms),
+`-011`/`-012`/`-013`/`-014` (each writable-gated setter's deny clause
+vs. its authorize-and-apply clause, matching the already-split
+`REQ-LINEP-011`/`-012` precedent), `-025` (the fragmented-encode
+capability, kept, vs. its own frame-count helper), `-027`
+(`iseled_nr_leds` vs. `iseled_rcv_timeout`, two distinct register
+fields), and `-029` (the register-block mechanism, kept, vs. its own
+`reconfig_strerror()`, matching `REQ-LINEP-028`/`-029`). Three of
+these (`-025`/`-027`/`-029`) had zero "shall" occurrences -- the same
+proxy-missed-bundling pattern Group 1's `REQ-RMAP-*` batch found.
+
+1 flagged id confirmed genuinely atomic: `-022` (multi-error-code
+decode pipeline), matching the established codebase-wide "one
+function, one validate-then-decode contract" pattern already used by
+`REQ-GPIO-027`/`REQ-SPI-027`/`REQ-I2C-012`/`REQ-UART-020`/
+`REQ-PWM-026`/`REQ-LINEP-018`/`REQ-CANEP-017`/`REQ-MDIO-013`/`-017`/
+`REQ-WAKEUP-011`/`-015`. `-015` (`strerror`'s non-NULL+distinct
+compound text) also confirmed atomic against an even stronger,
+~20-prefix-wide precedent.
+
+Tags moved/duplicated to sit above the exact function/test per split;
+every split verified with its own distinct test (one brand-new test
+for `-032`, others split from existing tests or already independently
+tested). A representative sample mutation-tested against real
+injected defects in `src/ep_iseled.c`, each caught only by its own
+split's test, then reverted.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (run
+separately) each 100% (1185/1185 requirements, 512/512 functions).
+
+**Next**: other Group 2 prefixes (`REQ-GPIO-*`, `REQ-CANEP-*`, etc.)
+remain, tracked as separate batches against the same tracker.
+
 ### v0.447.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-GPIO-*: requirement-atomicity audit, Group 2 per-endpoint)
 
