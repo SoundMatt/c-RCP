@@ -2,14 +2,12 @@
 //cfusa:test REQ-ADC-001
 //cfusa:test REQ-ADC-002
 //cfusa:test REQ-ADC-003
-//cfusa:test REQ-ADC-004
 //cfusa:test REQ-ADC-005
 //cfusa:test REQ-ADC-006
 //cfusa:test REQ-ADC-007
 //cfusa:test REQ-ADC-008
 //cfusa:test REQ-ADC-009
 //cfusa:test REQ-ADC-010
-//cfusa:test REQ-ADC-011
 //cfusa:test REQ-ADC-012
 //cfusa:test REQ-ADC-013
 //cfusa:test REQ-ADC-014
@@ -23,17 +21,16 @@
 //cfusa:test REQ-ADC-022
 //cfusa:test REQ-ADC-023
 //cfusa:test REQ-ADC-024
-//cfusa:test REQ-ADC-025
-//cfusa:test REQ-ADC-026
 //cfusa:test REQ-ADC-027
 //cfusa:test REQ-ADC-028
-//cfusa:test REQ-ADC-029
 //cfusa:test REQ-ADC-030
-//cfusa:test REQ-ADC-031
-//cfusa:test REQ-ADC-037
-//cfusa:test REQ-ADC-038
-//cfusa:test REQ-ADC-039
 //cfusa:test REQ-ADC-040
+/* REQ-ADC-004/011/025/026/029/031/037/038/039 and their splits
+ * (REQ-ADC-041..055, c-RCP-18 audit issue #533 REQ-ADC batch) are
+ * deliberately NOT stacked here -- per CONTRIBUTING.md's "Writing a
+ * requirement" convention, each is tagged directly above the specific
+ * test function(s) that prove it, below, rather than at this file
+ * header. */
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -101,6 +98,7 @@ static void test_average_interval_zero_samples_is_no_signal(void)
     TEST_ASSERT_EQUAL_UINT64(0, result.timestamp);
 }
 
+//cfusa:test REQ-ADC-004
 static void test_average_interval_skips_no_signal_samples(void)
 {
     rcp_ep_adc_sample_t samples[3] = {
@@ -128,6 +126,7 @@ static void test_average_interval_timestamp_skips_trailing_no_signal(void)
     TEST_ASSERT_EQUAL_UINT64(4001, result.timestamp);
 }
 
+//cfusa:test REQ-ADC-041
 static void test_average_interval_all_no_signal_is_no_signal(void)
 {
     rcp_ep_adc_sample_t samples[2] = {
@@ -397,6 +396,7 @@ static void test_set_combine_avg_values_applies_when_authorized(void)
 
 /* ── Trigger outputs (Table 53), REQ-ADC-031 ─────────────────────────────── */
 
+//cfusa:test REQ-ADC-031
 static void test_trigger_state_init_has_no_previous_value(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -409,6 +409,7 @@ static void test_trigger_state_init_has_no_previous_value(void)
  * value -- there is nothing to detect a transition against. Trigger 4
  * (measurement_finished) is unaffected, since it has no previous-value
  * concept at all. */
+//cfusa:test REQ-ADC-052
 static void test_trigger_evaluate_first_call_never_fires_edge_triggers(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -428,6 +429,7 @@ static void test_trigger_evaluate_first_call_never_fires_edge_triggers(void)
 /* A genuine downward crossing of trigger_min fires BELOW_MIN exactly
  * once, on the call where the crossing happens -- not on every
  * subsequent call that stays below it. */
+//cfusa:test REQ-ADC-048
 static void test_trigger_evaluate_below_min_fires_once_per_crossing(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -440,6 +442,7 @@ static void test_trigger_evaluate_below_min_fires_once_per_crossing(void)
 }
 
 /* The symmetric upward crossing of trigger_min. */
+//cfusa:test REQ-ADC-049
 static void test_trigger_evaluate_above_min_fires_on_upward_crossing(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -451,6 +454,8 @@ static void test_trigger_evaluate_above_min_fires_on_upward_crossing(void)
 }
 
 /* trigger_max's own two crossings, independent of trigger_min's. */
+//cfusa:test REQ-ADC-050
+//cfusa:test REQ-ADC-051
 static void test_trigger_evaluate_max_crossings(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -466,6 +471,7 @@ static void test_trigger_evaluate_max_crossings(void)
 /* A value sitting exactly AT a threshold, then moving strictly away
  * from it, still counts as a genuine crossing (the ">="/"<=" boundary
  * inclusion on the PREVIOUS side, not the current side). */
+//cfusa:test REQ-ADC-048
 static void test_trigger_evaluate_exact_threshold_value_still_crosses(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -482,6 +488,7 @@ static void test_trigger_evaluate_exact_threshold_value_still_crosses(void)
  * is the discriminating case that distinguishes a strict ">" comparison
  * from an off-by-one ">=" on rcp_ep_adc_trigger_evaluate()'s own
  * current-value side. */
+//cfusa:test REQ-ADC-049
 static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_above(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -495,6 +502,7 @@ static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_abov
 
 /* The symmetric downward case: a value that moves DOWN to (not past) a
  * threshold from above must NOT fire the "falls below" trigger. */
+//cfusa:test REQ-ADC-048
 static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_below(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -507,6 +515,8 @@ static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_belo
 }
 
 /* trigger_max's own two symmetric "moves exactly to, not past" cases. */
+//cfusa:test REQ-ADC-050
+//cfusa:test REQ-ADC-051
 static void test_trigger_evaluate_max_moving_exactly_to_threshold_does_not_fire(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -527,6 +537,8 @@ static void test_trigger_evaluate_max_moving_exactly_to_threshold_does_not_fire(
 /* A jump that crosses BOTH min and max in a single call (e.g. from deep
  * below min to deep above max) fires every threshold trigger whose own
  * direction the jump satisfies -- not just one. */
+//cfusa:test REQ-ADC-049
+//cfusa:test REQ-ADC-051
 static void test_trigger_evaluate_large_jump_fires_multiple_triggers(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -540,6 +552,7 @@ static void test_trigger_evaluate_large_jump_fires_multiple_triggers(void)
 
 /* Trigger 4 composes with any of triggers 0-3 in the same call --
  * Table 53's own 5 signals are independent, not mutually exclusive. */
+//cfusa:test REQ-ADC-052
 static void test_trigger_evaluate_measurement_finished_composes_with_edge_triggers(void)
 {
     rcp_ep_adc_trigger_state_t s;
@@ -552,6 +565,7 @@ static void test_trigger_evaluate_measurement_finished_composes_with_edge_trigge
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
 
+//cfusa:test REQ-ADC-038
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -595,6 +609,7 @@ static void test_render_registers_matches_table_offsets(void)
 /* REQ-ADC's own wider uint16_t fields (adc_avg_intervals_per_request/
  * adc_samples_per_avg_interval) truncate to their low octet on render --
  * see the file header. */
+//cfusa:test REQ-ADC-038
 static void test_render_registers_truncates_wide_fields(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -610,6 +625,7 @@ static void test_render_registers_truncates_wide_fields(void)
     TEST_ASSERT_EQUAL_UINT8(0xAA, out[RCP_EP_ADC_REG_SAMPLES_PER_AVG]);
 }
 
+//cfusa:test REQ-ADC-039
 static void test_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -634,6 +650,7 @@ static void test_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_UINT16(0x44, cfg.adc_samples_per_avg_interval);
 }
 
+//cfusa:test REQ-ADC-039
 static void test_apply_reconfig_writes_resolution_and_trigger_thresholds(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -654,6 +671,7 @@ static void test_apply_reconfig_writes_resolution_and_trigger_thresholds(void)
     TEST_ASSERT_EQUAL_UINT16(0x2222, cfg.trigger_max);
 }
 
+//cfusa:test REQ-ADC-039
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -684,6 +702,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-ADC-039
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -701,6 +720,7 @@ static void test_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.resolution);
 }
 
+//cfusa:test REQ-ADC-039
 static void test_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
@@ -714,6 +734,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_adc_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-ADC-054
 static void test_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -739,6 +760,7 @@ static void test_reconfig_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-054
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_adc_encode_reconfig_request(0x00, 0, NULL, 0, 0);
@@ -746,6 +768,7 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-ADC-055
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_adc_reconfig_errc_t codes[] = {
@@ -791,6 +814,7 @@ static void test_strerror_never_null_and_distinct(void)
  * read request": the ADC request carries no byte_msg_payload; how many
  * measurements it asks for rides in read_size alone ("The readsize is set
  * to 16 such that 8 measurements are expected in return"). */
+//cfusa:test REQ-ADC-025
 static void test_read_request_round_trip(void)
 {
     rcp_bytes_t       frame = rcp_ep_adc_encode_read_request(6, 16, 21);
@@ -810,6 +834,32 @@ static void test_read_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-ADC-043 (split 2026-08-18, c-RCP-18 audit issue #533, from
+ * REQ-ADC-025): extraction §5.9.3 -- the ADC request has no
+ * byte_msg_payload of its own; how many measurement values a response
+ * should carry is conveyed by read_size alone. Decodes the raw ACF_ABB
+ * frame directly (not via rcp_ep_adc_decode_read_request(), which
+ * discards payload_len) so this genuinely pins the wire-level encode
+ * output, independently of REQ-ADC-025's own round-trip contract. Before
+ * this split, no test anywhere in this file asserted the encoded frame's
+ * payload length. */
+//cfusa:test REQ-ADC-043
+static void test_read_request_carries_no_payload(void)
+{
+    rcp_bytes_t                 frame = rcp_ep_adc_encode_read_request(6, 16, 21);
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT(0u, payload_len);
+
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-ADC-044
 static void test_read_request_rejects_wrong_bus(void)
 {
     rcp_bytes_t       frame = rcp_ep_adc_encode_read_request(6, 2, 21);
@@ -822,6 +872,7 @@ static void test_read_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-045
 static void test_read_request_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -843,6 +894,7 @@ static void test_read_request_rejects_wrong_op(void)
 /* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
  * plain ADC read request; every other value (here, 0b101, a reserved
  * value in ADC's endpoint-type row) shall be rejected. */
+//cfusa:test REQ-ADC-046
 static void test_read_request_rejects_nonzero_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -862,6 +914,7 @@ static void test_read_request_rejects_nonzero_evt(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-026
 static void test_read_request_rejects_short_frame(void)
 {
     uint16_t          out_read_size;
@@ -878,6 +931,8 @@ static void test_read_request_rejects_short_frame(void)
  * eight 2-octet values, and Figure 34's own header shows read_size =
  * 0b000000010000 = 16 for that response. Verifies the full N-value
  * payload, not a single value. */
+//cfusa:test REQ-ADC-011
+//cfusa:test REQ-ADC-027
 static void test_response_carries_eight_measurement_values(void)
 {
     const uint16_t    values[8] = {0x0001, 0x0002, 0x0003, 0x0004,
@@ -908,6 +963,7 @@ static void test_response_carries_eight_measurement_values(void)
 
 /* The header's read_size must report the payload the response actually
  * carries -- 2 * value_count (Figure 34, read_size = 16 for 8 values). */
+//cfusa:test REQ-ADC-011
 static void test_response_header_read_size_is_twice_value_count(void)
 {
     const uint16_t              values[8] = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -924,6 +980,7 @@ static void test_response_header_read_size_is_twice_value_count(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-027
 static void test_response_round_trip_untimed(void)
 {
     const uint16_t    values[1] = {12345};
@@ -949,6 +1006,7 @@ static void test_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-028
 static void test_response_round_trip_timed(void)
 {
     const uint16_t    values[2] = {54321, 111};
@@ -976,6 +1034,7 @@ static void test_response_round_trip_timed(void)
 
 /* A payload that is not a whole number of 2-octet values (Figure 34) is
  * not a well-formed ADC response. */
+//cfusa:test REQ-ADC-029
 static void test_response_decode_rejects_bad_payload_len(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -999,6 +1058,7 @@ static void test_response_decode_rejects_bad_payload_len(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-047
 static void test_response_decode_rejects_more_values_than_caller_can_hold(void)
 {
     const uint16_t    values[4] = {1, 2, 3, 4};
@@ -1015,6 +1075,7 @@ static void test_response_decode_rejects_more_values_than_caller_can_hold(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ADC-042
 static void test_response_encode_rejects_zero_or_oversized_value_count(void)
 {
     const uint16_t values[1] = {1};
@@ -1027,6 +1088,7 @@ static void test_response_encode_rejects_zero_or_oversized_value_count(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-ADC-030
 static void test_response_no_signal_sentinel_round_trips(void)
 {
     const uint16_t    values[2] = {RCP_EP_PWM_IN_NO_SIGNAL, 42};
@@ -1053,21 +1115,25 @@ static void test_response_no_signal_sentinel_round_trips(void)
 /* REQ-ADC-037, TC18 §13.7.9.2's three cadence cases -- see the file
  * header's own "three documented cadence cases" paragraph and
  * rcp_ep_adc_cadence_case()'s doc comment. */
+//cfusa:test REQ-ADC-037
 static void test_cadence_case_accumulate_when_combine_exceeds_intervals(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(2, 5));
 }
 
+//cfusa:test REQ-ADC-037
 static void test_cadence_case_one_to_one_when_combine_equals_intervals(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ONE_TO_ONE, rcp_ep_adc_cadence_case(4, 4));
 }
 
+//cfusa:test REQ-ADC-037
 static void test_cadence_case_fan_out_when_combine_below_intervals(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_FAN_OUT, rcp_ep_adc_cadence_case(6, 2));
 }
 
+//cfusa:test REQ-ADC-037
 static void test_cadence_case_boundary_values(void)
 {
     /* intervals == 0 with a nonzero combine can never be reached by any
@@ -1086,23 +1152,27 @@ static void test_cadence_case_boundary_values(void)
     TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(1, 255));
 }
 
+//cfusa:test REQ-ADC-053
 static void test_cadence_response_ready_true_when_pending_meets_combine(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(5u, 5u));
     TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(6u, 5u));
 }
 
+//cfusa:test REQ-ADC-053
 static void test_cadence_response_ready_false_when_pending_short(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(4u, 5u));
     TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(0u, 1u));
 }
 
+//cfusa:test REQ-ADC-053
 static void test_cadence_response_ready_zero_combine_always_ready(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(0u, 0u));
 }
 
+//cfusa:test REQ-ADC-053
 static void test_cadence_response_ready_drives_accumulate_case_across_executions(void)
 {
     /* intervals=2, combine=5: not ready after 1 or 2 executions (2, 4
@@ -1115,6 +1185,7 @@ static void test_cadence_response_ready_drives_accumulate_case_across_executions
     TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(6u, 5u));
 }
 
+//cfusa:test REQ-ADC-053
 static void test_cadence_response_ready_drives_fan_out_case_across_responses(void)
 {
     /* intervals=6, combine=2: one execution (6 pending) is immediately
@@ -1231,6 +1302,7 @@ int main(void)
     RUN_TEST(test_strerror_never_null_and_distinct);
 
     RUN_TEST(test_read_request_round_trip);
+    RUN_TEST(test_read_request_carries_no_payload);
     RUN_TEST(test_read_request_rejects_wrong_bus);
     RUN_TEST(test_read_request_rejects_wrong_op);
     RUN_TEST(test_read_request_rejects_nonzero_evt);
