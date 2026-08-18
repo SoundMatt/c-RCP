@@ -27,6 +27,10 @@
 //cfusa:req REQ-I2C-020
 //cfusa:req REQ-I2C-021
 //cfusa:req REQ-I2C-022
+//cfusa:req REQ-I2C-023
+//cfusa:req REQ-I2C-024
+//cfusa:req REQ-I2C-025
+//cfusa:req REQ-I2C-026
 /*
  * ep_i2c.h -- I2C endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 16, "Basic Endpoints", milestone 66).

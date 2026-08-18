@@ -19106,6 +19106,62 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.454.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-I2C-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-I2C-*` (`src/ep_i2c.c`/`include/rcp/ep_i2c.h`),
+Group 2's smallest prefix (22 total, 4 proxy-flagged) -- triaged all 22
+in full rather than only the 4 flagged, per Group 1's REQ-RMAP-* batch
+finding two real bundled requirements with zero "shall" occurrences.
+
+5 ids reworked, 4 new ones minted (`REQ-I2C-023..026`): `-012` (reject-
+malformed-frame contract, kept -- matches the same multi-error-code
+convention `REQ-GPIO-027`/`REQ-SPI-027`/`REQ-PWM-026` already establish
+for their own decode functions -- vs. its "accepts both op senses"
+success-path assertion, `-023`; also dropped a misattributed "dispatch
+layer UNSUPPORTED_CMD" clause this module never implements), `-013`
+(encode-success vs. `-024` reject-invalid-input, matching this same
+module's own `-010`/`-018` split for the sibling encode function),
+`-021` (`render_registers()`'s own contract, kept, vs. `-025`
+`encode_reconfig_request()`'s -- two different functions), `-022`
+(`apply_reconfig()`'s own contract, kept, vs. `-026`
+`reconfig_strerror()`'s -- again two different functions). `-019`
+retired: a zero-"shall" narrative entry tagging THREE different
+functions, every behavior of which duplicates content `-001`/`-021`/
+`-022` already atomically own (`-001`'s own text already cites `-019`
+as the historical origin of its range) -- the same near-duplicate risk
+Group 1's `REQ-RMAP-059`/`-061` finding flagged, caught only by reading
+the full narrative. Retired via the `REQ-RMAP-004..008` precedent,
+keeping one historical tag pair at `rcp_ep_i2c_mode_valid()`/
+`test_mode_valid_bounds()`.
+
+17 confirmed atomic on inspection, including 3 of the 4 flagged ids and
+2 zero-"shall" entries. `REQ-I2C-009`'s non-NULL-and-distinct
+`strerror()` bundling matches a near-universal codebase convention
+(`REQ-GPIO-001`, `REQ-SPI-001`, `REQ-PWM-024`, et al.), not a
+violation; `-010`/`-020`/`-016` confirmed atomic as one contract
+restated, matching `REQ-RMAP-051`/`-003`/`-018`'s own precedent.
+
+Tags moved/duplicated to sit above the exact function/test per split
+(not file-header-only); every split verified with its own distinct
+test (one brand-new dedicated test for `-024`, one test extended with
+a real distinctness assertion for `-026`, the rest already existing
+but mis-tagged); every split mutation-tested against a real injected
+defect, reverted after confirming. Also fixed a genuine `-020` test-tag
+gap and a stray requirement-id-shaped comment string that was
+confusing `cfusa`'s own tag scanner.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1257/1257 requirements, 512/512 functions).
+
+**Next**: other Group 2 (`REQ-WAKEUP-*` --
+`REQ-SPI-*`/`REQ-ADC-*`/`REQ-LINEP-*`/`REQ-GPIO-*`/`REQ-ISELED-*`/
+`REQ-CANEP-*`/`REQ-UART-*`/`REQ-PWM-*`/`REQ-MDIO-*` landed
+concurrently as v0.444.0-v0.452.0 below) and Group 4 prefixes remain,
+tracked as separate concurrent batches against the same tracker.
+
 ### v0.453.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-WAKEUP-*: requirement-atomicity audit, Group 2 per-endpoint)
 

@@ -12,7 +12,6 @@
 //cfusa:test REQ-SPI-035
 //cfusa:test REQ-SPI-036
 //cfusa:test REQ-SPI-037
-//cfusa:test REQ-I2C-019
 //cfusa:test REQ-I2C-020
 /* REQ-PWM-008/-028/-055/-056/-057/-058: moved 2026-08-18 (c-RCP-18-tracker,
  * REQ-PWM-* atomicity audit, issue #533) to sit directly above the
@@ -1076,13 +1075,15 @@ static void test_spi_no_error_latch(void)
 
 /* ── I2C endpoint (TC18 13.7.7) ───────────────────────────────────────────── */
 
-/* REQ-I2C-019 FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18
- * §13.7.7.2 Table 46's Ultra-fast (5 Mbit/s) preset at i2c_mode value 4 is
- * now accepted, and the register block (i2c_clock_divider/i2c_trail/
- * i2c_base_clk/i2c_ep_status) is now modelled via
- * rcp_ep_i2c_render_registers()/_apply_reconfig() -- see
- * ep_i2c.h's file header for the Table 46 address-collision resolution
- * this required. */
+/* Supplementary, non-normative coverage of rcp_ep_i2c_mode_valid()'s full
+ * preset range and rcp_ep_i2c_functional_cfg_t's field layout -- the
+ * authoritative, tagged tests for these are test_mode_valid_bounds()
+ * (REQ-I2C-001, tests/test_ep_i2c.c) and test_render_registers_matches_table_offsets()
+ * (REQ-I2C-021, tests/test_ep_i2c.c). This test carries no requirement-trace
+ * annotation of its own: the REQ-I2C-019 id it was originally written
+ * against has been retired (c-RCP-18-tracker, issue #533 REQ-I2C-*
+ * atomicity audit) in favor of REQ-I2C-001/-021/-022, which already own
+ * this behavior atomically. */
 static void test_i2c_mode_presets_and_register_block(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -1117,6 +1118,7 @@ static void test_i2c_mode_presets_and_register_block(void)
  * complete I2C payload INCLUDING the target address, which the endpoint must
  * neither interpret, validate nor rewrite -- staying transparent to 7-bit and
  * 10-bit addressing alike. */
+//cfusa:test REQ-I2C-020
 static void test_i2c_payload_address_carried_verbatim(void)
 {
     /* 7-bit form: address 0x53 shifted left with the bus-level R/W bit; and

@@ -22,7 +22,7 @@ TC18 protocol and its own measured evidence.
 | Cybersecurity Architecture | `CYBERSECURITY.md` | Complete — re-derived, Phase 22 |
 | Formal Verification | `FORMAL_VERIFICATION.md` + `tla/*.tla` | Complete — re-derived, Phase 22 |
 | Portability Audit | `PORTABILITY.md` | Complete (unaffected by the protocol replacement — KEEP AS-IS per `ROADMAP.md`'s Satellite Package Disposition table) |
-| Safety Requirements | `.fusa-reqs.json` | 1267 requirements; 1229 `scope: "tc18"` (1114 ASIL-B / 36 ASIL-A / 79 QM — this project's ISO 26262 safety-case basis), 23 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 9 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/779/"legacy-compat" and 947/136 figures — the counts moved again via the [c-RCP-16 follow-up] issue #552 fix (`REQ-ISELED-028`: `tc18-gap` → `retired`), and the [c-RCP-18-tracker] issue #533 Group 3/Group 1/Group 2 (`REQ-ACF-*`, `REQ-AVTP-*`, `REQ-RMAP-*`, `REQ-SPI-*`, `REQ-ADC-*`, `REQ-GPIO-*`, `REQ-LINEP-*`, `REQ-ISELED-*`, `REQ-CANEP-*`, `REQ-UART-*`, `REQ-PWM-*`, `REQ-MDIO-*`, `REQ-WAKEUP-*`) requirement-atomicity splits — the `REQ-ADC-*` batch's own `REQ-ADC-037`/`REQ-ADC-053` split additionally reclassified `REQ-ADC-037` from `tc18-gap` to `tc18`/ASIL-B once its atomicity split separated its now-fully-tested `cadence_case()` contract from `REQ-ADC-053`'s own genuinely-partial dispatch-wiring caveat, both after the issue #548 pass that reclassified 116 `tc18-gap` entries back to `scope: "tc18"` with a real ASIL rating, and the `REQ-CANEP-*`/`REQ-PWM-*` batches' own splits each added `tc18-gap` entries (`REQ-CANEP-038`; `REQ-PWM-068`/`-069`), moving that scope from 20 to 23; the `REQ-MDIO-*`/`REQ-WAKEUP-*` batches' own splits added no `tc18-gap` entries, leaving that scope unchanged at 23) |
+| Safety Requirements | `.fusa-reqs.json` | 1271 requirements; 1232 `scope: "tc18"` (1117 ASIL-B / 36 ASIL-A / 79 QM — this project's ISO 26262 safety-case basis), 23 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 10 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/779/"legacy-compat" and 947/136 figures — the counts moved again via the [c-RCP-16 follow-up] issue #552 fix (`REQ-ISELED-028`: `tc18-gap` → `retired`), and the [c-RCP-18-tracker] issue #533 Group 3/Group 1/Group 2 (`REQ-ACF-*`, `REQ-AVTP-*`, `REQ-RMAP-*`, `REQ-SPI-*`, `REQ-ADC-*`, `REQ-GPIO-*`, `REQ-LINEP-*`, `REQ-ISELED-*`, `REQ-CANEP-*`, `REQ-UART-*`, `REQ-PWM-*`, `REQ-MDIO-*`, `REQ-WAKEUP-*`, `REQ-I2C-*`) requirement-atomicity splits — the `REQ-ADC-*` batch's own `REQ-ADC-037`/`REQ-ADC-053` split additionally reclassified `REQ-ADC-037` from `tc18-gap` to `tc18`/ASIL-B once its atomicity split separated its now-fully-tested `cadence_case()` contract from `REQ-ADC-053`'s own genuinely-partial dispatch-wiring caveat, both after the issue #548 pass that reclassified 116 `tc18-gap` entries back to `scope: "tc18"` with a real ASIL rating, the `REQ-CANEP-*`/`REQ-PWM-*` batches' own splits each added `tc18-gap` entries (`REQ-CANEP-038`; `REQ-PWM-068`/`-069`), moving that scope from 20 to 23 (the `REQ-MDIO-*`/`REQ-WAKEUP-*` batches' own splits added none, leaving it unchanged), and the `REQ-I2C-*` batch's own split retired one near-duplicate (`REQ-I2C-019`), moving `retired` from 9 to 10) |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
@@ -542,12 +542,12 @@ All of the following gates run on every tagged release
 ## 6. Traceability Matrix
 
 Requirements → implementation tracing is maintained in `.fusa-reqs.json`
-(1267 requirements at HEAD: 1229 `scope: "tc18"` covering the
+(1271 requirements at HEAD: 1232 `scope: "tc18"` covering the
 register-map, lifecycle FSM, E2E safe points, every endpoint type's
 request/response shape, discovery, power-mode transitions, and every
 ADAPT-class satellite; 23 `scope: "tc18-gap"` marking TC18 normative
 clauses this implementation does or doesn't fully meet, QM by
-definition; 9 `scope: "retired"` — dead requirement text kept only
+definition; 10 `scope: "retired"` — dead requirement text kept only
 because a surviving `//cfusa:req` tag still names the ID, see
 `FREEDOM_FROM_INTERFERENCE.md` §3; 6 `scope: "internal"` — the
 allocator-hook indirection layer. This table's earlier 854/779/75
