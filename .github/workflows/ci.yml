@@ -619,30 +619,30 @@ jobs:
       # outright, not because coverage regressed, but because the flag's
       # fixed semantics no longer match what this gate is checking. c-FuSa
       # v0.6.1 also has no CLI flag left exposing the general "tested"
-      # metric as a hard gate -- filed upstream as SoundMatt/c-FuSa#214 --
-      # so, matching this file's own MC/DC-workaround precedent above
-      # (reading llvm-cov's real totals directly instead of routing through
-      # a mismatched flag), this step parses plain `cfusa trace`'s own
-      # "Coverage: N/N requirements traced, M/M tested" summary line
-      # directly and hard-fails if either count is not 100%.
+      # metric as a hard gate -- filed upstream as SoundMatt/c-FuSa#214.
+      #
+      # Matching this file's own MC/DC-workaround precedent above (reading
+      # llvm-cov's real totals directly instead of routing through a
+      # mismatched flag): `cfusa trace --format json` exposes a stable,
+      # schemaVersion-tagged `coverage` object
+      # (totalRequirements/tracedRequirements/testedRequirements/
+      # secTestedRequirements) -- parsed here via jq, NOT by scraping the
+      # human-readable text summary line (tried first, then replaced:
+      # text output has no compatibility contract and could silently
+      # reformat on a future cfusa release, where the JSON schema's own
+      # version field would instead loudly signal a breaking change).
       - name: Test-trace coverage report (100% hard gate, "tested" metric)
         run: |
-          out="$(/tmp/cfusa/build/cfusa trace)"
-          echo "$out" | tail -5
-          line="$(echo "$out" | grep -E '^Coverage: [0-9]+/[0-9]+ requirements traced, [0-9]+/[0-9]+ tested$')"
-          if [ -z "$line" ]; then
-            echo "::error::cfusa trace's summary line not found or not in the expected format -- cannot verify the 'tested' metric. Full output above."
+          cov="$(/tmp/cfusa/build/cfusa trace --format json | jq '.coverage')"
+          echo "$cov"
+          total=$(echo "$cov" | jq '.totalRequirements')
+          traced=$(echo "$cov" | jq '.tracedRequirements')
+          tested=$(echo "$cov" | jq '.testedRequirements')
+          if [ "$traced" != "$total" ] || [ "$tested" != "$total" ]; then
+            echo "::error::'tested' metric gate failed: traced=$traced tested=$tested total=$total (both must equal total for a 100% gate)"
             exit 1
           fi
-          traced_n=$(echo "$line" | sed -E 's#Coverage: ([0-9]+)/([0-9]+).*#\1#')
-          traced_d=$(echo "$line" | sed -E 's#Coverage: ([0-9]+)/([0-9]+).*#\2#')
-          tested_n=$(echo "$line" | sed -E 's#.*, ([0-9]+)/([0-9]+) tested#\1#')
-          tested_d=$(echo "$line" | sed -E 's#.*, ([0-9]+)/([0-9]+) tested#\2#')
-          if [ "$traced_n" != "$traced_d" ] || [ "$tested_n" != "$tested_d" ]; then
-            echo "::error::'tested' metric gate failed: $line (both counts must be equal for a 100% gate)"
-            exit 1
-          fi
-          echo "OK: $line"
+          echo "OK: $traced/$total traced, $tested/$total tested"
 
       # Genuine security-test coverage (distinct from the general "tested"
       # gate above): CYBERSECURITY.md's own six security layers cite exactly

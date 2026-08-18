@@ -19106,6 +19106,41 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.456.0 -- 2026-08-18 (CI tooling: harden the "tested" metric gate
+to parse `cfusa trace --format json` instead of scraping the text
+summary line)
+
+Follow-up to v0.455.0 (issue #575), raised by direct self-review of
+that PR's own change: the workaround for c-FuSa v0.6.1's missing
+general "tested" CLI gate (`SoundMatt/c-FuSa#214`) originally parsed
+plain `cfusa trace`'s human-readable "Coverage: N/N requirements
+traced, M/M tested" summary line with `grep`/`sed`. That text output
+carries no compatibility contract -- a future cfusa release
+reformatting it would silently break the parse (the regex would just
+stop matching, likely failing loud via the existing "summary line not
+found" guard, but only after the fact, not via any advance signal).
+
+`cfusa trace --format json` (already documented in `--help`, never
+actually exercised until now) exposes exactly what this gate needs as
+a stable, `schemaVersion`-tagged `coverage` object:
+`{totalRequirements, tracedRequirements, testedRequirements,
+secTestedRequirements}`. Switched the workaround to `cfusa trace
+--format json | jq '.coverage'`, extracting
+`tracedRequirements`/`testedRequirements`/`totalRequirements`
+directly -- a schema field, not a screen-scrape. A future breaking
+change to that schema would show up as a different `schemaVersion` or
+a missing key, either of which fails this step loudly and
+immediately, rather than silently matching nothing.
+
+No functional change to what the gate checks (still 100%
+traced-and-tested, same semantics as v0.455.0) -- this is purely a
+robustness improvement to *how* it checks it. Verified: `cfusa trace
+--format json | jq '.coverage'` locally returns `{totalRequirements:
+1271, tracedRequirements: 1271, testedRequirements: 1271,
+secTestedRequirements: 37}`, matching v0.455.0's own already-verified
+numbers exactly; full 67-test suite + ASan/UBSan clean (no source
+touched, `.github/workflows/ci.yml` only).
+
 ### v0.455.0 -- 2026-08-18 (CI tooling: bump pinned `cfusa` v0.5.54 ->
 v0.6.1, real `//cfusa:sec-test` coverage, fix REQ-UART-038 tracing gap;
 issue #575)
