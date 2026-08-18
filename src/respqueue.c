@@ -31,6 +31,7 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q)
 
 //cfusa:req REQ-RMAP-059
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-085
 bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len)
 {
     bool ok = rcp_respqueue_push_seq(q, frame, frame_len, q->next_sequence_num);
@@ -44,6 +45,7 @@ bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_l
 
 //cfusa:req REQ-RMAP-059
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-085
 bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len,
                              uint8_t sequence_num)
 {
@@ -67,7 +69,8 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
     copy = rcp_bytes_dup(frame, frame_len);
     if (frame_len != 0 && copy.data == NULL) return false; /* alloc failure: q untouched */
 
-    /* TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423, corrected by
+    /* TC18 §12.9.4/§12.9.5 (REQ-RMAP-085, split 2026-08-18 off REQ-RMAP-059/061,
+     * c-RCP-18-tracker issue #533; originally GitHub #423, corrected by
      * GitHub #446, made universal by issue #521): evict lowest-
      * sequence_num entries, one at a time, for as long as EITHER (a)
      * capacity_octets is nonzero (TC18's own "queue is completely full"
@@ -120,15 +123,13 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
     return true;
 }
 
-//cfusa:req REQ-RMAP-059
-//cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-085
 bool rcp_respqueue_overflow(const rcp_respqueue_t *q)
 {
     return q->overflow;
 }
 
-//cfusa:req REQ-RMAP-059
-//cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-085
 void rcp_respqueue_clear_overflow(rcp_respqueue_t *q)
 {
     q->overflow = false;

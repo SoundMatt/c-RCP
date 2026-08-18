@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.443.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-RMAP-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-RMAP-*` (`src/regmap.c`/`src/respqueue.c`),
+Group 1's lowest proxy-flag density (7/81) -- triaged all 81 in full
+rather than only the 7 flagged, per the tracker's own "worth a quick
+pass to confirm rather than assuming" note.
+
+6 ids split into 6 new ones (`REQ-RMAP-082..087`): `-014` (in-range
+non-NULL vs. out-of-range `"unknown"`), `-050` (write-direction
+ticks-to-ms vs. read-direction ms-to-ticks/render-fallback -- the
+original text's own "written value shall be rejected" phrasing
+actually described the read side), `-054` (sentinel-scan-stop vs.
+power-on-default, two different functions), `-059`/`-061` (a TC18
+§12.9.4/§12.9.5 eviction/overflow rule duplicated near-verbatim across
+both ids' own text -- `-059`'s own prior text called it "a SEPARATE,
+additional MUST rule ... never modeled" -- now one canonical id,
+`-085`), `-070` (single-field pass-through vs. whole-struct
+completeness guarantee), and `-079` (original partial-write contract
+vs. a later-discovered, independently-tested EP0-row-0 override,
+issue #466). 3 more flagged ids (`-003`, `-018`, plus `-051`
+discovered atomic on inspection) confirmed genuinely atomic --
+same "one function, one init contract" pattern `-016`/`-017`/`-019`
+already establish.
+
+Tags moved/duplicated to sit above the exact function/test per split
+(not file-header-only); every split verified with its own distinct
+test (one brand-new comprehensive test for `-086`, the rest already
+existing but mis-tagged); every split mutation-tested against a real
+injected defect, reverted after confirming.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1174/1174 requirements, 512/512 functions).
+
+**Next**: other Group 1 (`REQ-ACF-*`, `REQ-AVTP-*` -- both already
+landed concurrently) and Group 2/4 prefixes remain, tracked as
+separate batches against the same tracker.
+
 ### v0.442.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-AVTP-*: requirement-atomicity audit, Group 1 protocol-generic)
 

@@ -23,7 +23,7 @@
 //cfusa:test REQ-MOCK-031
 //cfusa:test REQ-MOCK-032
 //cfusa:test REQ-MOCK-033
-//cfusa:test REQ-RMAP-054
+//cfusa:test REQ-RMAP-084
 //cfusa:test REQ-WDG-010
 //cfusa:test REQ-AVTP-030
 //cfusa:test REQ-AVTP-032
@@ -2547,7 +2547,8 @@ static void test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream(void)
     rcp_mock_server_destroy(srv);
 }
 
-/* REQ-RMAP-054 (issue #459): TC18 §12.7.8 requires the EP_ID_config table's
+/* REQ-RMAP-084 (issue #459; split 2026-08-18 off REQ-RMAP-054, c-RCP-18-
+ * tracker issue #533): TC18 §12.7.8 requires the EP_ID_config table's
  * power-on default to permit EP0 access before any client config is
  * written. rcp_mock_server_new() must seed row 0 with
  * rcp_regmap_ep_id_map_row_init_default()'s own default (request_stream_
@@ -2560,6 +2561,7 @@ static void test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream(void)
  * mock.c) -- resolving byte_bus_id 0 as bound to request_stream_index 1
  * purely from the seeded default row is only possible if
  * rcp_mock_server_new() actually populated it. */
+//cfusa:test REQ-RMAP-084
 static void test_new_server_seeds_ep_id_map_default_row_for_ep0(void)
 {
     rcp_mock_server_t *srv  = rcp_mock_server_new();

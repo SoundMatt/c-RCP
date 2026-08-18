@@ -1623,6 +1623,7 @@ rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *en
 //cfusa:req REQ-RMAP-011
 //cfusa:req REQ-RMAP-012
 //cfusa:req REQ-RMAP-070
+//cfusa:req REQ-RMAP-086
 //cfusa:req REQ-LIFECYCLE-031
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
@@ -1795,6 +1796,7 @@ rcp_regmap_ep_generic_cfg_reconfig_strerror(rcp_regmap_ep_generic_cfg_reconfig_e
 }
 
 //cfusa:req REQ-RMAP-079
+//cfusa:req REQ-RMAP-087
 rcp_regmap_ep_generic_cfg_reconfig_errc_t
 rcp_regmap_ep_generic_cfg_apply_reconfig(rcp_regmap_ep_generic_cfg_t *entries, size_t count,
                                           uint16_t relative_start_address,
@@ -1821,8 +1823,8 @@ rcp_regmap_ep_generic_cfg_apply_reconfig(rcp_regmap_ep_generic_cfg_t *entries, s
      * never updated at all, matching TC18 §13.7.1.2's own "no effect"
      * rule for read-only registers.
      *
-     * ep_used (offset 1, bit 0) has its own narrower, row-0-only override:
-     * TC18 Table 31's ep_used row states EP0's bit is "fixed to 1 as EP0
+     * ep_used (offset 1, bit 0) has its own narrower, row-0-only override
+     * (REQ-RMAP-087): TC18 Table 31's ep_used row states EP0's bit is "fixed to 1 as EP0
      * needs to be always implemented", on top of the field's otherwise
      * general R/W* status for every other row. A write to row 0 that
      * targets this bit is silently ignored for that one field only --
@@ -1939,6 +1941,7 @@ static const char *gpio_named_signal_string(rcp_regmap_named_signal_t sig)
 
 //cfusa:req REQ-RMAP-014
 //cfusa:req REQ-RMAP-015
+//cfusa:req REQ-RMAP-082
 const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig)
 {
     const char *gpio_name = gpio_named_signal_string(sig);
@@ -2045,7 +2048,7 @@ void rcp_regmap_response_queue_cfg_init(rcp_regmap_response_queue_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
 }
 
-//cfusa:req REQ-RMAP-050
+//cfusa:req REQ-RMAP-083
 bool rcp_regmap_wd_timeout_ms_to_ticks(uint32_t timeout_ms,
                                         uint32_t ms_per_tick,
                                         uint16_t *out_ticks)
@@ -2060,7 +2063,7 @@ bool rcp_regmap_wd_timeout_ms_to_ticks(uint32_t timeout_ms,
      * safety-integrity register should never silently grant more slack
      * than requested. */
     ticks = timeout_ms / ms_per_tick;
-    if (ticks > (uint32_t)UINT16_MAX) return false; /* REQ-RMAP-050: 16-bit register width */
+    if (ticks > (uint32_t)UINT16_MAX) return false; /* REQ-RMAP-083: 16-bit register width */
 
     *out_ticks = (uint16_t)ticks;
     return true;
@@ -2082,14 +2085,14 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
     return true;
 }
 
-/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049/050) ──
+/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049/083) ──
  * See this function's own doc comment (regmap.h) for the full field-by-
  * field mapping and the deliberately-excluded fields' own reasoning. */
 
 //cfusa:req REQ-RMAP-047
 //cfusa:req REQ-RMAP-048
 //cfusa:req REQ-RMAP-049
-//cfusa:req REQ-RMAP-050
+//cfusa:req REQ-RMAP-083
 //cfusa:req REQ-RMAP-071
 //cfusa:req REQ-E2E-046
 //cfusa:req REQ-RMAP-051
@@ -2119,7 +2122,7 @@ void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t 
                                                                                     (regmap.h) */
         put_u16(&out[24u * i + 0x0008u], max_request_size_wire);
 
-        /* REQ-RMAP-050: falls back to 0x0000 if the internal ms value
+        /* REQ-RMAP-083: falls back to 0x0000 if the internal ms value
          * cannot be represented at watchdog_ms_per_tick's own rate
          * (including watchdog_ms_per_tick == 0, "not configured") --
          * see this function's own doc comment (regmap.h) for the full
@@ -2226,6 +2229,7 @@ rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_re
 //cfusa:req REQ-RMAP-047
 //cfusa:req REQ-RMAP-048
 //cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-050
 //cfusa:req REQ-RMAP-071
 rcp_regmap_request_stream_cfg_reconfig_errc_t
 rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *entries,
@@ -2466,7 +2470,7 @@ size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *
     return capacity;
 }
 
-//cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-084
 void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row)
 {
     row->request_stream_index = 1u;

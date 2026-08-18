@@ -22,7 +22,7 @@ TC18 protocol and its own measured evidence.
 | Cybersecurity Architecture | `CYBERSECURITY.md` | Complete — re-derived, Phase 22 |
 | Formal Verification | `FORMAL_VERIFICATION.md` + `tla/*.tla` | Complete — re-derived, Phase 22 |
 | Portability Audit | `PORTABILITY.md` | Complete (unaffected by the protocol replacement — KEEP AS-IS per `ROADMAP.md`'s Satellite Package Disposition table) |
-| Safety Requirements | `.fusa-reqs.json` | 1168 requirements; 1136 `scope: "tc18"` (1031 ASIL-B / 35 ASIL-A / 70 QM — this project's ISO 26262 safety-case basis), 19 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 7 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/779/"legacy-compat" and 947/136 figures — the counts moved again via the [c-RCP-16 follow-up] issue #552 fix (`REQ-ISELED-028`: `tc18-gap` → `retired`), and the [c-RCP-18-tracker] issue #533 Group 3/Group 1 (`REQ-ACF-*`, `REQ-AVTP-*`) requirement-atomicity splits, both after the issue #548 pass that reclassified 116 `tc18-gap` entries back to `scope: "tc18"` with a real ASIL rating) |
+| Safety Requirements | `.fusa-reqs.json` | 1174 requirements; 1142 `scope: "tc18"` (1035 ASIL-B / 36 ASIL-A / 71 QM — this project's ISO 26262 safety-case basis), 19 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 7 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/779/"legacy-compat" and 947/136 figures — the counts moved again via the [c-RCP-16 follow-up] issue #552 fix (`REQ-ISELED-028`: `tc18-gap` → `retired`), and the [c-RCP-18-tracker] issue #533 Group 3/Group 1 (`REQ-ACF-*`, `REQ-AVTP-*`, `REQ-RMAP-*`) requirement-atomicity splits, both after the issue #548 pass that reclassified 116 `tc18-gap` entries back to `scope: "tc18"` with a real ASIL rating) |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
@@ -542,7 +542,7 @@ All of the following gates run on every tagged release
 ## 6. Traceability Matrix
 
 Requirements → implementation tracing is maintained in `.fusa-reqs.json`
-(1168 requirements at HEAD: 1136 `scope: "tc18"` covering the
+(1174 requirements at HEAD: 1142 `scope: "tc18"` covering the
 register-map, lifecycle FSM, E2E safe points, every endpoint type's
 request/response shape, discovery, power-mode transitions, and every
 ADAPT-class satellite; 19 `scope: "tc18-gap"` marking TC18 normative

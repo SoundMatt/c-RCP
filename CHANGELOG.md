@@ -34,6 +34,96 @@ the rationale.
 
 ## Releases
 
+### v0.443.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-RMAP-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-RMAP-*` prefix (`src/regmap.c`/`src/respqueue.c`,
+`include/rcp/regmap.h`/`include/rcp/respqueue.h`) -- the lowest
+proxy-flag density in Group 1 (7/81 flagged "2+ shall"), per the
+tracker's own note that this batch was "probably already fine, worth
+a quick pass to confirm." All 81 requirements read in full against
+their actual `text` and traced code/tests, not just the 7 flagged
+ones.
+
+6 ids split into 87 (81 originals + 6 new, `REQ-RMAP-082..087`):
+
+- `REQ-RMAP-014` -> `-014`/`-082`: `rcp_regmap_named_signal_string()`'s
+  in-range non-NULL guarantee vs. its out-of-range `"unknown"`
+  fallback -- two distinct outcomes of the same switch's named cases
+  vs. default arm, the same per-outcome granularity `REQ-PWM-002..009`
+  already established.
+- `REQ-RMAP-050` -> `-050`/`-083`: the watchdog-timeout register's
+  write-direction `ticks_to_ms()` conversion (kept as `-050`) vs. its
+  read-direction `ms_to_ticks()`/render()-fallback-to-`0x0000` behavior
+  (`-083`) -- the original text's own "a written value shall be
+  rejected" phrasing was, on inspection, actually describing the READ
+  side, a real point of confusion the split resolves.
+- `REQ-RMAP-054` -> `-054`/`-084`: EP_ID_config's sentinel-scan-stop
+  contract (`rcp_regmap_ep_id_map_effective_count()`, kept as `-054`)
+  vs. its power-on-default contract (`rcp_regmap_ep_id_map_row_init_default()`,
+  a different function, `-084`).
+- `REQ-RMAP-059`/`REQ-RMAP-061` -> new `REQ-RMAP-085`: the TC18
+  §12.9.4/§12.9.5 slot-full eviction-of-lowest-`sequence_num`-entry +
+  overflow-bit rule had been bolted onto BOTH `-059`'s and `-061`'s own
+  text near-verbatim (`-059`'s own prior text even called it "a
+  SEPARATE, additional MUST rule this entry's own text never
+  modeled") -- a real attribution hazard, not just a proxy miss (0
+  "shall" occurrences), caught only by reading the narrative in full.
+  Now one canonical id; `-059`/`-061` keep only their own byte-budget
+  and per-message-ceiling contracts respectively.
+- `REQ-RMAP-070` -> `-070`/`-086`: `rcp_regmap_writer_ctx()`'s
+  `via_discovery_stream` single-field pass-through (kept as `-070`)
+  vs. the function-wide "every member of the returned struct
+  explicitly assigned, none left uninitialized" completeness
+  guarantee (`-086`, a distinct claim over all 5 members).
+- `REQ-RMAP-079` -> `-079`/`-087`: `rcp_regmap_ep_generic_cfg_apply_reconfig()`'s
+  original partial-field-write/`ep_type`-read-only-noop contract
+  (kept as `-079`) vs. its later-discovered (issue #466), independently
+  tested EP0-row-0 `ep_used`-forced-true override (`-087`) -- self-
+  described in the prior text as "a second, narrower gap found in this
+  same function after #311 closed."
+
+3 more ids confirmed atomic despite the proxy flag (same "one
+function's one init contract, phrased with a zero-except-one-field
+exception" pattern already established by `REQ-RMAP-016`/`-017`/
+`-019`, just phrased with two "shall"s instead of one): `REQ-RMAP-003`,
+`REQ-RMAP-018`. `REQ-RMAP-051` also confirmed atomic on inspection
+(its "classified as FUNCTIONAL_W_STAR and writable in states X/Y" text
+is one behavioral contract restated, not two).
+
+All 6 splits' `//cfusa:req`/`//cfusa:test` tags moved/duplicated to
+sit directly above the exact function/test each id describes (not
+left at a file header only), per `CONTRIBUTING.md`. Every split
+verified to already have (or was given) its own distinct test
+assertion: `REQ-RMAP-082`'s test function split out of `-014`'s former
+shared one; `REQ-RMAP-086` got a brand-new comprehensive test
+(`test_writer_ctx_every_member_is_explicitly_assigned`, asserting all
+5 struct members across two calls); the other four splits' tests
+already existed as separate, focused functions, just mis-tagged or
+untagged. Every split mutation-tested against a real injected defect
+(reverted after confirming): the newly-independent clause's own test
+failed cleanly while the retained id's own test stayed green in every
+case.
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's
+exact flags, `ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67
+passing; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100` / `trace --sec-tested 100` (run standalone, per
+the #533 REQ-CFG-* batch's combined-flag reporting-bug finding) each
+100% (1174/1174 requirements, 512/512 functions).
+
+Re-synced `AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s
+`.fusa-reqs.json` scope-count tables (also accounting for the
+concurrently-merged `REQ-ACF-*`/`REQ-AVTP-*` batches' own 20+11 new
+ids): 1174 total (1142 `tc18` [1035 ASIL-B / 36 ASIL-A / 71 QM] / 19
+`tc18-gap` / 7 `retired` / 6 `internal`).
+
+Part of #533. Not closing it -- other Group 1/2/4 prefixes and any
+remaining Group 3 batches are separate, possibly concurrent, work
+against the same tracker.
+
 ### v0.442.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-AVTP-*: requirement-atomicity audit, Group 1 protocol-generic)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by

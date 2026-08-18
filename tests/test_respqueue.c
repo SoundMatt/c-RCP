@@ -3,6 +3,7 @@
 //cfusa:test REQ-RMAP-061
 //cfusa:test REQ-RMAP-064
 //cfusa:test REQ-RMAP-065
+//cfusa:test REQ-RMAP-085
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -187,8 +188,11 @@ static void test_push_refused_once_a_single_frame_exceeds_max_avtpdu_size(void)
     rcp_respqueue_destroy(&q);
 }
 
-/* ── TC18 §12.9.4/§12.9.5 (GitHub #423): slot-count eviction + overflow bit ─ */
+/* ── TC18 §12.9.4/§12.9.5 (REQ-RMAP-085, split 2026-08-18 off
+ * REQ-RMAP-059/061, c-RCP-18-tracker issue #533; originally GitHub
+ * #423): slot-count eviction + overflow bit ─────────────────────────── */
 
+//cfusa:test REQ-RMAP-085
 static void test_push_evicts_lowest_sequence_num_not_oldest_inserted(void)
 {
     rcp_respqueue_t q;
@@ -250,6 +254,7 @@ static void test_push_evicts_lowest_sequence_num_not_oldest_inserted(void)
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-085
 static void test_overflow_flag_latches_until_cleared(void)
 {
     rcp_respqueue_t q;
@@ -285,6 +290,7 @@ static void test_overflow_flag_latches_until_cleared(void)
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-085
 static void test_capacity_octets_nonzero_still_enforces_max_entries_slot_bound(void)
 {
     /* Issue #521 (ASIL-D-oriented no-dynamic-allocation push):
@@ -314,6 +320,8 @@ static void test_capacity_octets_nonzero_still_enforces_max_entries_slot_bound(v
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-061
+//cfusa:test REQ-RMAP-085
 static void test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction(void)
 {
     /* Same guarantee as above, for REQ-RMAP-061's own per-message
@@ -335,6 +343,7 @@ static void test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction(voi
 /* ── GitHub #446: capacity_octets (the real TC18 queue_size bound) exhaustion
  * triggers eviction, not reject-and-unchanged ──────────────────────────── */
 
+//cfusa:test REQ-RMAP-085
 static void test_push_evicts_single_entry_when_capacity_octets_would_be_exceeded(void)
 {
     /* A realistically-configured queue_size (well under
@@ -364,6 +373,7 @@ static void test_push_evicts_single_entry_when_capacity_octets_would_be_exceeded
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-085
 static void test_push_evicts_multiple_entries_when_one_is_not_enough_bytes(void)
 {
     /* Byte-size varies per evicted entry -- a single eviction is not
@@ -413,6 +423,7 @@ static void test_push_evicts_multiple_entries_when_one_is_not_enough_bytes(void)
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-085
 static void test_capacity_octets_eviction_prefers_lowest_sequence_num_not_fifo_oldest(void)
 {
     /* Same "lowest sequence_num, not FIFO-oldest" guarantee the #423
@@ -450,6 +461,7 @@ static void test_capacity_octets_eviction_prefers_lowest_sequence_num_not_fifo_o
     rcp_respqueue_destroy(&q);
 }
 
+//cfusa:test REQ-RMAP-085
 static void test_capacity_octets_zero_falls_back_to_max_entries_bound(void)
 {
     /* GitHub #446's own design recommendation: with capacity_octets == 0
