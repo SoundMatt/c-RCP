@@ -2,7 +2,6 @@
 #include "rcp/admin.h"
 #include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
 #include "mem_bounded.h"
 #include "platform.h"
 
@@ -21,17 +20,33 @@ typedef struct {
     void               *user_data;
 } admin_subscriber_t;
 
+/* [c-RCP-17] Worst-case rendered size of one rcp_admin_server_metrics_
+ * text() line: bounded by that function's own `line[256]` stack buffer
+ * and its `written = min(n, sizeof(line) - 1)` clamp, so 255 bytes is the
+ * true per-line ceiling, not an estimate. */
+#define ADMIN_METRICS_LINE_MAX ((size_t)255u)
+#define ADMIN_METRICS_TEXT_MAX ((size_t)(RCP_ADMIN_MAX_COUNTERS * ADMIN_METRICS_LINE_MAX) + 1u)
+
 struct rcp_admin_server {
-    rcp_mutex_t             mu; /* protects endpoints[], subscribers[], counters[] */
-    rcp_avtp_addr_t        *endpoints;
-    size_t                  endpoints_len;
-    size_t                  endpoints_cap;
-    admin_subscriber_t    *subscribers;
-    size_t                  subscribers_len;
-    size_t                  subscribers_cap;
-    admin_counter_t       *counters;
-    size_t                  counters_len;
-    size_t                  counters_cap;
+    rcp_mutex_t          mu; /* protects endpoints[], subscribers[], counters[] */
+    /* [c-RCP-17] Fixed-capacity embedded arrays, not heap-allocated: see
+     * RCP_ADMIN_MAX_ENDPOINTS/RCP_ADMIN_MAX_SUBSCRIBERS/RCP_ADMIN_MAX_
+     * COUNTERS's own doc comment (admin.h) for the rationale and the
+     * resulting capacity-exceeded failure modes. */
+    rcp_avtp_addr_t      endpoints[RCP_ADMIN_MAX_ENDPOINTS];
+    size_t               endpoints_len;
+    admin_subscriber_t   subscribers[RCP_ADMIN_MAX_SUBSCRIBERS];
+    size_t               subscribers_len;
+    admin_counter_t      counters[RCP_ADMIN_MAX_COUNTERS];
+    size_t               counters_len;
+    /* rcp_admin_server_metrics_text()'s own rendering scratch space --
+     * embedded here (this whole struct is already srv's one, single,
+     * already-existing rcp_calloc() at construction time) rather than a
+     * per-call heap allocation, sized to ADMIN_METRICS_TEXT_MAX's own
+     * worst case (RCP_ADMIN_MAX_COUNTERS lines at ADMIN_METRICS_LINE_MAX
+     * bytes each) so it can never overflow regardless of what counters[]
+     * holds. */
+    char                 metrics_scratch[ADMIN_METRICS_TEXT_MAX];
 };
 
 //cfusa:req REQ-ADMIN-009
@@ -48,12 +63,6 @@ void rcp_admin_server_destroy(rcp_admin_server_t *srv)
 {
     if (!srv) return;
     rcp_mutex_destroy(&srv->mu);
-    rcp_free(srv->endpoints);
-    srv->endpoints = NULL;
-    rcp_free(srv->subscribers);
-    srv->subscribers = NULL;
-    rcp_free(srv->counters);
-    srv->counters = NULL;
     rcp_free(srv);
     srv = NULL;
 }
@@ -75,18 +84,7 @@ bool rcp_admin_server_register_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t
 
     rcp_mutex_lock(&srv->mu);
     if (find_endpoint_index(srv, addr) == srv->endpoints_len) {
-        if (srv->endpoints_len == srv->endpoints_cap) {
-            size_t new_cap = (srv->endpoints_cap == 0) ? 8 : srv->endpoints_cap * 2;
-            size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->endpoints));
-            rcp_avtp_addr_t *grown = alloc_bytes == 0
-                ? NULL
-                : (rcp_avtp_addr_t *)rcp_realloc(srv->endpoints, alloc_bytes);
-            if (grown) {
-                srv->endpoints     = grown;
-                srv->endpoints_cap = new_cap;
-            }
-        }
-        if (srv->endpoints_len < srv->endpoints_cap) {
+        if (srv->endpoints_len < RCP_ADMIN_MAX_ENDPOINTS) {
             srv->endpoints[srv->endpoints_len++] = addr;
             changed = true;
         }
@@ -132,22 +130,10 @@ size_t rcp_admin_server_endpoints(rcp_admin_server_t *srv, rcp_endpoint_info_t *
 //cfusa:req REQ-ADMIN-003
 bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, void *user_data)
 {
-    bool ok = true;
+    bool ok;
 
     rcp_mutex_lock(&srv->mu);
-    if (srv->subscribers_len == srv->subscribers_cap) {
-        size_t new_cap = (srv->subscribers_cap == 0) ? 4 : srv->subscribers_cap * 2;
-        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->subscribers));
-        admin_subscriber_t *grown = alloc_bytes == 0
-            ? NULL
-            : (admin_subscriber_t *)rcp_realloc(srv->subscribers, alloc_bytes);
-        if (!grown) {
-            ok = false;
-        } else {
-            srv->subscribers     = grown;
-            srv->subscribers_cap = new_cap;
-        }
-    }
+    ok = srv->subscribers_len < RCP_ADMIN_MAX_SUBSCRIBERS;
     if (ok) {
         srv->subscribers[srv->subscribers_len].cb        = cb;
         srv->subscribers[srv->subscribers_len].user_data  = user_data;
@@ -160,36 +146,31 @@ bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, 
 //cfusa:req REQ-ADMIN-004
 void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
 {
-    admin_subscriber_t *local;
-    size_t               n;
-    size_t               i;
+    /* [c-RCP-17] A fixed-size stack snapshot, not a per-call heap
+     * allocation -- subscribers[] is itself now capped at
+     * RCP_ADMIN_MAX_SUBSCRIBERS (admin.h), small enough that copying the
+     * whole thing onto the stack costs nothing and can never fail the way
+     * the old rcp_malloc()'d snapshot could. */
+    admin_subscriber_t local[RCP_ADMIN_MAX_SUBSCRIBERS];
+    size_t              n;
+    size_t              i;
 
     rcp_mutex_lock(&srv->mu);
     n = srv->subscribers_len;
-    {
-        size_t alloc_bytes = (n > 0) ? rcp_alloc_checked_size(n, sizeof(*local)) : 1;
-        local = alloc_bytes == 0 ? NULL : (admin_subscriber_t *)rcp_malloc(alloc_bytes);
-    }
-    if (local) {
-        for (i = 0; i < n; i++) local[i] = srv->subscribers[i];
-    } else {
-        n = 0; /* best-effort on OOM: skip delivery rather than crash */
-    }
+    for (i = 0; i < n; i++) local[i] = srv->subscribers[i];
     rcp_mutex_unlock(&srv->mu);
 
     /* Invoked outside the lock -- see the deviation note in admin.h. */
     for (i = 0; i < n; i++) {
         local[i].cb(&ev, local[i].user_data);
     }
-    rcp_free(local);
-    local = NULL;
 }
 
 //cfusa:req REQ-ADMIN-005
 //cfusa:req REQ-ADMIN-007
 bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, const char *labels, double delta)
 {
-    bool ok = true;
+    bool ok;
     size_t i;
 
     rcp_mutex_lock(&srv->mu);
@@ -201,19 +182,7 @@ bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, 
         }
     }
 
-    if (srv->counters_len == srv->counters_cap) {
-        size_t new_cap = (srv->counters_cap == 0) ? 8 : srv->counters_cap * 2;
-        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->counters));
-        admin_counter_t *grown = alloc_bytes == 0
-            ? NULL
-            : (admin_counter_t *)rcp_realloc(srv->counters, alloc_bytes);
-        if (!grown) {
-            ok = false;
-        } else {
-            srv->counters     = grown;
-            srv->counters_cap = new_cap;
-        }
-    }
+    ok = srv->counters_len < RCP_ADMIN_MAX_COUNTERS;
     if (ok) {
         admin_counter_t *c = &srv->counters[srv->counters_len];
         rcp_strncpy_bounded(c->name, sizeof(c->name), name);
@@ -228,11 +197,9 @@ bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, 
 //cfusa:req REQ-ADMIN-006
 size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t cap)
 {
-    size_t total = 0;
+    size_t total;
     size_t i;
-    char  *scratch = NULL;
     size_t scratch_len = 0;
-    size_t scratch_cap = 0;
 
     rcp_mutex_lock(&srv->mu);
     for (i = 0; i < srv->counters_len; i++) {
@@ -253,28 +220,26 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
            or a long name/labels pair reads past the stack buffer. */
         size_t written = ((size_t)n >= sizeof(line)) ? sizeof(line) - 1 : (size_t)n;
 
-        if (scratch_len + written + 1 > scratch_cap) {
-            size_t new_cap = scratch_cap == 0 ? 256 : scratch_cap * 2;
-            char *grown;
-            while (new_cap < scratch_len + written + 1) new_cap *= 2;
-            grown = (char *)rcp_realloc(scratch, new_cap);
-            if (!grown) continue;
-            scratch     = grown;
-            scratch_cap = new_cap;
-        }
-        rcp_memcpy_bounded(scratch + scratch_len, scratch_cap - scratch_len, line, written);
+        /* [c-RCP-17] srv->metrics_scratch is a fixed ADMIN_METRICS_TEXT_MAX-
+         * byte embedded buffer, sized to the true worst case (counters_len
+         * is capped at RCP_ADMIN_MAX_COUNTERS, and `written` is capped at
+         * ADMIN_METRICS_LINE_MAX above) -- this bound check can never
+         * actually trip given those two invariants; kept as defense in
+         * depth rather than assumed. */
+        if (scratch_len + written + 1 > sizeof(srv->metrics_scratch)) continue;
+        rcp_memcpy_bounded(srv->metrics_scratch + scratch_len,
+                            sizeof(srv->metrics_scratch) - scratch_len, line, written);
         scratch_len += written;
-        scratch[scratch_len] = '\0';
+        srv->metrics_scratch[scratch_len] = '\0';
     }
-    rcp_mutex_unlock(&srv->mu);
 
     total = scratch_len;
     if (out && cap > 0) {
         size_t to_copy = total < cap - 1 ? total : cap - 1;
-        if (scratch) rcp_memcpy_bounded(out, cap - 1, scratch, to_copy);
+        rcp_memcpy_bounded(out, cap - 1, srv->metrics_scratch, to_copy);
         out[to_copy] = '\0';
     }
-    rcp_free(scratch);
-    scratch = NULL;
+    rcp_mutex_unlock(&srv->mu);
+
     return total;
 }

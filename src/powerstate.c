@@ -2,7 +2,6 @@
 #include "rcp/powerstate.h"
 #include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -41,12 +40,15 @@ typedef struct {
 
 struct rcp_powerstate_manager {
     rcp_mutex_t               mu; /* protects entries[], callbacks[] */
-    endpoint_entry_t         *entries;
+    /* [c-RCP-17] Fixed-capacity embedded arrays, not heap-allocated: see
+     * RCP_POWERSTATE_MAX_ENDPOINTS/RCP_POWERSTATE_MAX_CALLBACKS's own doc
+     * comment (powerstate.h) for the rationale and the resulting
+     * capacity-exceeded failure modes. */
+    endpoint_entry_t          entries[RCP_POWERSTATE_MAX_ENDPOINTS];
     size_t                    n_entries;
-    rcp_powerstate_power_fn  *callbacks;
-    void                    **callback_ctx;
+    rcp_powerstate_power_fn   callbacks[RCP_POWERSTATE_MAX_CALLBACKS];
+    void                     *callback_ctx[RCP_POWERSTATE_MAX_CALLBACKS];
     size_t                    n_callbacks;
-    size_t                    callbacks_cap;
 };
 
 static endpoint_entry_t *find_entry(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
@@ -60,24 +62,7 @@ static endpoint_entry_t *find_entry(rcp_powerstate_manager_t *m, rcp_avtp_addr_t
 
 static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_fn cb, void *user_data)
 {
-    if (m->n_callbacks == m->callbacks_cap) {
-        size_t new_cap = (m->callbacks_cap == 0) ? 4 : m->callbacks_cap * 2;
-        size_t cb_bytes = rcp_alloc_checked_size(new_cap, sizeof(rcp_powerstate_power_fn));
-        rcp_powerstate_power_fn *grown_cb = cb_bytes == 0
-            ? NULL
-            : (rcp_powerstate_power_fn *)rcp_realloc(m->callbacks, cb_bytes);
-        void                   **grown_ctx;
-        size_t ctx_bytes;
-        if (!grown_cb) return false;
-        m->callbacks = grown_cb;
-        ctx_bytes = rcp_alloc_checked_size(new_cap, sizeof(*m->callback_ctx));
-        grown_ctx = ctx_bytes == 0
-            ? NULL
-            : (void **)rcp_realloc(m->callback_ctx, ctx_bytes);
-        if (!grown_ctx) return false;
-        m->callback_ctx  = grown_ctx;
-        m->callbacks_cap = new_cap;
-    }
+    if (m->n_callbacks == RCP_POWERSTATE_MAX_CALLBACKS) return false;
     m->callbacks[m->n_callbacks]    = cb;
     m->callback_ctx[m->n_callbacks] = user_data;
     m->n_callbacks++;
@@ -106,22 +91,18 @@ static void emit(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr, rcp_pwrmode_
 //cfusa:req REQ-PWR-011
 rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endpoints, size_t n_endpoints)
 {
-    rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)rcp_calloc(1, sizeof(*m));
+    rcp_powerstate_manager_t *m;
     size_t i;
 
+    /* [c-RCP-17] entries[] is now a fixed RCP_POWERSTATE_MAX_ENDPOINTS-
+     * capacity embedded array (powerstate.h doc comment) -- reject before
+     * allocating m at all rather than allocate-then-unwind. */
+    if (n_endpoints > RCP_POWERSTATE_MAX_ENDPOINTS) return NULL;
+
+    m = (rcp_powerstate_manager_t *)rcp_calloc(1, sizeof(*m));
     if (!m) return NULL;
     rcp_mutex_init(&m->mu);
 
-    if (n_endpoints > 0) {
-        endpoint_entry_t *entries = (endpoint_entry_t *)rcp_calloc(n_endpoints, sizeof(*entries));
-        m->entries = entries;
-        if (!m->entries) {
-            rcp_mutex_destroy(&m->mu);
-            rcp_free(m);
-            m = NULL;
-            return NULL;
-        }
-    }
     for (i = 0; i < n_endpoints; i++) {
         m->entries[i].addr            = endpoints[i];
         m->entries[i].mode            = RCP_PWRMODE_NORMAL;
@@ -437,12 +418,6 @@ void rcp_powerstate_manager_destroy(rcp_powerstate_manager_t *m)
 {
     if (!m) return;
 
-    rcp_free(m->entries);
-    m->entries = NULL;
-    rcp_free(m->callbacks);
-    m->callbacks = NULL;
-    rcp_free(m->callback_ctx);
-    m->callback_ctx = NULL;
     rcp_mutex_destroy(&m->mu);
     rcp_free(m);
     m = NULL;

@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.428.0 -- 2026-08-18 (c-RCP-17 Phase (b) continued: powerstate.c
+endpoint table + callback list, admin.c's three growable arrays and
+per-call metrics scratch buffer, all fixed-capacity)
+
+Continues c-RCP-17 (issue #521) past v0.427.0's `l2.c`/`udp.c`/
+`watchdog.c`/`deadline.c` slice (PR #538), closing the two modules that
+PR explicitly deferred for scope/time: `powerstate.c` (same
+fixed-capacity shape as watchdog/deadline) and `admin.c` (three
+independently-growable arrays plus a string-building scratch buffer,
+the more complex case).
+
+`powerstate.c`'s `entries[]` table and `callbacks[]`/`callback_ctx[]`
+list are now fixed-capacity embedded arrays: `RCP_POWERSTATE_MAX_
+ENDPOINTS` (64, matching `mock.h`'s `RCP_MOCK_MAX_ENDPOINTS`/
+`regmap.h`'s `RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES` precedent -- one entry
+per endpoint, the same scale) and `RCP_POWERSTATE_MAX_CALLBACKS` (16,
+matching watchdog/deadline's own callback-cap precedent).
+
+`admin.c`'s `endpoints[]`, `subscribers[]`, and `counters[]` (each its
+own independent doubling-`rcp_realloc()` scheme) are now fixed-capacity
+embedded arrays: `RCP_ADMIN_MAX_ENDPOINTS` (64, same endpoint-count
+precedent), `RCP_ADMIN_MAX_SUBSCRIBERS` (16, same callback-cap
+precedent), and `RCP_ADMIN_MAX_COUNTERS` (256, a new conventional
+choice -- a Prometheus-style counter is keyed on a caller-chosen (name,
+labels) pair, so cardinality scales with distinct metric series, not
+endpoint count; 256 gives headroom for several counters per endpoint at
+`RCP_ADMIN_MAX_ENDPOINTS`' own scale). None of the three is TC18
+wire-bounded -- `admin.c` is RELAY-envelope/admin glue per its own file
+header, so all three caps are this module's own policy choice, exactly
+as issue #521's filing anticipated for this file. Two simplifications
+fell out of this: `rcp_admin_server_emit()`'s per-call `rcp_malloc()`'d
+subscriber snapshot is now a fixed 16-entry stack array; `rcp_admin_
+server_metrics_text()`'s growing `scratch` buffer is now a fixed
+`srv->metrics_scratch[]` member sized to the true worst case (counters
+capped at `RCP_ADMIN_MAX_COUNTERS`, each line capped at 255 bytes by
+that function's own existing `line[256]` stack buffer).
+
+All five new capacity guards (powerstate x2, admin x3) mutation-tested
+individually (temporarily widened each past its real constant,
+confirmed the matching new boundary test fails, reverted). Full
+67-test suite: 100% passing. ASan/UBSan clean. `cfusa check`/`trace`
+(v0.5.54): 0 errors, 100%/100%, unchanged from baseline. See
+`CHANGELOG.md`'s matching entry for full detail.
+
+**Remaining for c-RCP-17**: `respqueue.c`/`loan.c` still need the real
+redesign decisions issue #521's own filing flagged, not mechanical
+swaps; fragment-plan segment arrays; and Phase (c)'s "document what
+stays dynamic" pass (`fragment.c`, `relay.c`, `mdns.c`, `platform.c`)
+have not been reached yet.
+
 ### v0.427.0 -- 2026-08-18 (c-RCP-17 Phase (b), partial: fixed-capacity
 `l2.c`/`udp.c` recv scratch buffers, `watchdog.c`/`deadline.c` stream
 tables + callback lists)

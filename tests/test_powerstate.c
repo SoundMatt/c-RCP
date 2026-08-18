@@ -527,6 +527,56 @@ static void test_subscribe_fires_on_every_attempted_transition(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+/* ── [c-RCP-17] Fixed-capacity endpoint table / callback list ───────────────── */
+
+//cfusa:test REQ-PWR-011
+static void test_manager_new_at_max_endpoints_succeeds(void)
+{
+    rcp_avtp_addr_t endpoints[RCP_POWERSTATE_MAX_ENDPOINTS];
+    rcp_powerstate_manager_t *m;
+    size_t i;
+
+    for (i = 0; i < RCP_POWERSTATE_MAX_ENDPOINTS; i++) {
+        endpoints[i] = make_addr((uint16_t)(i + 1), 5);
+    }
+
+    m = rcp_powerstate_manager_new(endpoints, RCP_POWERSTATE_MAX_ENDPOINTS);
+    TEST_ASSERT_NOT_NULL(m);
+    /* Last-registered endpoint is reachable -- confirms the fixed array was
+     * fully populated, not silently truncated below capacity. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL,
+                       rcp_powerstate_manager_mode(m, endpoints[RCP_POWERSTATE_MAX_ENDPOINTS - 1]));
+    rcp_powerstate_manager_destroy(m);
+}
+
+//cfusa:test REQ-PWR-011
+static void test_manager_new_over_max_endpoints_returns_null(void)
+{
+    rcp_avtp_addr_t endpoints[RCP_POWERSTATE_MAX_ENDPOINTS + 1];
+    size_t i;
+
+    for (i = 0; i < RCP_POWERSTATE_MAX_ENDPOINTS + 1; i++) {
+        endpoints[i] = make_addr((uint16_t)(i + 1), 5);
+    }
+
+    TEST_ASSERT_NULL(rcp_powerstate_manager_new(endpoints, RCP_POWERSTATE_MAX_ENDPOINTS + 1));
+}
+
+//cfusa:test REQ-PWR-009
+static void test_subscribe_at_max_callbacks_succeeds_then_next_fails(void)
+{
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
+    size_t i;
+
+    for (i = 0; i < RCP_POWERSTATE_MAX_CALLBACKS; i++) {
+        TEST_ASSERT_TRUE(rcp_powerstate_manager_subscribe(m, count_events, NULL));
+    }
+    /* One more, at capacity: rejected, not silently grown. */
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_subscribe(m, count_events, NULL));
+
+    rcp_powerstate_manager_destroy(m);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -559,6 +609,9 @@ int main(void)
     RUN_TEST(test_encode_wakeup_probe_unknown_endpoint_is_zeroed);
     RUN_TEST(test_endpoints_are_independently_tracked);
     RUN_TEST(test_subscribe_fires_on_every_attempted_transition);
+    RUN_TEST(test_manager_new_at_max_endpoints_succeeds);
+    RUN_TEST(test_manager_new_over_max_endpoints_returns_null);
+    RUN_TEST(test_subscribe_at_max_callbacks_succeeds_then_next_fails);
 
     return UNITY_END();
 }

@@ -126,10 +126,30 @@ typedef void (*rcp_powerstate_power_fn)(const rcp_power_event_t *ev, void *user_
 
 typedef struct rcp_powerstate_manager rcp_powerstate_manager_t;
 
+/* [c-RCP-17] Fixed capacities for rcp_powerstate_manager_t's internal
+ * endpoint table and callback list -- backs a compile-time-sized embedded
+ * array, not a heap allocation growable to fit any n_endpoints/subscriber
+ * count. RCP_POWERSTATE_MAX_ENDPOINTS matches mock.h's
+ * RCP_MOCK_MAX_ENDPOINTS and regmap.h's RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES/
+ * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES precedent (64, a plausible real-device
+ * total-endpoint-count ceiling) since this table is genuinely one entry
+ * per endpoint, unlike watchdog.h's/deadline.h's own 16-per-Keeper/Monitor
+ * choice (a *stream* count, a different scale). RCP_POWERSTATE_MAX_
+ * CALLBACKS matches watchdog.h's/deadline.h's own RCP_WATCHDOG_MAX_
+ * CALLBACKS/RCP_DEADLINE_MAX_CALLBACKS precedent (16, a conventional
+ * integrator-subscriber cap -- TC18 does not bound this, it counts
+ * function pointers, not protocol entities). See
+ * rcp_powerstate_manager_new()'s and rcp_powerstate_manager_subscribe()'s
+ * own doc comments for the resulting capacity-exceeded failure modes. */
+#define RCP_POWERSTATE_MAX_ENDPOINTS ((size_t)64u)
+#define RCP_POWERSTATE_MAX_CALLBACKS ((size_t)16u)
+
 /* Creates a Manager over the given endpoints (copied by value), starting
  * every endpoint at RCP_PWRMODE_NORMAL with a not-yet-started handshake.
  * endpoints/n_endpoints may describe zero endpoints. Returns NULL on
- * allocation failure. */
+ * allocation failure, or if n_endpoints exceeds RCP_POWERSTATE_MAX_
+ * ENDPOINTS (the endpoint table is a fixed-capacity embedded array -- see
+ * that constant's own doc comment). */
 rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endpoints, size_t n_endpoints);
 
 /* Returns the current mirrored mode for addr, or RCP_PWRMODE_NORMAL if
@@ -289,8 +309,10 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_pin(rcp_powerstate_manager
 
 /* Registers cb to be invoked on every attempted mode transition, across
  * all endpoints. Not thread-safe with destroy(); register before handing
- * m to other threads. Returns false on allocation failure (cb not
- * added). */
+ * m to other threads. Returns false if m already holds
+ * RCP_POWERSTATE_MAX_CALLBACKS subscribers (cb not added; the callback
+ * list is a fixed-capacity embedded array, not a heap allocation growable
+ * without bound -- see that constant's own doc comment). */
 bool rcp_powerstate_manager_subscribe(rcp_powerstate_manager_t *m, rcp_powerstate_power_fn cb, void *user_data);
 
 /* Frees m. No background thread to stop -- see the file header. Call
