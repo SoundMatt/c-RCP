@@ -19106,6 +19106,84 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID
+pass + FTTI cross-check test)
+
+Closes issue #524 (`c-RCP-22`)'s two remaining gaps (gaps 1-3 closed
+in v0.415.0/PR #531): the HARA's structural review is now fully
+closed, all 5 gaps.
+
+**Gap 4.** Read and analyzed all 9 protocol-bridge/adapter modules
+(`canbr.c`, `ddsbr.c`, `doipbr.c`, `grpcbridge.c`, `linbr.c`,
+`mqttbr.c`, `restbridge.c`, `someipbr.c`, `udsbr.c`) directly against
+current source -- none had ever appeared in this HARA. Confirmed all 9
+are, as of this pass, byte-for-byte identical fail-closed stubs: every
+parameter `(void)`-cast, unconditional `return RCP_ERR_NOT_SUPPORTED`,
+no state touched, no backend-specific logic anywhere yet to
+differentiate risk between them (each is independently covered by its
+own `REQ-*-001` test already asserting exactly that contract). Rather
+than invent 9 cosmetically-distinct ASIL ratings off identical code,
+recorded the honest finding as a single consolidated hazard, `H-012`
+(new `SG-012`, QM: S2/E2/C2 per Table 4, matching this HARA's existing
+`cfusa_compute_asil()`-verified arithmetic convention): a code
+regression away from the documented fail-closed contract could let a
+caller believe a bridge translation succeeded when it did not.
+`H-012`'s own `safe_state` field explicitly scopes this QM conclusion
+to the *current stub implementation only* -- the first concrete
+backend linked into any one of the 9 modules moves that module out of
+this consolidated entry and requires its own dedicated
+hazard-identification pass (a new `H-0NN`) before that backend ships,
+recorded as a standing rule for future bridge implementations rather
+than a one-time waiver.
+
+**Gap 5.** Added
+`tests/test_watchdog.c::test_overflow_detected_within_recorded_ftti()`.
+Configures a real `rcp_watchdog_keeper_t` (fine-grained
+`poll_interval_ms = 2`) with H-001's own recorded `ftti_ms` (100 ms,
+`.fusa-hara.json`) as `rx_wd_timeout_ms`, measures actual wall-clock
+elapsed time via `rcp_monotonic_ms()` from stream construction to
+detected overflow under real timing (busy-wait `test_sleep_ms()`, no
+mocked clock), and asserts the measurement lands in
+`[ftti_ms, ftti_ms + 300ms]`: not before (`REQ-E2E-025`'s own
+`elapsed >= timeout` contract), and not more than a bounded
+CI-scheduling/ASan-jitter slack after. The pre-existing
+`poll_for_overflow()` helper (used by this and other watchdog tests)
+only ever bounded detection at a generous 5000ms -- ~50x the recorded
+FTTI -- which proves eventual detection but was never actually tied to
+the recorded FTTI value at all; this is the first test in the repo
+that is. H-003 shares H-001's exact 100ms FTTI and underlying
+`rcp_e2e_wd_evaluate()` mechanism (only `rx_wd_safestate_enable`
+differs), so this one sampled test cross-checks both hazards' FTTI
+claims. H-008's 200ms WakeUp-handshake FTTI is a distinct
+external-step-driven mechanism (`rcp_pwrmode_*`, no single
+elapsed-time bound to sample against) and is not covered here --
+consistent with issue `c-RCP-22`'s own "at least one" sampled
+cross-check ask, which named H-001's watchdog as its own example.
+
+Mutation-tested (behavior-changing test, not just a new assertion):
+temporarily multiplied `e2e.c`'s `rcp_e2e_wd_evaluate()` overflow
+comparison's `rx_wd_timeout_ms` by 5 -- the new test failed exactly as
+expected (`Expected TRUE Was FALSE`, correctly catching the FTTI being
+missed by 4x) while every other `test_watchdog` case still passed;
+reverted, `git diff` confirmed a byte-identical restore, full suite
+green again.
+
+`.fusa-hara.json`'s hazard/safety-goal counts move from 11/11 to
+12/12. `HARA.md`'s "Known Content Gaps (issue c-RCP-22)" section
+updated: all 5 gaps now recorded closed (was 3/5). Full 67-test suite
+(`test_watchdog` now 14 tests, was 13) + ASan/UBSan
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean; fresh CI-pinned `cfusa`
+(v0.5.54) `check`: 0 errors; `trace --req-coverage 100
+--sec-tested 100`: 100%/100%.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.418.0` to match `CMakeLists.txt`, per
+the `version-sources-agree` gate (c-RCP-09, PR #529).
+
+**Next**: none tracked against `c-RCP-22` -- all 5 gaps closed. Issue
+#524 closed alongside this release.
+
 ### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document,
 `cfusa qualify` regression fix)
 
