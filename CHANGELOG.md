@@ -34,6 +34,99 @@ the rationale.
 
 ## Releases
 
+### v0.429.0 -- 2026-08-18 (c-RCP-16: SEOOC evidence package items 3-5 -- real MC/DC, freedom-from-interference, AUDIT_PACK reframe)
+
+Continues issue #518's five-item suggested approach after PR #528
+(items 1-2: `SEOOC_BOUNDARY.md`, `cfusa qualify` TCL fix). This round
+closes items 3, 4, and 5.
+
+**Item 3 -- real MC/DC measurement.** `ci.yml` gains an `mcdc` job:
+builds with `clang -fprofile-instr-generate -fcoverage-mapping
+-fcoverage-mcdc`, runs the full test suite with per-binary `.profraw`
+profiling, merges via `llvm-profdata`, and reads `llvm-cov export`'s
+own `totals.mcdc` block directly -- genuine condition/decision
+coverage, distinct from the branch-coverage proxy `cfusa coverage
+--dal`/`--asil` silently substitutes when MC/DC is required but no
+`--mcdc-file` is given (`cfusa coverage --help`'s own words: "NOT
+verified MC/DC evidence"). Deliberately does **not** route through
+`cfusa coverage --mcdc-file`: that flag's parser scans for literal
+`"covered_true_count"`/`"covered_false_count"` JSON keys that real
+`llvm-cov export` never emits at any LLVM version (verified against
+upstream LLVM's `CoverageExporterJson.cpp`, which emits positional
+arrays instead, and reproduced directly end-to-end) -- filed and
+already tracked upstream as SoundMatt/c-FuSa#129, not blocking this
+job. Verified locally (Apple Clang 21, same mechanism as the CI job's
+`clang-18`): 64.4% MC/DC condition-pair coverage (437/679) against
+83.7% branch coverage over the same instrumented binaries -- the ~19
+point gap is itself the concrete demonstration of why the branch-proxy
+fallback is not a substitute. Informational only per the issue's own
+suggested sequencing; no hard threshold introduced.
+
+**Item 4 -- freedom-from-interference argument.** New
+`FREEDOM_FROM_INTERFERENCE.md` (ISO 26262-6:2018 Clause 7 / ISO
+26262-9:2018 Clause 6). Corrects the issue's own stale
+`tc18`-vs-`legacy-compat` framing against current HEAD's real
+`.fusa-reqs.json` scopes (`tc18`/`tc18-gap`/`retired`/`internal`;
+the pre-TC18 Zone/Command surface it described was fully removed at
+v0.91.0). Finds `retired` entries and 3 genuinely-`NOT IMPLEMENTED`
+`tc18-gap` entries have zero runtime footprint (freedom-from-
+interference by construction), and identifies `e2e.c`'s CRC32
+safe-point mechanism -- ASIL-B -- as allocating through `alloc.c`'s
+single, process-wide, unpartitioned `rcp_alloc_set_hooks()` table on
+its per-request safety-relevant path, callable by any QM-rated caller
+with no access control; `watchdog.c` has the same dependency in a
+narrower, once-per-keeper form (this branch was rebased past PR #538's
+concurrent c-RCP-17 fixed-capacity conversion, and the finding was
+re-verified/rewritten against the merged tree rather than left
+describing removed code). Recorded as new binding AoU-8 in
+`SEOOC_BOUNDARY.md`, not asserted as closed -- a real QM/ASIL allocator
+partition is a substantial design change outside a documentation pass.
+Also surfaces (but does not itself fix) a `.fusa-reqs.json`
+data-hygiene finding: the large majority of `tc18-gap`-scoped entries'
+own text has moved on to "IMPLEMENTED" without their `scope` field
+following, including all 10 of that scope's ASIL-B-rated entries
+despite the scope's own catalog note saying it should always be QM.
+
+**Item 5 -- reframe `AUDIT_PACK.md` §2.** Retitled and given an
+explicit framing paragraph explaining the same derogation table is
+also real (without-asserting) evidence toward an integrator's own
+ASIL-D item-level HARA, cross-referencing `SEOOC_BOUNDARY.md` §2a
+rather than duplicating it. §1's Document Index, §3's MC/DC
+discussion, §4's DO-178C bullet, §6's Traceability Matrix, and §7's
+change-impact procedure are also corrected from the same stale
+854-requirement/`"legacy-compat"` figures item 4 identified, to the
+current, verified 1095-requirement/four-scope breakdown.
+
+**One real source fix, surfaced by the new `mcdc` job itself.**
+`src/mem_bounded.h`'s `rcp_strncpy_bounded()` called POSIX/XSI
+`strnlen()`, which this project's own strict `-std=c99`
+(`CMAKE_C_EXTENSIONS OFF`, no `_POSIX_C_SOURCE`/`_DEFAULT_SOURCE`
+feature-test macro anywhere) never actually declares in glibc's
+`<string.h>` -- every prior CI compiler (gcc-12, clang-14) only
+*warned* on the resulting implicit-function-declaration and linked
+against glibc's still-present symbol regardless; clang 15+ (first
+introduced to this project's CI by the `mcdc` job's clang-18
+requirement) treats that as a hard error by default, surfacing a
+latent non-conformance this repo's own C99 target already implied.
+Fixed with a hand-rolled `rcp_strnlen_bounded()` (identical semantics,
+no libc dependency) instead of a feature-test-macro workaround,
+matching this header's own "explicit bounded primitives" ethos. Not a
+behavior change -- re-verified: full 67-test suite green both before
+and after, MC/DC totals identical (437/679 condition pairs, 64.4%)
+before and after the swap.
+
+Full 67-test suite green; ASan/UBSan (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`) clean. `cfusa check` (v0.5.54): 0
+errors. `cfusa trace --req-coverage 100 --sec-tested 100`: unchanged
+100%/100% (the `mem_bounded.h` fix touches no requirement-tagged
+behavior). New `mcdc` CI job verified end-to-end locally before being
+committed (build, profiled test run, merge, export, and totals
+extraction all reproduced against this repo's actual 67-test suite on
+an equivalent LLVM toolchain) rather than trusted un-run -- and its
+first real CI run caught the `strnlen()` portability gap above, which
+local verification on a different (Apple Clang) toolchain could not
+have surfaced.
+
 ### v0.428.0 -- 2026-08-18 (c-RCP-17 Phase (b) continued: `powerstate.c` endpoint table + callback list, `admin.c`'s three growable arrays and per-call metrics scratch buffer, all fixed-capacity)
 
 Continues c-RCP-17 (issue #521) past PR #538/v0.427.0's `l2.c`/`udp.c`/
