@@ -3,6 +3,8 @@
 
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <string.h>
 
 //cfusa:req REQ-FRAG-001
@@ -142,7 +144,7 @@ static bool append(rcp_fragment_reassembler_t *r, const uint8_t *payload, size_t
         r->cap = new_cap;
     }
 
-    memcpy(&r->buf[r->len], payload, append_len);
+    rcp_memcpy_bounded(&r->buf[r->len], r->cap - r->len, payload, append_len);
     r->len += append_len;
     return true;
 }

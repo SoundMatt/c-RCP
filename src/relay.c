@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "relay/relay.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,7 +36,7 @@ relay_bytes_t relay_bytes_dup(const uint8_t *data, size_t len)
     b.data = (uint8_t *)rcp_malloc(len);
     if (!b.data) return b;
 
-    memcpy(b.data, data, len);
+    rcp_memcpy_bounded(b.data, len, data, len);
     b.len = len;
     return b;
 }
@@ -93,7 +95,7 @@ bool relay_message_set_id(relay_message_t *m, const char *id)
         size_t n = strlen(id) + 1;
         copy = (char *)rcp_malloc(n);
         if (!copy) return false;
-        memcpy(copy, id, n);
+        rcp_memcpy_bounded(copy, n, id, n);
     }
 
     rcp_free(m->id);
@@ -114,7 +116,7 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
             value_n    = strlen(value) + 1;
             value_copy = (char *)rcp_malloc(value_n);
             if (!value_copy) return false;
-            memcpy(value_copy, value, value_n);
+            rcp_memcpy_bounded(value_copy, value_n, value, value_n);
             rcp_free(m->meta[i].value);
             m->meta[i].value = value_copy;
             return true;
@@ -131,8 +133,8 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
         key_copy = NULL;
         return false;
     }
-    memcpy(key_copy, key, key_n);
-    memcpy(value_copy, value, value_n);
+    rcp_memcpy_bounded(key_copy, key_n, key, key_n);
+    rcp_memcpy_bounded(value_copy, value_n, value, value_n);
 
     {
         size_t alloc_bytes = rcp_alloc_checked_size(m->meta_len + 1u, sizeof(*m->meta));

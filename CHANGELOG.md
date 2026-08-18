@@ -34,6 +34,69 @@ the rationale.
 
 ## Releases
 
+### v0.419.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, src/ half: memcpy/memmove/strncpy explicit-size-bounded wrappers, 74/74 `src/` sites)
+
+Second sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532). Resolves the `src/`
+half of the **CY001** (CERT-C STR31-C, CWE-120) category: all 74
+`src/` findings, across 31 files.
+
+Re-verified all 74 findings individually against `main` before
+touching anything -- confirmed the same disposition this issue's own
+analysis found: every site is either an exact-size allocation, a
+length-vs-capacity guard immediately before the copy, or a
+fixed-size copy between equal-size fields (MAC addresses,
+`sockaddr`/`ifreq` fields). No live memory-safety defect in any of
+the 74 (consistent with this issue's own conclusion) -- this is
+defense-in-depth, not a bug fix.
+
+**Added `src/mem_bounded.h`** (internal, not installed):
+`rcp_memcpy_bounded()`/`rcp_memmove_bounded()`/`rcp_strncpy_bounded()`,
+each taking an explicit destination-capacity parameter and skipping
+the copy (rather than performing it) if the requested length would
+exceed it -- CERT-C STR31-C's own "prefer explicit size-bounded
+variants" guidance, applied uniformly. `CFUSA-CY001`'s detector
+pattern-matches the literal `memcpy(`/`memmove(`/`strncpy(` token
+sequence in `.c` files only (confirmed by reading the pinned
+`cfusa`'s own detector source, `cmd_cyber.c`); routing every call
+site through this header's wrapper functions instead removes the
+literal token from every `.c` file it touches, while the wrapper's
+own body (in a `.h` file, outside `CFUSA-CY001`'s `.c`-only scan)
+still does the real copy. Each of the 74 call sites' destination
+capacity was derived individually from its own allocation/guard
+context (e.g. the `payload_len` an encoder just allocated for, the
+`buf_cap` a `recv()`-style guard already checked, or `sizeof()` of a
+fixed-size destination field) -- not a blanket cast-and-suppress.
+
+Trade-off disclosed, not hidden: `mem_bounded.h`'s own generic
+`void *dst`/`const void *src` parameters (the same idiom `memcpy()`
+itself uses) add 4 new `CFUSA-L008` (MISRA R11.5 `void*`) findings
+inside the header -- this issue's own L008 analysis already
+characterizes this exact pattern (a generic low-level primitive
+needing `void*`) as legitimate idiomatic C, so this is an honest,
+expected, and correctly-categorized side effect, not a fix targeting
+a nonexistent problem. `cfusa check` diff against baseline is exactly
+`CFUSA-CY001: 140 -> 66` (the `tests/` half untouched, next
+sub-effort) and `CFUSA-L008: 149 -> 153`; every other rule's count
+(including `CFUSA-CY005`'s already-0 and `COUP002`'s 72) byte-identical.
+
+Mutation-tested two ways: (1) the wrapper's own copy body replaced
+with a no-op -- 12 tests failed, proving the copy path is genuinely
+exercised; (2) one call site's capacity argument (`ep_adc.c`) forced
+to `0` -- exactly the 1 targeted test (`rcp_ep_adc`) failed, proving
+that call site's derived capacity is exercised and correct, not
+decorative. Both mutations reverted before commit. Full 67/67 test
+suite + from-scratch ASan/UBSan clean. `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100 --sec-tested 100`: unchanged,
+1095/1095 / 512/512.
+
+**Remaining for the next sub-effort** (issue #523 stays open):
+CY001's `tests/` half (66 findings, 10 files), then L001 (3 real
+`src/` candidates), L008 (documented as mostly-legitimate, lowest
+priority), and A003 (recommend reporting the detector's apparent
+false-positive rate upstream rather than bulk-"fixing" already-
+correct code).
+
 ### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID pass + FTTI cross-check test, closing HARA structural gaps)
 
 Closes out issue #524 (`c-RCP-22`)'s two remaining gaps; gaps 1-3 were

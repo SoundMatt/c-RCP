@@ -2,6 +2,8 @@
 #include "rcp/request_compound.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -154,7 +156,7 @@ static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t 
     rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
     put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
 
-    if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
+    if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_ACF_GBB_HEADER_LEN], payload_len, payload, payload_len);
     if (pad > 0) memset(&b[RCP_ACF_GBB_HEADER_LEN + payload_len], 0, pad);
 
     frame.data = b;

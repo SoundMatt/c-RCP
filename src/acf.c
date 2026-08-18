@@ -2,6 +2,8 @@
 #include "rcp/acf.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -373,7 +375,7 @@ rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
     h.pad = pad;
     rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_ABB, quadlets, &h);
 
-    if (payload_len > 0) memcpy(&b[RCP_ACF_ABB_HEADER_LEN], payload, payload_len);
+    if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_ACF_ABB_HEADER_LEN], payload_len, payload, payload_len);
     if (pad > 0) memset(&b[RCP_ACF_ABB_HEADER_LEN + payload_len], 0, pad);
 
     frame.data = b;
@@ -456,7 +458,7 @@ rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
     ts = (hdr->info.mtv == RCP_ACF_MTV_UNTIMED) ? 0u : hdr->message_timestamp;
     put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
 
-    if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
+    if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_ACF_GBB_HEADER_LEN], payload_len, payload, payload_len);
     if (pad > 0) memset(&b[RCP_ACF_GBB_HEADER_LEN + payload_len], 0, pad);
 
     frame.data = b;

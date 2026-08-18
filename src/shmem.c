@@ -2,6 +2,8 @@
 #include "rcp/shmem.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "platform.h"
 
 #include <stdlib.h>
@@ -118,7 +120,7 @@ static int shmem_side_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         return RCP_ERR_BUSY;
     }
 
-    if (item.len > 0) memcpy(buf, item.data, item.len);
+    if (item.len > 0) rcp_memcpy_bounded(buf, buf_cap, item.data, item.len);
     *out_len = item.len;
     rcp_bytes_free(&items[*head]);
     *head = (*head + 1) % cap;

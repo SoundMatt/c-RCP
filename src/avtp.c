@@ -2,6 +2,7 @@
 #include "rcp/avtp.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -48,14 +49,14 @@ static uint32_t get_u32(const uint8_t *p)
 
 static void put_stream_id(uint8_t *p, rcp_stream_id_t id)
 {
-    memcpy(p, id.mac, sizeof(id.mac));
+    rcp_memcpy_bounded(p, sizeof(id.mac), id.mac, sizeof(id.mac));
     put_u16(&p[6], id.unique_id);
 }
 
 static rcp_stream_id_t get_stream_id(const uint8_t *p)
 {
     rcp_stream_id_t id;
-    memcpy(id.mac, p, sizeof(id.mac));
+    rcp_memcpy_bounded(id.mac, sizeof(id.mac), p, sizeof(id.mac));
     id.unique_id = get_u16(&p[6]);
     return id;
 }
@@ -66,7 +67,7 @@ static rcp_stream_id_t get_stream_id(const uint8_t *p)
 rcp_stream_id_t rcp_stream_id_make(const uint8_t mac[6], uint16_t unique_id)
 {
     rcp_stream_id_t id;
-    memcpy(id.mac, mac, sizeof(id.mac));
+    rcp_memcpy_bounded(id.mac, sizeof(id.mac), mac, sizeof(id.mac));
     id.unique_id = unique_id;
     return id;
 }
@@ -133,7 +134,7 @@ rcp_bytes_t rcp_avtp_encode_ntscf(const rcp_avtp_ntscf_header_t *hdr,
     b[3] = hdr->sequence_num;
     put_stream_id(&b[4], hdr->stream_id);
 
-    if (payload_len > 0) memcpy(&b[RCP_AVTP_NTSCF_HEADER_LEN], payload, payload_len);
+    if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_AVTP_NTSCF_HEADER_LEN], payload_len, payload, payload_len);
 
     frame.data = b;
     frame.len  = n;
@@ -199,7 +200,7 @@ rcp_bytes_t rcp_avtp_encode_tscf(const rcp_avtp_tscf_header_t *hdr,
     put_u16(&b[20], (uint16_t)payload_len);
     /* bytes 22-23 reserved, left zeroed by the memset above */
 
-    if (payload_len > 0) memcpy(&b[RCP_AVTP_TSCF_HEADER_LEN], payload, payload_len);
+    if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_AVTP_TSCF_HEADER_LEN], payload_len, payload, payload_len);
 
     frame.data = b;
     frame.len  = n;
@@ -381,7 +382,7 @@ static int loopback_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         return RCP_ERR_BUSY;
     }
 
-    if (item.len > 0) memcpy(buf, item.data, item.len);
+    if (item.len > 0) rcp_memcpy_bounded(buf, buf_cap, item.data, item.len);
     *out_len = item.len;
     rcp_bytes_free(&lb->items[lb->head]);
     lb->head = (lb->head + 1) % lb->cap;

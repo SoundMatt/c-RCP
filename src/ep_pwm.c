@@ -2,6 +2,8 @@
 #include "rcp/ep_pwm.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -284,7 +286,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id
     if (!payload) return empty;
 
     put_u16(payload, start_address);
-    memcpy(payload + RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN, data, data_len);
+    rcp_memcpy_bounded(payload + RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN, data_len, data, data_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;
@@ -799,7 +801,7 @@ rcp_bytes_t rcp_ep_pwm_in_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     if (!payload) return empty;
 
     put_u16(payload, start_address);
-    memcpy(payload + RCP_EP_PWM_IN_RECONFIG_ADDR_LEN, data, data_len);
+    rcp_memcpy_bounded(payload + RCP_EP_PWM_IN_RECONFIG_ADDR_LEN, data_len, data, data_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;

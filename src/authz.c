@@ -3,6 +3,7 @@
 #include "rcp/alloc.h"
 
 #include "alloc_overflow.h"
+#include "mem_bounded.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -26,8 +27,7 @@ struct rcp_authz_policy {
 
 static void copy_identity(char *dst, const char *src)
 {
-    strncpy(dst, src, RCP_AUTHZ_IDENTITY_MAX - 1);
-    dst[RCP_AUTHZ_IDENTITY_MAX - 1] = '\0';
+    rcp_strncpy_bounded(dst, RCP_AUTHZ_IDENTITY_MAX, src);
 }
 
 //cfusa:req REQ-AUTH-009
@@ -82,7 +82,7 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
         size_t alloc_bytes = rcp_alloc_checked_size(n_addrs, sizeof(*entry.addrs));
         entry.addrs = alloc_bytes == 0 ? NULL : (rcp_avtp_addr_t *)rcp_malloc(alloc_bytes);
         if (!entry.addrs) return false;
-        memcpy(entry.addrs, addrs, n_addrs * sizeof(*entry.addrs));
+        rcp_memcpy_bounded(entry.addrs, alloc_bytes, addrs, n_addrs * sizeof(*entry.addrs));
         entry.n_addrs = n_addrs;
     }
     if (n_request_types > 0) {
@@ -92,7 +92,7 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
             rcp_free(entry.addrs);
             return false;
         }
-        memcpy(entry.request_types, request_types, n_request_types * sizeof(*entry.request_types));
+        rcp_memcpy_bounded(entry.request_types, alloc_bytes, request_types, n_request_types * sizeof(*entry.request_types));
         entry.n_request_types = n_request_types;
     }
 

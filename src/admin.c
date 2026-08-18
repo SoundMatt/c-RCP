@@ -3,6 +3,7 @@
 #include "rcp/alloc.h"
 
 #include "alloc_overflow.h"
+#include "mem_bounded.h"
 #include "platform.h"
 
 #include <stdio.h>
@@ -210,10 +211,8 @@ bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, 
     }
     if (ok) {
         admin_counter_t *c = &srv->counters[srv->counters_len];
-        strncpy(c->name, name, sizeof(c->name) - 1);
-        c->name[sizeof(c->name) - 1] = '\0';
-        strncpy(c->labels, labels, sizeof(c->labels) - 1);
-        c->labels[sizeof(c->labels) - 1] = '\0';
+        rcp_strncpy_bounded(c->name, sizeof(c->name), name);
+        rcp_strncpy_bounded(c->labels, sizeof(c->labels), labels);
         c->value = delta;
         srv->counters_len++;
     }
@@ -258,7 +257,7 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
             scratch     = grown;
             scratch_cap = new_cap;
         }
-        memcpy(scratch + scratch_len, line, written);
+        rcp_memcpy_bounded(scratch + scratch_len, scratch_cap - scratch_len, line, written);
         scratch_len += written;
         scratch[scratch_len] = '\0';
     }
@@ -267,7 +266,7 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
     total = scratch_len;
     if (out && cap > 0) {
         size_t to_copy = total < cap - 1 ? total : cap - 1;
-        if (scratch) memcpy(out, scratch, to_copy);
+        if (scratch) rcp_memcpy_bounded(out, cap - 1, scratch, to_copy);
         out[to_copy] = '\0';
     }
     rcp_free(scratch);
