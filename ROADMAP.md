@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.451.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-PWM-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-PWM-*` (`src/ep_pwm.c`/`include/rcp/ep_pwm.h`),
+Group 2's largest single prefix (59 requirements, including
+`REQ-PWM-002..009`/`-056`, `CONTRIBUTING.md`'s own cited positive
+atomicity example) and its lowest proxy-flag density so far (2/59) --
+triaged all 59 in full rather than only the 2 flagged, per the
+tracker's own note that the proxy misses real zero-"shall" bundling
+(confirmed again: 12 of 14 splits below carried only one "shall").
+
+14 ids split into 16 new ones (`REQ-PWM-060..075`): PWM_OUT's
+`apply_reconfig()` short-payload vs. out-of-range errors (`-011`/`-060`,
+mirrored on the PWM_IN side as `-058`'s own split into `-070`/`-071`);
+`decode_read_request()`'s four bundled error conditions (`-026`/`-061`/
+`-062`/`-063`); `decode_write_request()`'s WRONG_OP vs. BAD_PAYLOAD_LEN
+(`-028`/`-064`); `decode_response()`'s SHORT_FRAME vs. WRONG_BUS on
+both PWM_OUT (`-031`/`-065`, closing a real gap -- no test previously
+existed) and PWM_IN (`-043`/`-066`); `trigger_events_at_tick()`'s
+skew-delay rule vs. its separate 0%-duty MID_PULSE carve-out
+(`-055`/`-067`); `generation_state()`'s three classifier outcomes
+(`-057`/`-068`/`-069`, the same per-branch pattern `-002..009`
+established); and PWM_IN's `max_period_outcome()`'s four Table 48
+outcomes (`-072..075`), the largest single bundle found -- previously
+narrated inside `-058` alongside that id's own register-block claim,
+which now covers only the register block. Also tagged
+`saturating_add_u16()`/`_sub_u16()` with `REQ-PWM-006`/`-007` directly
+(CONTRIBUTING.md's own worked example, previously untagged).
+
+**Known residual, documented not fixed**: both endpoints' register-block
+quintets (`render_registers()`/`reconfig_strerror()`/
+`encode_reconfig_request()`) still share `-010`/`-011`/`-058` across
+functions those ids' text doesn't describe -- same class of gap #519
+found for the saturating helpers, deferred to a follow-up batch.
+
+Moved every pre-existing `REQ-PWM-*` `//cfusa:test` tag (57 in
+`test_ep_pwm.c`, 6 in `test_tc18_gaps_ep.c`) off those files' own
+file-header blocks to the specific test function each proves -- both
+had every PWM tag stacked at the top, exactly the `--sec-tested`-blind
+-spot anti-pattern `CONTRIBUTING.md` warns against. New/split ids given
+their own focused tests where none existed (`test_out_read_request_
+rejects_bad_msg_type`, `_write_request_rejects_wrong_op`, `_response_
+decode_rejects_wrong_bus`, plus splitting two combined test functions
+into one-per-outcome); every split mutation-tested against a real
+injected defect, reverted after confirming.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1190/1190 requirements, 512/512 functions).
+
+**Next**: other Group 2 (`REQ-ADC-*`, `REQ-CANEP-*`, `REQ-GPIO-*`,
+etc.) and Group 4 prefixes remain, tracked as separate batches against
+the same tracker.
+
 ### v0.450.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-UART-*: requirement-atomicity audit, Group 2 per-endpoint)
 

@@ -1,60 +1,11 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-PWM-001
-//cfusa:test REQ-PWM-002
-//cfusa:test REQ-PWM-003
-//cfusa:test REQ-PWM-004
-//cfusa:test REQ-PWM-005
-//cfusa:test REQ-PWM-006
-//cfusa:test REQ-PWM-007
-//cfusa:test REQ-PWM-008
-//cfusa:test REQ-PWM-009
-//cfusa:test REQ-PWM-010
-//cfusa:test REQ-PWM-011
-//cfusa:test REQ-PWM-012
-//cfusa:test REQ-PWM-013
-//cfusa:test REQ-PWM-014
-//cfusa:test REQ-PWM-015
-//cfusa:test REQ-PWM-016
-//cfusa:test REQ-PWM-017
-//cfusa:test REQ-PWM-018
-//cfusa:test REQ-PWM-019
-//cfusa:test REQ-PWM-020
-//cfusa:test REQ-PWM-021
-//cfusa:test REQ-PWM-022
-//cfusa:test REQ-PWM-023
-//cfusa:test REQ-PWM-024
-//cfusa:test REQ-PWM-025
-//cfusa:test REQ-PWM-026
-//cfusa:test REQ-PWM-027
-//cfusa:test REQ-PWM-028
-//cfusa:test REQ-PWM-029
-//cfusa:test REQ-PWM-030
-//cfusa:test REQ-PWM-031
-//cfusa:test REQ-PWM-032
-//cfusa:test REQ-PWM-033
-//cfusa:test REQ-PWM-034
-//cfusa:test REQ-PWM-035
-//cfusa:test REQ-PWM-036
-//cfusa:test REQ-PWM-037
-//cfusa:test REQ-PWM-038
-//cfusa:test REQ-PWM-039
-//cfusa:test REQ-PWM-040
-//cfusa:test REQ-PWM-041
-//cfusa:test REQ-PWM-042
-//cfusa:test REQ-PWM-043
-//cfusa:test REQ-PWM-044
-//cfusa:test REQ-PWM-045
-//cfusa:test REQ-PWM-046
-//cfusa:test REQ-PWM-047
-//cfusa:test REQ-PWM-048
-//cfusa:test REQ-PWM-049
-//cfusa:test REQ-PWM-050
-//cfusa:test REQ-PWM-051
-//cfusa:test REQ-PWM-052
-//cfusa:test REQ-PWM-053
-//cfusa:test REQ-PWM-054
-//cfusa:test REQ-PWM-058
-//cfusa:test REQ-PWM-059
+/* Per CONTRIBUTING.md's "Writing a requirement" convention: every
+ * requirement-test tag below sits directly above the specific test
+ * function that proves it, not stacked here at the file header -- a
+ * file-header block of tags satisfies cfusa trace --sec-tested 100 for
+ * every requirement in the file regardless of which test function (if
+ * any) actually exercises each one. Moved 2026-08-18 (c-RCP-18-tracker,
+ * REQ-PWM-* atomicity audit, issue #533). */
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -70,6 +21,7 @@ void tearDown(void) {}
 
 /* ── PWM_OUT: evt[2:0] write semantics ─────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-001
 static void test_out_write_semantics_valid(void)
 {
     uint8_t v;
@@ -81,6 +33,7 @@ static void test_out_write_semantics_valid(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_write_semantics_valid(255));
 }
 
+//cfusa:test REQ-PWM-002
 static void test_out_apply_write_replace(void)
 {
     rcp_ep_pwm_value_t current = {100, 50};
@@ -91,6 +44,7 @@ static void test_out_apply_write_replace(void)
     TEST_ASSERT_EQUAL_UINT16(75, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-003
 static void test_out_apply_write_or(void)
 {
     rcp_ep_pwm_value_t current = {0x00F0, 0x0F00};
@@ -101,6 +55,7 @@ static void test_out_apply_write_or(void)
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-004
 static void test_out_apply_write_and(void)
 {
     rcp_ep_pwm_value_t current = {0x00FF, 0x0FF0};
@@ -111,6 +66,7 @@ static void test_out_apply_write_and(void)
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-005
 static void test_out_apply_write_xor(void)
 {
     rcp_ep_pwm_value_t current = {0x00FF, 0x0F0F};
@@ -121,6 +77,7 @@ static void test_out_apply_write_xor(void)
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-006
 static void test_out_apply_write_add_saturates(void)
 {
     rcp_ep_pwm_value_t current = {0xFFF0, 100};
@@ -151,6 +108,7 @@ static void test_out_apply_write_add_saturates(void)
  * the old, inverted implementation these came out 0 and 150 -- both
  * wrong, and different from these for every request where the operands
  * differ. */
+//cfusa:test REQ-PWM-007
 static void test_out_apply_write_sub_is_request_minus_current_and_saturates(void)
 {
     rcp_ep_pwm_value_t current = {10, 200};
@@ -165,6 +123,7 @@ static void test_out_apply_write_sub_is_request_minus_current_and_saturates(void
  * because subtraction is not commutative. Table 30's "payload minus
  * current" with payload=0x0100 and current=0x0001 must be 0x00FF; the
  * inverted order would saturate to 0x0000 instead. */
+//cfusa:test REQ-PWM-007
 static void test_out_apply_write_sub_operand_order_is_observable(void)
 {
     rcp_ep_pwm_value_t current = {0x0001, 0x0001};
@@ -175,6 +134,7 @@ static void test_out_apply_write_sub_operand_order_is_observable(void)
     TEST_ASSERT_EQUAL_UINT16(0x00FF, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-008
 static void test_out_apply_write_reserved4_is_noop(void)
 {
     rcp_ep_pwm_value_t current = {123, 456};
@@ -191,6 +151,7 @@ static void test_out_apply_write_reserved4_is_noop(void)
  * Reserved mapping). Exercises rcp_ep_pwm_out_apply_write() with the raw
  * wire-value enum casts a decoder would actually produce, not just the
  * named constants. */
+//cfusa:test REQ-PWM-008
 static void test_out_apply_write_wire_value_4_is_reserved_noop(void)
 {
     rcp_ep_pwm_value_t current = {123, 456};
@@ -202,6 +163,7 @@ static void test_out_apply_write_wire_value_4_is_reserved_noop(void)
     TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-006
 static void test_out_apply_write_wire_value_5_is_add(void)
 {
     rcp_ep_pwm_value_t current = {10, 200};
@@ -217,6 +179,7 @@ static void test_out_apply_write_wire_value_5_is_add(void)
  * payload - current (see test_out_apply_write_sub_is_request_minus_current
  * _and_saturates() for the cited text): current={30,250},
  * request={100,300} yields 70 and 50. */
+//cfusa:test REQ-PWM-007
 static void test_out_apply_write_wire_value_6_is_sub(void)
 {
     rcp_ep_pwm_value_t current = {30, 250};
@@ -228,6 +191,7 @@ static void test_out_apply_write_wire_value_6_is_sub(void)
     TEST_ASSERT_EQUAL_UINT16(50, result.active_duration);
 }
 
+//cfusa:test REQ-PWM-009
 static void test_out_apply_write_reconfig_misrouted_is_noop(void)
 {
     rcp_ep_pwm_value_t current = {123, 456};
@@ -268,6 +232,7 @@ static void test_out_apply_write_reconfig_misrouted_is_noop(void)
  * pwmo_duty_cycle_min (16 bit, R/W), 0x000C pwmo_duty_cycle_max (16 bit,
  * R/W), 0x000E pwmo_skew (8 bit, R/W). The block therefore spans 0x0F
  * octets. */
+//cfusa:test REQ-PWM-010
 static void test_out_apply_reconfig_writes_clk_divider(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -287,6 +252,7 @@ static void test_out_apply_reconfig_writes_clk_divider(void)
 /* A single write spanning Table 43's 0x0008..0x000E tail: clk_divider,
  * signal flags, duty_cycle_min (16 bit BE), duty_cycle_max (16 bit BE),
  * skew. */
+//cfusa:test REQ-PWM-010
 static void test_out_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -317,6 +283,7 @@ static void test_out_apply_reconfig_writes_multi_register_span(void)
  * "EP functional config common entries": 0x0002.0 ep_enable, 0x0002.4
  * ep_clear_req_storage. Writing bit 0 is how a client enables the
  * endpoint -- the operation the old single-bool "toggle" stood in for. */
+//cfusa:test REQ-PWM-010
 static void test_out_apply_reconfig_writes_enable_bit(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -343,6 +310,7 @@ static void test_out_apply_reconfig_writes_enable_bit(void)
 
 /* A write covering only one octet of a 16-bit register (Table 43's
  * 0x000C pwmo_duty_cycle_max) touches only that octet. */
+//cfusa:test REQ-PWM-010
 static void test_out_apply_reconfig_partial_multi_octet_register(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -361,6 +329,7 @@ static void test_out_apply_reconfig_partial_multi_octet_register(void)
  * ignored." Table 43's last register is 0x000E (8 bit), so EP_LEN is
  * 0x0F: a two-octet write at 0x000E overruns by one and the WHOLE write
  * is dropped. */
+//cfusa:test REQ-PWM-060
 static void test_out_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -376,6 +345,7 @@ static void test_out_apply_reconfig_rejects_write_past_ep_len(void)
 /* Table 43 marks 0x0000 pwmo_ep_len, 0x0001 reserved and 0x0004
  * pwmo_base_clk as R (read-only): a write covering them leaves them
  * alone while the rest of the same span still lands. */
+//cfusa:test REQ-PWM-010
 static void test_out_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -405,6 +375,7 @@ static void test_out_apply_reconfig_ignores_read_only_registers(void)
     TEST_ASSERT_EQUAL_UINT8(0u, block[RCP_EP_PWM_OUT_REG_RESERVED_01]);
 }
 
+//cfusa:test REQ-PWM-011
 static void test_out_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -421,6 +392,7 @@ static void test_out_apply_reconfig_rejects_payload_without_data(void)
 /* Figure 18 shows the configuration request as an ordinary ACF_ABB write
  * with evt[2:0] = 111b, address prefix then data. Round-trip: encode,
  * decode as a write request, route the payload to apply_reconfig(). */
+//cfusa:test REQ-PWM-010
 static void test_out_reconfig_request_round_trip(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -450,6 +422,7 @@ static void test_out_reconfig_request_round_trip(void)
 }
 
 /* render_registers() reports the block at exactly the Table 43 offsets. */
+//cfusa:test REQ-PWM-010
 static void test_out_render_registers_matches_table_offsets(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -484,6 +457,7 @@ static void test_out_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT8(0x09u, block[0x0E]);  /* skew          */
 }
 
+//cfusa:test REQ-PWM-011
 static void test_out_reconfig_strerror_never_null(void)
 {
     TEST_ASSERT_NOT_NULL(rcp_ep_pwm_out_reconfig_strerror(RCP_EP_PWM_OUT_RECONFIG_OK));
@@ -495,6 +469,7 @@ static void test_out_reconfig_strerror_never_null(void)
 
 /* ── PWM_OUT: triggers ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-012
 static void test_out_trigger_none_never_fires(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_NONE, RCP_EP_PWM_OUT_EVENT_CYCLE_START));
@@ -502,6 +477,7 @@ static void test_out_trigger_none_never_fires(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_NONE, RCP_EP_PWM_OUT_EVENT_DONE));
 }
 
+//cfusa:test REQ-PWM-013
 static void test_out_trigger_cycle_start(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_CYCLE_START, RCP_EP_PWM_OUT_EVENT_CYCLE_START));
@@ -509,6 +485,7 @@ static void test_out_trigger_cycle_start(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_CYCLE_START, RCP_EP_PWM_OUT_EVENT_DONE));
 }
 
+//cfusa:test REQ-PWM-014
 static void test_out_trigger_mid_pulse(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_MID_PULSE, RCP_EP_PWM_OUT_EVENT_MID_PULSE));
@@ -516,6 +493,7 @@ static void test_out_trigger_mid_pulse(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_MID_PULSE, RCP_EP_PWM_OUT_EVENT_DONE));
 }
 
+//cfusa:test REQ-PWM-015
 static void test_out_trigger_done(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_DONE, RCP_EP_PWM_OUT_EVENT_DONE));
@@ -525,6 +503,7 @@ static void test_out_trigger_done(void)
 
 /* ── PWM_OUT: functional config ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-016
 static void test_out_functional_cfg_init_zeroes(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -547,6 +526,7 @@ static void test_out_functional_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT8(0u, cfg.skew);
 }
 
+//cfusa:test REQ-PWM-017
 static void test_out_functional_cfg_writable_false_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t writer = {0};
@@ -557,6 +537,7 @@ static void test_out_functional_cfg_writable_false_hw_unconfigured(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
+//cfusa:test REQ-PWM-018
 static void test_out_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
     rcp_lifecycle_writer_ctx_t none          = {0};
@@ -578,6 +559,7 @@ static void test_out_functional_cfg_writable_hw_configured_requires_authorizatio
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
+//cfusa:test REQ-PWM-019
 static void test_out_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t unauth = {0};
@@ -589,6 +571,7 @@ static void test_out_functional_cfg_writable_rcp_configured_requires_authorizati
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, auth));
 }
 
+//cfusa:test REQ-PWM-020
 static void test_out_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -601,6 +584,7 @@ static void test_out_set_trigger_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_OUT_TRIGGER_NONE, cfg.trigger);
 }
 
+//cfusa:test REQ-PWM-021
 static void test_out_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -614,6 +598,7 @@ static void test_out_set_trigger_applies_when_authorized(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_OUT_TRIGGER_DONE, cfg.trigger);
 }
 
+//cfusa:test REQ-PWM-022
 static void test_out_set_enabled_rejects_unauthorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -625,6 +610,7 @@ static void test_out_set_enabled_rejects_unauthorized(void)
     TEST_ASSERT_FALSE(cfg.common.ep_enable);
 }
 
+//cfusa:test REQ-PWM-023
 static void test_out_set_enabled_applies_when_authorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -639,6 +625,7 @@ static void test_out_set_enabled_applies_when_authorized(void)
 
 /* ── PWM_OUT: error codes ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-024
 static void test_out_strerror_never_null_and_distinct(void)
 {
     rcp_ep_pwm_out_errc_t codes[] = {
@@ -668,6 +655,7 @@ static void test_out_strerror_never_null_and_distinct(void)
  * exactly four bytes" rule maps to RCP_ERROR_INVALID_PARAMETER, the same
  * numbered code GPIO's own, verbatim-identical §13.7.4.1 rule already
  * uses. */
+//cfusa:test REQ-PWM-028
 static void test_out_wire_error_maps_bad_payload_len_to_invalid_parameter(void)
 {
     const int wire_code = (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN);
@@ -680,6 +668,7 @@ static void test_out_wire_error_maps_bad_payload_len_to_invalid_parameter(void)
  * RCP_EP_PWM_OUT_ERR_RESERVED_EVT maps to RCP_ERROR_UNSUPPORTED_CMD --
  * TC18 §13.5 Table 33's GPIO/PWM_OUT row's own "reserved value ->
  * UNSUPPORTED_CMD" rule for evt[2:0]=100b. */
+//cfusa:test REQ-PWM-008
 static void test_out_wire_error_maps_reserved_evt_to_unsupported_cmd(void)
 {
     const int wire_code = (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_RESERVED_EVT);
@@ -705,6 +694,7 @@ static void test_out_wire_error_is_none_for_local_only_codes(void)
 
 /* ── PWM_OUT: read request ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-025
 static void test_out_read_request_round_trip(void)
 {
     rcp_bytes_t            frame = rcp_ep_pwm_out_encode_read_request(3, 7);
@@ -720,6 +710,7 @@ static void test_out_read_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-062
 static void test_out_read_request_rejects_wrong_bus(void)
 {
     rcp_bytes_t           frame = rcp_ep_pwm_out_encode_read_request(3, 7);
@@ -730,6 +721,7 @@ static void test_out_read_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-063
 static void test_out_read_request_rejects_wrong_op(void)
 {
     rcp_ep_pwm_value_t    value = {1, 2};
@@ -741,6 +733,7 @@ static void test_out_read_request_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-026
 static void test_out_read_request_rejects_short_frame(void)
 {
     uint8_t               out_tn;
@@ -749,8 +742,35 @@ static void test_out_read_request_rejects_short_frame(void)
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_SHORT_FRAME, rc);
 }
 
+/* Split 2026-08-18 (c-RCP-18-tracker, REQ-PWM-* atomicity audit, issue
+ * #533): REQ-PWM-026 previously bundled this BAD_MSG_TYPE clause with
+ * SHORT_FRAME/WRONG_BUS/WRONG_OP under one id; no dedicated test existed
+ * for it before this split -- encoding a GBB frame (rcp_acf_encode_gbb())
+ * and decoding it as an ABB read request is a non-ACF_ABB frame from
+ * rcp_acf_decode_abb()'s own point of view, mirroring ep_gpio.c's
+ * identical test_read_request_rejects_bad_msg_type(). */
+//cfusa:test REQ-PWM-061
+static void test_out_read_request_rejects_bad_msg_type(void)
+{
+    rcp_acf_gbb_header_t  gbb_hdr = {0};
+    rcp_bytes_t           frame;
+    uint8_t               out_tn;
+    rcp_ep_pwm_out_errc_t rc;
+
+    gbb_hdr.info.byte_bus_id = 3;
+    gbb_hdr.info.op          = RCP_ACF_OP_READ;
+    frame = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_ep_pwm_out_decode_read_request(frame.data, frame.len, 3, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_BAD_MSG_TYPE, rc);
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── PWM_OUT: write request ────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-027
 static void test_out_write_request_round_trip(void)
 {
     rcp_ep_pwm_value_t    value = {1000, 500};
@@ -773,6 +793,7 @@ static void test_out_write_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-028
 static void test_out_write_request_rejects_bad_payload_len(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -809,6 +830,31 @@ static void test_out_write_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+/* Split 2026-08-18 (c-RCP-18-tracker, REQ-PWM-* atomicity audit, issue
+ * #533): REQ-PWM-028 previously bundled this WRONG_OP clause with
+ * BAD_PAYLOAD_LEN under one id; no dedicated test existed for it before
+ * this split. */
+//cfusa:test REQ-PWM-064
+static void test_out_write_request_rejects_wrong_op(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_pwm_value_t          out_value;
+    uint8_t                     out_evt;
+    uint8_t                     out_tn;
+    rcp_ep_pwm_out_errc_t       rc;
+
+    hdr.byte_bus_id = 5;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_ep_pwm_out_decode_write_request(frame.data, frame.len, 5, &out_value, &out_evt, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_WRONG_OP, rc);
+
+    rcp_bytes_free(&frame);
+}
+
 /* FIXED 2026-08-14 (issue #426, REQ-PWM-008): TC18 §13.5 Table 33's
  * GPIO/PWM_OUT row's two-part rule for evt[2:0]=100b
  * (RCP_EP_PWM_OUT_WRITE_RESERVED4): "reserved -- request shall be
@@ -817,6 +863,7 @@ static void test_out_write_request_rejects_wrong_bus(void)
  * ignores the request (returns current unchanged), and
  * rcp_ep_pwm_out_decode_write_request() now returns the dedicated
  * RCP_EP_PWM_OUT_ERR_RESERVED_EVT for that same evt value. */
+//cfusa:test REQ-PWM-008
 static void test_out_write_request_rejects_reserved_evt(void)
 {
     rcp_ep_pwm_value_t    current = {1234, 567};
@@ -850,6 +897,7 @@ static void test_out_write_request_rejects_reserved_evt(void)
 
 /* ── PWM_OUT: response ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-029
 static void test_out_response_round_trip_untimed(void)
 {
     rcp_ep_pwm_value_t    value = {2000, 1000};
@@ -873,6 +921,7 @@ static void test_out_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-030
 static void test_out_response_round_trip_timed(void)
 {
     rcp_ep_pwm_value_t    value = {3000, 1500};
@@ -893,6 +942,7 @@ static void test_out_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-031
 static void test_out_response_decode_rejects_short_frame(void)
 {
     rcp_ep_pwm_value_t    out_value;
@@ -905,14 +955,41 @@ static void test_out_response_decode_rejects_short_frame(void)
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_SHORT_FRAME, rc);
 }
 
+/* Split 2026-08-18 (c-RCP-18-tracker, REQ-PWM-* atomicity audit, issue
+ * #533): REQ-PWM-031 previously bundled this WRONG_BUS clause with
+ * SHORT_FRAME under one id. No dedicated test existed for it before this
+ * split -- the PWM_IN sibling (REQ-PWM-046) already had one
+ * (test_in_response_decode_rejects_wrong_bus below); PWM_OUT's own
+ * decode_response never had the equivalent, exactly the silent-gap risk
+ * this audit exists to close. */
+//cfusa:test REQ-PWM-065
+static void test_out_response_decode_rejects_wrong_bus(void)
+{
+    rcp_ep_pwm_value_t    value = {1, 1};
+    rcp_bytes_t            frame = rcp_ep_pwm_out_encode_response(9, value, 1, false, 0);
+    rcp_ep_pwm_value_t    out_value;
+    bool                   out_timed;
+    uint64_t               out_ts;
+    uint8_t                out_tn;
+    rcp_ep_pwm_out_errc_t rc;
+
+    rc = rcp_ep_pwm_out_decode_response(frame.data, frame.len, 10, &out_value, &out_timed,
+                                         &out_ts, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_WRONG_BUS, rc);
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── PWM_IN: triggers ───────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-032
 static void test_in_trigger_none_never_fires(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_NONE, false, true));
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_NONE, true, false));
 }
 
+//cfusa:test REQ-PWM-033
 static void test_in_trigger_rising(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, false, true));
@@ -920,6 +997,7 @@ static void test_in_trigger_rising(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, true, true));
 }
 
+//cfusa:test REQ-PWM-034
 static void test_in_trigger_falling(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, true, false));
@@ -929,6 +1007,7 @@ static void test_in_trigger_falling(void)
 
 /* ── PWM_IN: functional config ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-035
 static void test_in_functional_cfg_init_zeroes(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -945,6 +1024,7 @@ static void test_in_functional_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.max_period);
 }
 
+//cfusa:test REQ-PWM-036
 static void test_in_functional_cfg_writable_false_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t writer = {0};
@@ -952,6 +1032,7 @@ static void test_in_functional_cfg_writable_false_hw_unconfigured(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
+//cfusa:test REQ-PWM-037
 static void test_in_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
     rcp_lifecycle_writer_ctx_t none          = {0};
@@ -973,6 +1054,7 @@ static void test_in_functional_cfg_writable_hw_configured_requires_authorization
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
+//cfusa:test REQ-PWM-038
 static void test_in_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t unauth = {0};
@@ -984,6 +1066,7 @@ static void test_in_functional_cfg_writable_rcp_configured_requires_authorizatio
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, auth));
 }
 
+//cfusa:test REQ-PWM-039
 static void test_in_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -996,6 +1079,7 @@ static void test_in_set_trigger_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_TRIGGER_NONE, cfg.trigger);
 }
 
+//cfusa:test REQ-PWM-040
 static void test_in_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1011,6 +1095,7 @@ static void test_in_set_trigger_applies_when_authorized(void)
 
 /* ── PWM_IN: error codes ───────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-041
 static void test_in_strerror_never_null_and_distinct(void)
 {
     rcp_ep_pwm_in_errc_t codes[] = {
@@ -1035,6 +1120,7 @@ static void test_in_strerror_never_null_and_distinct(void)
 
 /* ── PWM_IN: read request ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-042
 static void test_in_read_request_round_trip(void)
 {
     rcp_bytes_t           frame = rcp_ep_pwm_in_encode_read_request(2, 5);
@@ -1048,6 +1134,7 @@ static void test_in_read_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-043
 static void test_in_read_request_rejects_short_frame(void)
 {
     uint8_t              out_tn;
@@ -1060,6 +1147,7 @@ static void test_in_read_request_rejects_short_frame(void)
  * clause -- test_in_response_decode_rejects_wrong_bus() above proves
  * this for _decode_response(), a different function; the read-request
  * decoder's own byte_bus_id check was never separately exercised. */
+//cfusa:test REQ-PWM-066
 static void test_in_read_request_rejects_wrong_bus(void)
 {
     rcp_bytes_t           frame = rcp_ep_pwm_in_encode_read_request(2, 5);
@@ -1077,6 +1165,7 @@ static void test_in_read_request_rejects_wrong_bus(void)
  * real evt=111b configuration-write request from a conforming peer would
  * have been silently misinterpreted as an ordinary read. See the file
  * header. */
+//cfusa:test REQ-PWM-059
 static void test_in_read_request_rejects_bad_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -1100,6 +1189,7 @@ static void test_in_read_request_rejects_bad_evt(void)
 
 /* ── PWM_IN: the EP_func register block ──────────────────────────────────── */
 
+//cfusa:test REQ-PWM-058
 static void test_in_render_registers_matches_table_offsets(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1129,6 +1219,7 @@ static void test_in_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT16(0x000Cu, RCP_EP_PWM_IN_EP_FUNC_LEN);
 }
 
+//cfusa:test REQ-PWM-058
 static void test_in_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1151,6 +1242,7 @@ static void test_in_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_UINT16(0x2233, cfg.max_period);
 }
 
+//cfusa:test REQ-PWM-058
 static void test_in_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1181,6 +1273,7 @@ static void test_in_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-PWM-071
 static void test_in_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1198,6 +1291,7 @@ static void test_in_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.max_period);
 }
 
+//cfusa:test REQ-PWM-070
 static void test_in_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1211,6 +1305,7 @@ static void test_in_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_pwm_in_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-PWM-058
 static void test_in_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -1243,6 +1338,7 @@ static void test_in_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-PWM-058
 static void test_in_reconfig_strerror_never_null(void)
 {
     rcp_ep_pwm_in_reconfig_errc_t codes[] = {
@@ -1259,6 +1355,7 @@ static void test_in_reconfig_strerror_never_null(void)
 
 /* ── PWM_IN: response ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWM-044
 static void test_in_response_round_trip_untimed(void)
 {
     rcp_ep_pwm_value_t   value = {4000, 2000};
@@ -1280,6 +1377,7 @@ static void test_in_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-045
 static void test_in_response_round_trip_timed(void)
 {
     rcp_ep_pwm_value_t   value = {5000, 2500};
@@ -1300,6 +1398,7 @@ static void test_in_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-046
 static void test_in_response_decode_rejects_wrong_bus(void)
 {
     rcp_ep_pwm_value_t   value = {1, 1};
@@ -1316,6 +1415,7 @@ static void test_in_response_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-PWM-047
 static void test_in_response_no_signal_sentinel_round_trips(void)
 {
     rcp_ep_pwm_value_t   value = {RCP_EP_PWM_IN_NO_SIGNAL, RCP_EP_PWM_IN_NO_SIGNAL};
@@ -1341,6 +1441,7 @@ static void test_in_response_no_signal_sentinel_round_trips(void)
 /* ADDED 2026-08-14 (issue #428, REQ-PWM-058): a measured period at or
  * below max_period is never a timeout, regardless of err_on_max_period or
  * resp_on_err_enabled. */
+//cfusa:test REQ-PWM-072
 static void test_in_max_period_outcome_not_exceeded_is_ok(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_OK,
@@ -1352,6 +1453,7 @@ static void test_in_max_period_outcome_not_exceeded_is_ok(void)
 /* Table 48's 0b row: "if MAX PERIOD is exceeded, invalidate measurement
  * and wait for new active phase of signal" -- never an error, regardless
  * of resp_on_err_enabled. */
+//cfusa:test REQ-PWM-073
 static void test_in_max_period_outcome_bit_clear_invalidates_never_errors(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE,
@@ -1362,19 +1464,31 @@ static void test_in_max_period_outcome_bit_clear_invalidates_never_errors(void)
 
 /* Table 48's 1b row: "if MAX_PERIOD is exceeded stop measurement and
  * signal error if error response is enabled in EP_config" -- stop always
- * happens; the error signal is conditional on resp_on_err_enabled. */
-static void test_in_max_period_outcome_bit_set_stops_and_conditionally_errors(void)
+ * happens; the error signal is conditional on resp_on_err_enabled. Split
+ * 2026-08-18 (c-RCP-18-tracker, REQ-PWM-* atomicity audit, issue #533)
+ * into two separate test functions -- one per REQ-PWM-074/-075's own
+ * split id -- so each split id has its own distinct, independently
+ * mutation-testable assertion rather than sharing one test function's
+ * two TEST_ASSERT_EQUAL() calls. */
+//cfusa:test REQ-PWM-074
+static void test_in_max_period_outcome_stop_without_error(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP,
+                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, false));
+}
+
+//cfusa:test REQ-PWM-075
+static void test_in_max_period_outcome_stop_and_error(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR,
                       rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, true));
-    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP,
-                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, false));
 }
 
 /* REQ-WIREERR-007 (issue #163): STOP_AND_ERROR is the only outcome
  * Table 48's own row ties to "signal error" -- the numbered wire code is
  * PWM_IN's own RCP_ERROR_PWM_IN_NO_SIGNAL (9), the only Table 30 entry
  * naming this endpoint type specifically. */
+//cfusa:test REQ-WIREERR-007
 static void test_in_wire_error_maps_stop_and_error_to_pwm_in_no_signal(void)
 {
     const int wire_code = (int)rcp_ep_pwm_in_wire_error(RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR);
@@ -1413,6 +1527,7 @@ static void test_in_wire_error_matches_max_period_outcome_across_inputs(void)
 
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 
+//cfusa:test REQ-PWM-048
 static void test_compound_wait_mode_valid_accepts_exactly_4_to_7(void)
 {
     uint8_t v;
@@ -1431,6 +1546,7 @@ static void test_compound_wait_mode_valid_accepts_exactly_4_to_7(void)
  * >= current interface status (captured), i.e. captured <= threshold.
  * Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B) -- this test
  * previously pinned the reverse (captured >= threshold). */
+//cfusa:test REQ-PWM-049
 static void test_compound_wait_period_ge(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
@@ -1441,6 +1557,7 @@ static void test_compound_wait_period_ge(void)
 }
 
 /* evt=101b ("LE"): threshold <= captured, i.e. captured >= threshold. */
+//cfusa:test REQ-PWM-050
 static void test_compound_wait_period_le(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
@@ -1451,6 +1568,7 @@ static void test_compound_wait_period_le(void)
 }
 
 /* evt=110b ("GE"), duty-cycle sub-field: captured <= threshold. */
+//cfusa:test REQ-PWM-051
 static void test_compound_wait_duty_ge(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
@@ -1461,6 +1579,7 @@ static void test_compound_wait_duty_ge(void)
 }
 
 /* evt=111b ("LE"), duty-cycle sub-field: captured >= threshold. */
+//cfusa:test REQ-PWM-052
 static void test_compound_wait_duty_le(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
@@ -1470,6 +1589,7 @@ static void test_compound_wait_duty_le(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_LE, 501));
 }
 
+//cfusa:test REQ-PWM-053
 static void test_compound_wait_invalid_mode_returns_false(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
@@ -1478,6 +1598,7 @@ static void test_compound_wait_invalid_mode_returns_false(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, (rcp_ep_pwm_in_compound_wait_mode_t)8, 0));
 }
 
+//cfusa:test REQ-PWM-054
 static void test_compound_wait_no_signal_never_matches(void)
 {
     rcp_ep_pwm_value_t captured = {RCP_EP_PWM_IN_NO_SIGNAL, RCP_EP_PWM_IN_NO_SIGNAL};
@@ -1539,15 +1660,18 @@ int main(void)
     RUN_TEST(test_out_read_request_rejects_wrong_bus);
     RUN_TEST(test_out_read_request_rejects_wrong_op);
     RUN_TEST(test_out_read_request_rejects_short_frame);
+    RUN_TEST(test_out_read_request_rejects_bad_msg_type);
 
     RUN_TEST(test_out_write_request_round_trip);
     RUN_TEST(test_out_write_request_rejects_bad_payload_len);
     RUN_TEST(test_out_write_request_rejects_wrong_bus);
+    RUN_TEST(test_out_write_request_rejects_wrong_op);
     RUN_TEST(test_out_write_request_rejects_reserved_evt);
 
     RUN_TEST(test_out_response_round_trip_untimed);
     RUN_TEST(test_out_response_round_trip_timed);
     RUN_TEST(test_out_response_decode_rejects_short_frame);
+    RUN_TEST(test_out_response_decode_rejects_wrong_bus);
 
     RUN_TEST(test_in_trigger_none_never_fires);
     RUN_TEST(test_in_trigger_rising);
@@ -1583,7 +1707,8 @@ int main(void)
 
     RUN_TEST(test_in_max_period_outcome_not_exceeded_is_ok);
     RUN_TEST(test_in_max_period_outcome_bit_clear_invalidates_never_errors);
-    RUN_TEST(test_in_max_period_outcome_bit_set_stops_and_conditionally_errors);
+    RUN_TEST(test_in_max_period_outcome_stop_without_error);
+    RUN_TEST(test_in_max_period_outcome_stop_and_error);
     RUN_TEST(test_in_wire_error_maps_stop_and_error_to_pwm_in_no_signal);
     RUN_TEST(test_in_wire_error_is_none_for_the_non_error_outcomes);
     RUN_TEST(test_in_wire_error_matches_max_period_outcome_across_inputs);
