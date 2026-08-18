@@ -24,6 +24,8 @@
 //cfusa:test REQ-WAKEUP-020
 //cfusa:test REQ-WAKEUP-021
 //cfusa:test REQ-WAKEUP-022
+//cfusa:test REQ-WAKEUP-024
+//cfusa:test REQ-WAKEUP-025
 //cfusa:test REQ-E2E-028
 //cfusa:test REQ-E2E-029
 //cfusa:test REQ-E2E-030
@@ -1768,6 +1770,8 @@ static void test_wakeup_plain_message_has_no_source_field(void)
  * _decode_wakeup_message_with_source() now provide that, as a 3-byte
  * ACF_ABB payload (opcode + source + source_index) alongside the
  * pre-existing, unchanged 1-byte plain pair. */
+//cfusa:test REQ-WAKEUP-017
+//cfusa:test REQ-WAKEUP-024
 static void test_wakeup_message_with_source_round_trips_all_source_kinds(void)
 {
     rcp_bytes_t             frame;
@@ -1827,6 +1831,7 @@ static void test_wakeup_message_with_source_round_trips_all_source_kinds(void)
 
 /* An out-of-range source byte is a decode failure, not silently
  * reinterpreted as RCP_EP_WAKEUP_SOURCE_UNKNOWN. */
+//cfusa:test REQ-WAKEUP-024
 static void test_wakeup_message_with_source_rejects_an_unknown_source_byte(void)
 {
     rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
@@ -1847,6 +1852,7 @@ static void test_wakeup_message_with_source_rejects_an_unknown_source_byte(void)
 /* The plain 1-byte message shape is rejected by the _with_source
  * decoder -- its own contract is specifically the 3-byte shape, not
  * "the 3-byte shape or shorter". */
+//cfusa:test REQ-WAKEUP-024
 static void test_wakeup_message_with_source_decoder_rejects_the_plain_shape(void)
 {
     rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message(3u, 0x16u);
@@ -1915,6 +1921,8 @@ static void test_wakeup_repetition_time_is_configurable_but_not_wire_reachable(v
  * the deviation -- a conforming RC Client watching for an error response
  * now sees the refusal, and the numbered wire code TC18 §12.5 calls for
  * is genuinely carried on the wire. */
+//cfusa:test REQ-WAKEUP-019
+//cfusa:test REQ-WAKEUP-025
 static void test_wakeup_refusal_is_a_genuine_error_response(void)
 {
     rcp_acf_byte_message_info_t hdr    = {0};
@@ -1955,6 +1963,7 @@ static void test_wakeup_refusal_is_a_genuine_error_response(void)
  * encode side) is NOT reinterpreted as a refusal -- REQ-WAKEUP-019's own
  * decode-side fix is specific to RCP_ERROR_REQUEST_CANCELED, not "any
  * error response at all". */
+//cfusa:test REQ-WAKEUP-025
 static void test_wakeup_decode_rejects_an_unrelated_error_code(void)
 {
     rcp_bytes_t                 frame = rcp_acf_build_error_response(1u, 0x44u,
