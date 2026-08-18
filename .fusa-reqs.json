@@ -1,6 +1,5 @@
 {
-  "requirements": [
-    {
+  "requirements": [{
       "id": "REQ-DL-001",
       "title": "heartbeat() resets a stream's deadline timer",
       "text": "rcp_deadline_monitor_heartbeat() shall reset the named stream's last-signal time to the current time.",
@@ -7599,7 +7598,7 @@
       "status": "implemented",
       "tc18": "§12.7.7 Table 24; NOTE: rx_wd_info_enable (formerly 0x000D.7) is REPLACED in RC5 by rx_stream_status, a different mechanism (a passive aggregate status bit reacting to any of 4 fault causes) with no clean 1:1 mapping back to the old per-cause active notification concept -- already investigated, genuinely ambiguous, left open in regmap.h's own file header (task #97); see also REQ-E2E-046 (the new bit's own, separately-tracked requirement). TC18.txt L2889-2891 reflects the superseded 0.5.1_RC (RC1) wording."
     },
-        {
+    {
       "id": "REQ-LINEP-006",
       "title": "rcp_ep_lin_trigger_fires() never fires for trigger RCP_EP_LIN_TRIGGER_NONE",
       "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event and trailing_time_expired. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted RCP_EP_LIN_TRIGGER_TX_DONE's own AND-of-both-conditions outcome -- a second, independently-testable switch-arm behavior of the same function, the same per-switch-arm-per-id pattern REQ-PWM-002 through REQ-PWM-009 already establish for evt[2:0] write semantics. That clause is now REQ-LINEP-030's own id, which also absorbs REQ-LINEP-023 (RETIRED -- see that entry): -023's own text, added when issue #201 introduced trailing_time_expired, described the identical TX_DONE AND-of-both-conditions rule this entry's own now-removed TX_DONE clause already restated after its 2026-08-13 correction, both citing the same TC18-13.7.10.1-002 master id. This entry keeps only the NONE case.",
@@ -7727,7 +7726,7 @@
       "scope": "tc18",
       "status": "implemented"
     },
-        {
+    {
       "id": "REQ-LINEP-016",
       "title": "rcp_ep_lin_encode_command_request() encodes the read direction, evt=0, and carries the raw payload unmodified",
       "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 33 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte. MERGED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): REQ-LINEP-026 (RETIRED -- see that entry) duplicated this entry's own \"evt = 0\" fact under a separate id, both citing the same TC18-13.5-001 master id; that entry is now retired, this one remains the canonical home for this function's whole encode contract.",
@@ -7751,7 +7750,7 @@
       "tc18": "§13.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (§13.7.10.1), TC18.txt L5691-5693; evt[2:0] plain-request rule per §13.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-018",
       "title": "rcp_ep_lin_decode_command_request() rejects a frame too short for its ACF_ABB header or payload",
       "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled four independently-testable rejection outcomes of the same function under one 'shall' clause joined by commas (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_command_request_rejects_short_frame, test_command_request_rejects_bad_msg_type, test_command_request_rejects_wrong_bus, test_command_request_rejects_wrong_op) -- the exact 2+-independently-testable-behaviors-under-one-id pattern this audit exists to close, missed by the '2+ shall' proxy because the whole rule was phrased as a single sentence. The RCP_EP_LIN_ERR_BAD_MSG_TYPE clause is now REQ-LINEP-031's own id, RCP_EP_LIN_ERR_WRONG_BUS is REQ-LINEP-032's, and RCP_EP_LIN_ERR_WRONG_OP is REQ-LINEP-033's; the RCP_EP_LIN_ERR_BAD_EVT clause had already been split out as REQ-LINEP-027 before this audit. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
@@ -7799,7 +7798,7 @@
       "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-019",
       "title": "rcp_ep_lin_encode_response() encodes an untimed response as ACF_ABB",
       "text": "rcp_ep_lin_encode_response() shall encode an ACF_ABB message when timed is false, with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted the timed=true ACF_GBB encoding shape as a second, materially different (extra message_timestamp/mtv fields, different ACF message type entirely) independently-testable outcome of the same function -- for consistency with rcp_ep_lin_decode_response()'s own sibling untimed/timed split (REQ-LINEP-020/021), which already treats the two shapes as separate ids. That clause is now REQ-LINEP-034's own id. This entry keeps only the untimed (ACF_ABB) case.",
@@ -7847,7 +7846,7 @@
       "tc18": "§13.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-022",
       "title": "rcp_ep_lin_decode_response() rejects a frame too short for its applicable ACF header",
       "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two independently-testable rejection outcomes of the same function under one 'shall' clause joined by 'and' (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_response_decode_rejects_short_frame, test_response_decode_rejects_wrong_bus). The RCP_EP_LIN_ERR_WRONG_BUS clause is now REQ-LINEP-035's own id. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
@@ -8049,14 +8048,26 @@
     },
     {
       "id": "REQ-CANEP-016",
-      "title": "rcp_ep_can_encode_frame_request() enforces frame-format, id, length, and xl_header preconditions",
-      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request with evt left at 0 (TC18 Table 33's plain-request value for CAN's endpoint-type row) and frame_format packed into the payload's leading quadlet's top 3 bits alongside arbitration_id (TC18 §13.7.11.3 Figure 39), followed by this module's own xl-header/data layout. FIXED (v0.109.0): previously packed frame_format into evt[2:0] instead, a wire position TC18 does not assign it (see REQ-CANEP-031's corrected text).",
+      "title": "rcp_ep_can_encode_frame_request() rejects a frame violating frame-format, id, length, or xl_header preconditions",
+      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format). FIXED (v0.109.0): frame_format was previously packed into evt[2:0] instead of the payload's leading quadlet, a wire position TC18 does not assign it (see REQ-CANEP-039's own text). SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried the function's own successful-encoding contract (evt left at 0, frame_format/arbitration_id packed into the leading quadlet, xl-header/data layout appended) under the same id -- two independently-testable outcomes of the same function (reject vs. encode), the same per-outcome granularity REQ-PWM-002..009 and REQ-RMAP-014/-082 already establish. That successful-encoding contract is now REQ-CANEP-033's own separate id; this entry keeps only its own precondition-rejection contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
+    },
+    {
+      "id": "REQ-CANEP-033",
+      "title": "rcp_ep_can_encode_frame_request() encodes a valid frame as an ACF_ABB request with frame_format/arbitration_id packed into the leading quadlet",
+      "text": "rcp_ep_can_encode_frame_request() shall, given preconditions rcp_ep_can_frame_format_valid()/rcp_ep_can_arbitration_id_valid()/rcp_ep_can_frame_format_max_data_len()/rcp_ep_can_frame_format_is_xl() all satisfied, encode an ACF_ABB request with evt left at 0 (TC18 Table 33's plain-request value for CAN's endpoint-type row) and frame_format packed into the payload's leading quadlet's top 3 bits alongside arbitration_id (TC18 \u00a713.7.11.3 Figure 39), followed by this module's own xl-header/data layout. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-016's own prior text, which bundled this successful-encoding outcome with that entry's own precondition-rejection contract under one id -- see REQ-CANEP-016 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
       "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
@@ -9143,26 +9154,50 @@
     },
     {
       "id": "REQ-CANEP-023",
-      "title": "rcp_ep_can_frame_response_fragment_count() reports 0 under the same preconditions the unfragmented response encoder fails for, and delegates the fragment count to fragment.h otherwise",
-      "text": "rcp_ep_can_frame_response_fragment_count() shall return 0 when frame_format/arbitration_id/xl_header/rx_len fail the same preconditions rcp_ep_can_encode_frame_response() validates, and shall otherwise return rcp_fragment_plan_count()'s answer for the combined prefix-then-data payload length and max_fragment_payload.",
+      "title": "rcp_ep_can_frame_response_fragment_count() reports 0 under the same preconditions the unfragmented response encoder fails for",
+      "text": "rcp_ep_can_frame_response_fragment_count() shall return 0 when frame_format/arbitration_id/xl_header/rx_len fail the same preconditions rcp_ep_can_encode_frame_response() validates. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried the function's own success-path delegation to fragment.h's rcp_fragment_plan_count() under the same id -- two independently-testable outcomes (precondition-failure vs. successful delegation), each already proven by its own distinct test (test_fragment_count_zero_for_bad_preconditions vs. test_fragment_count_one_when_fits_in_one_fragment/test_fragment_count_zero_when_segment_count_exceeds_max_fragment_segments). That delegation contract is now REQ-CANEP-034's own separate id; this entry keeps only its own precondition-failure contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
+    },
+    {
+      "id": "REQ-CANEP-034",
+      "title": "rcp_ep_can_frame_response_fragment_count() delegates to fragment.h's rcp_fragment_plan_count() otherwise",
+      "text": "rcp_ep_can_frame_response_fragment_count() shall, when frame_format/arbitration_id/xl_header/rx_len pass the same preconditions rcp_ep_can_encode_frame_response() validates, return rcp_fragment_plan_count()'s answer for the combined prefix-then-data payload length and max_fragment_payload. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-023's own prior text, which bundled this successful-delegation outcome with that entry's own precondition-failure contract under one id -- see REQ-CANEP-023 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
       "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CANEP-024",
       "title": "rcp_ep_can_encode_frame_response_fragmented() splits a CAN frame response's combined payload into correctly-numbered ACF fragments",
-      "text": "rcp_ep_can_encode_frame_response_fragmented() shall encode rcp_ep_can_frame_response_fragment_count() ACF frames whose ms/read_size_or_segment_num fields follow fragment.h's rcp_fragment_plan() and whose byte_bus_id/evt/op/transaction_num/timed/timestamp match rcp_ep_can_encode_frame_response()'s own single-frame encoding, producing exactly one frame identical to that single-frame encoding when the combined payload already fits in one fragment.",
+      "text": "rcp_ep_can_encode_frame_response_fragmented() shall encode rcp_ep_can_frame_response_fragment_count() ACF frames whose ms/read_size_or_segment_num fields follow fragment.h's rcp_fragment_plan() and whose byte_bus_id/evt/op/transaction_num/timed/timestamp match rcp_ep_can_encode_frame_response()'s own single-frame encoding. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried the degenerate single-fragment special case ('producing exactly one frame identical to that single-frame encoding when the combined payload already fits in one fragment') under the same id -- already proven by its own distinct test (test_fragment_response_unfragmented_matches_single_frame_path), independent from the general multi-fragment tests (test_fragment_worst_case_can_xl_response_round_trip/test_fragment_timed_response_round_trip). That special case is now REQ-CANEP-035's own separate id; this entry keeps only its own general multi-fragment plan-correctness contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
+    },
+    {
+      "id": "REQ-CANEP-035",
+      "title": "rcp_ep_can_encode_frame_response_fragmented() produces exactly one frame, identical to the unfragmented single-frame encoding, when the combined payload already fits in one fragment",
+      "text": "rcp_ep_can_encode_frame_response_fragmented() shall produce exactly one frame, byte-for-byte identical to rcp_ep_can_encode_frame_response()'s own single-frame encoding, when the combined prefix-then-data payload already fits within one max_fragment_payload-sized fragment. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-024's own prior text, which bundled this degenerate single-fragment special case with that entry's own general multi-fragment plan-correctness contract under one id -- see REQ-CANEP-024 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
       "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
@@ -9191,14 +9226,26 @@
     },
     {
       "id": "REQ-CANEP-027",
-      "title": "rcp_ep_can_decode_reassembled_frame_response() parses a fully reassembled combined payload into frame_format/arbitration_id/xl_header/rx_data",
-      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given a reassembled buffer of at least 4 bytes, read frame_format from its leading quadlet's top 3 bits (TC18 §13.7.11.3 Figure 39), returning RCP_EP_CAN_ERR_SHORT_FRAME if the buffer is shorter than that format's own full prefix length, RCP_EP_CAN_ERR_BAD_FRAME_FORMAT if it is not rcp_ep_can_frame_format_valid(), or RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that format; otherwise populate out_frame_format, out_arbitration_id, out_xl_header (only when the format is a CAN XL variant), and out_rx_data/out_rx_len identically to how rcp_ep_can_decode_frame_response() would have for the same original, unfragmented payload. FIXED (v0.109.0): frame_format was previously a caller-supplied input (sourced from a per-fragment evt[2:0], REQ-CANEP-026's now-corrected design); it is now derived from the reassembled payload itself, the only place it is actually carried.",
+      "title": "rcp_ep_can_decode_reassembled_frame_response() rejects a too-short, wrong-frame-format, or bad-arbitration-id reassembled buffer",
+      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given a reassembled buffer of at least 4 bytes, read frame_format from its leading quadlet's top 3 bits (TC18 \u00a713.7.11.3 Figure 39), returning RCP_EP_CAN_ERR_SHORT_FRAME if the buffer is shorter than 4 bytes or than that format's own full prefix length, RCP_EP_CAN_ERR_BAD_FRAME_FORMAT if it is not rcp_ep_can_frame_format_valid(), or RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that format. FIXED (v0.109.0): frame_format was previously a caller-supplied input (sourced from a per-fragment evt[2:0], REQ-CANEP-026's now-corrected design); it is now derived from the reassembled payload itself, the only place it is actually carried. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried the function's own successful-populate contract (recovering out_frame_format/out_arbitration_id/out_xl_header/out_rx_data identically to rcp_ep_can_decode_frame_response()) under the same id -- two independently-testable outcomes (reject-taxonomy vs. successful field recovery), the same reject/success split already established for this module's sibling decode functions (REQ-CANEP-017/-018 for the request decoder, REQ-CANEP-020/-022 for the response decoder). That successful-populate contract is now REQ-CANEP-036's own separate id; this entry keeps only its own reject-taxonomy contract. A real coverage gap closed alongside this split: RCP_EP_CAN_ERR_BAD_FRAME_FORMAT had no dedicated test of its own for this function before this batch (test_reassembled_decode_rejects_bad_frame_format, tests/test_ep_can.c, is new).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
+    },
+    {
+      "id": "REQ-CANEP-036",
+      "title": "rcp_ep_can_decode_reassembled_frame_response() recovers frame_format/arbitration_id/xl_header/rx_data from a well-formed reassembled buffer",
+      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given a well-formed reassembled buffer (passing the short-frame/frame-format/arbitration-id preconditions REQ-CANEP-027 owns), populate out_frame_format, out_arbitration_id, out_xl_header (only when the format is a CAN XL variant), and out_rx_data/out_rx_len identically to how rcp_ep_can_decode_frame_response() would have for the same original, unfragmented payload, returning RCP_EP_CAN_OK. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-027's own prior text, which bundled this successful-populate outcome with that entry's own reject-taxonomy contract under one id -- see REQ-CANEP-027 for that half and its own history. Prior test coverage for this specific outcome existed only indirectly, folded into REQ-CANEP-024's own multi-fragment round-trip tests (which exercise this function only as the last step of a full fragment/reassemble pipeline); test_reassembled_decode_round_trip_recovers_fields (tests/test_ep_can.c) is a new, focused test proving this function's own contract directly, independent of fragmentation.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
       "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
@@ -12900,13 +12947,25 @@
     {
       "id": "REQ-CANEP-028",
       "title": "can_ep_len, can_base_clk and the CAN endpoint's three status registers",
-      "text": "IMPLEMENTED (issue #201, 2026-08-12): rcp_ep_can_render_registers()/_apply_reconfig() (ep_can.h/ep_can.c) now model the CAN functional-configuration block's own descriptor, clock and status registers (TC18 §13.7.11.2 Table 56 -- RC1's own Table 53, renumbered, issue #341 lineage): can_ep_len (0x0000, 8 bit, R, fixed at RCP_EP_CAN_EP_FUNC_LEN), the reserved octet at 0x0001 (8 bit, R, reads 0x00), can_base_clk (0x0004, 16 bit, R — always renders 0, no real clock source modelled, matching every other endpoint type's own base_clk honesty), can_ep_status (0x0006, 16 bit, R/W, new rcp_ep_can_functional_cfg_t::ep_status field), the 32-bit CAN EP status at 0x001C (R/W, new ::status field) and the 32-bit FIFO status at 0x0020 (R/W, new ::fifo_status field), reachable via the generic §12.7.1 evt[2:0]==111b mechanism. Bus-off, error-passive and FIFO-overflow conditions are now observable and settable through this endpoint. Scoped to end at 0x0024, immediately before REQ-CANEP-029's own already-documented address collision in the acceptance-filter region -- resolving that collision was not required to close this register block, since it lies entirely outside this span. The 0x0008-0x001B span (can_clk_divider, two reserved regions, the three 'CAN bit time register' fields, and TDCC) is deliberately left read-only/rendering 0 for now: an earlier investigation (issue #256 Group I) already found Table 56 gives those 32-bit registers no sub-field bit-layout in the specification text, so converting this module's own rcp_ep_can_bit_timing_t to and from their wire representation is not derivable without inventing an unverified bit-packing scheme -- the same reasoning already deferred mapping them anywhere else in this codebase, and this fix does not force that decision. WIRE-BIT DEFECT FIXED (issue #470, 2026-08-14): can_ep_enable&clr's (0x0002) CAN_ENABLE_CLR_BIT_CLEAR constant was defined at bit 1 instead of the bit 4 TC18 Table 35 (EP functional config common entries) fixes for ep_clear_req_storage on EVERY endpoint type -- CAN's own can_ep_enable&clr row explicitly defers to Table 35 for this octet's layout rather than redefining it, and 0x0002.1:3 is reserved (reads 000b) in that table, so bit 1 collided with nothing and the fix to bit 4 introduces no new collision either. Every sibling endpoint (ep_uart.c/ep_lin.c/ep_adc.c/ep_iseled.c/ep_mdio.c) already used bit 4; CAN alone was wrong, self-consistently (render and parse both used the same wrong bit, so this module's own round-trip tests never caught it -- only a byte-literal wire assertion could). Corrected to (1u<<4) in rcp_ep_can_render_registers()/parse_can_registers() (src/ep_can.c); tests/test_tc18_gaps_ep2.c's new test_can_ep_enable_clr_clear_bit_is_wire_bit_4() asserts the exact rendered/parsed byte values (0x10, not 0x02) to prevent regression.",
+      "text": "IMPLEMENTED (issue #201, 2026-08-12): rcp_ep_can_render_registers()/_apply_reconfig() (ep_can.h/ep_can.c) now model the CAN functional-configuration block's own descriptor, clock and status registers (TC18 \u00a713.7.11.2 Table 56 -- RC1's own Table 53, renumbered, issue #341 lineage): can_ep_len (0x0000, 8 bit, R, fixed at RCP_EP_CAN_EP_FUNC_LEN), the reserved octet at 0x0001 (8 bit, R, reads 0x00), can_base_clk (0x0004, 16 bit, R \u2014 always renders 0, no real clock source modelled, matching every other endpoint type's own base_clk honesty), can_ep_status (0x0006, 16 bit, R/W, new rcp_ep_can_functional_cfg_t::ep_status field), the 32-bit CAN EP status at 0x001C (R/W, new ::status field) and the 32-bit FIFO status at 0x0020 (R/W, new ::fifo_status field), reachable via the generic \u00a712.7.1 evt[2:0]==111b mechanism. Bus-off, error-passive and FIFO-overflow conditions are now observable and settable through this endpoint. Scoped to end at 0x0024, immediately before REQ-CANEP-029's own already-documented address collision in the acceptance-filter region -- resolving that collision was not required to close this register block, since it lies entirely outside this span. The 0x0008-0x001B span (can_clk_divider, two reserved regions, the three 'CAN bit time register' fields, and TDCC) is deliberately left read-only/rendering 0 for now: an earlier investigation (issue #256 Group I) already found Table 56 gives those 32-bit registers no sub-field bit-layout in the specification text, so converting this module's own rcp_ep_can_bit_timing_t to and from their wire representation is not derivable without inventing an unverified bit-packing scheme -- the same reasoning already deferred mapping them anywhere else in this codebase, and this fix does not force that decision. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried the can_ep_enable&clr (0x0002) CAN_ENABLE_CLR_BIT_CLEAR wire-bit defect fix (issue #470, 2026-08-14) -- a different register, from a different issue, dated two days after this one, sharing only the same two implementing functions. That fix is now REQ-CANEP-037's own separate id; this entry keeps only its own descriptor/clock/status register-block contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18_master_id": "TC18-13.7.11.2-002"
+    },
+    {
+      "id": "REQ-CANEP-037",
+      "title": "can_ep_enable&clr's ep_clear_req_storage bit is wire bit 4, matching TC18 Table 35 and every sibling endpoint",
+      "text": "WIRE-BIT DEFECT FIXED (issue #470, 2026-08-14): can_ep_enable&clr's (0x0002) CAN_ENABLE_CLR_BIT_CLEAR constant was defined at bit 1 instead of the bit 4 TC18 Table 35 (EP functional config common entries) fixes for ep_clear_req_storage on EVERY endpoint type -- CAN's own can_ep_enable&clr row explicitly defers to Table 35 for this octet's layout rather than redefining it, and 0x0002.1:3 is reserved (reads 000b) in that table, so bit 1 collided with nothing and the fix to bit 4 introduces no new collision either. Every sibling endpoint (ep_uart.c/ep_lin.c/ep_adc.c/ep_iseled.c/ep_mdio.c) already used bit 4; CAN alone was wrong, self-consistently (render and parse both used the same wrong bit, so this module's own round-trip tests never caught it -- only a byte-literal wire assertion could). Corrected to (1u<<4) in rcp_ep_can_render_registers()/parse_can_registers() (src/ep_can.c); tests/test_tc18_gaps_ep2.c's test_can_ep_enable_clr_clear_bit_is_wire_bit_4() asserts the exact rendered/parsed byte values (0x10, not 0x02) to prevent regression. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-028's own prior text, which bundled this defect fix -- a different register than can_ep_len/can_base_clk/the status registers REQ-CANEP-028 itself describes, from a later, unrelated issue -- under the same id; see REQ-CANEP-028 for its own separate register-block contract.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
       "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
@@ -12923,38 +12982,73 @@
     },
     {
       "id": "REQ-CANEP-030",
-      "title": "Usage of the new CAN XL physical layer is a functional-configuration setting of the CAN endpoint",
-      "text": "PARTIAL (2026-08-13, issue #336): TC18 §13.7.11.2 lists 'usage of new PL (YES|NO) for CAN XL' among the settings the CAN endpoint's functional configuration comprises, i.e. a per-endpoint, runtime-writable choice, alongside bit-rate and filter settings that all do have real register rows in Table 56. This one does not -- the register table goes directly from can_clk_divider (0x0008) to the undecomposed CAN bit-time/TDCC register span (0x000C-0x001B) with no row named for this setting anywhere, and no prose elsewhere in §13.7.11 gives it a bit position either. This is a genuine specification gap, not a local implementation one -- filed as TC18_spec_defects_report.md item 57 (and its own _quadruple_checked.md review copy). New rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned (ep_can.h/ep_can.c) is deliberately an IN-MEMORY-ONLY field with no wire offset, matching that constraint honestly rather than inventing an unverified register bit: rcp_ep_can_set_xl_new_pl_provisioned() lets a caller record this choice (lifecycle-authorized, same as every other functional-config setter), and new rcp_ep_can_xl_frame_matches_provisioned_pl() validates a decoded frame's own XL variant against it -- closing this requirement's own 'nothing rejects a frame whose XL variant contradicts the endpoint's actual physical layer' half. c-RCP's own pre-existing per-frame expression of physical-layer selection (RCP_EP_CAN_FRAME_XL_CLASSICAL_PL/_NEW_PL in evt[2:0]) is unchanged and still the wire-level mechanism a real frame carries its own choice in; the new provisioned field is the endpoint-level constraint that frame is now checked against. What remains genuinely NOT implemented: a client still cannot read back this setting over the register map the way every other functional-config setting can, since TC18 gives no bit position to expose it at.",
+      "title": "rcp_ep_can_set_xl_new_pl_provisioned() records the endpoint's CAN XL physical-layer provisioning choice, authorization-gated",
+      "text": "PARTIAL (2026-08-13, issue #336): TC18 \u00a713.7.11.2 lists 'usage of new PL (YES|NO) for CAN XL' among the settings the CAN endpoint's functional configuration comprises, i.e. a per-endpoint, runtime-writable choice, alongside bit-rate and filter settings that all do have real register rows in Table 56. This one does not -- the register table goes directly from can_clk_divider (0x0008) to the undecomposed CAN bit-time/TDCC register span (0x000C-0x001B) with no row named for this setting anywhere, and no prose elsewhere in \u00a713.7.11 gives it a bit position either. This is a genuine specification gap, not a local implementation one -- filed as TC18_spec_defects_report.md item 57 (and its own _quadruple_checked.md review copy). New rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned (ep_can.h/ep_can.c) is deliberately an IN-MEMORY-ONLY field with no wire offset, matching that constraint honestly rather than inventing an unverified register bit: rcp_ep_can_set_xl_new_pl_provisioned() shall let a caller record this choice, gated the same way as every other functional-config setter (applying new_pl_provisioned to cfg and returning true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise). What remains genuinely NOT implemented: a client still cannot read back this setting over the register map the way every other functional-config setting can, since TC18 gives no bit position to expose it at. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried a second function's own contract -- rcp_ep_can_xl_frame_matches_provisioned_pl(), which validates a decoded frame's own XL variant against this stored setting -- under the same id, self-described in that prior text as 'closing this requirement's own ... half'. That validator contract is now REQ-CANEP-038's own separate id; this entry keeps only its own setter/storage contract.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§13.7.11.2, TC18.txt L5772",
+      "tc18": "\u00a713.7.11.2, TC18.txt L5772",
+      "tc18_master_id": "TC18-13.7.11.2-001"
+    },
+    {
+      "id": "REQ-CANEP-038",
+      "title": "rcp_ep_can_xl_frame_matches_provisioned_pl() rejects a decoded CAN XL frame whose physical-layer variant contradicts the endpoint's provisioned choice",
+      "text": "rcp_ep_can_xl_frame_matches_provisioned_pl() shall return true for any non-CAN-XL format (a frame with no physical-layer choice of its own to conflict with); for a CAN XL format, it shall return true iff format matches the physical layer xl_new_pl_provisioned selects (RCP_EP_CAN_FRAME_XL_NEW_PL when true, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL when false), and false otherwise. This closes the 'nothing rejects a frame whose XL variant contradicts the endpoint's actual physical layer' half of REQ-CANEP-030's own prior finding (issue #336): c-RCP's pre-existing per-frame expression of physical-layer selection (RCP_EP_CAN_FRAME_XL_CLASSICAL_PL/_NEW_PL in evt[2:0]) is unchanged and still the wire-level mechanism a real frame carries its own choice in; this function is the endpoint-level constraint that frame is now checked against. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-030's own prior text, which bundled this validator's contract with that entry's own setter/storage contract for xl_new_pl_provisioned under one id -- see REQ-CANEP-030 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.2, TC18.txt L5772",
       "tc18_master_id": "TC18-13.7.11.2-001"
     },
     {
       "id": "REQ-CANEP-031",
       "title": "The FrameFormat selector's numeric code assignment (CBFF 0 through XL new-PL 5, with 6 and 7 reserved), carried in the payload's leading quadlet",
-      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 §13.7.11.3 Table 57 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved and rcp_ep_can_frame_format_valid() shall reject them, causing rcp_ep_can_decode_frame_request()/_decode_frame_response()/_decode_reassembled_frame_response() to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT. The selector shall be carried in the top 3 bits of the payload's leading quadlet (TC18 §13.7.11.3 Figure 39), sharing that quadlet with a 29-bit arbitration_id. CORRECTED (v0.109.0): this requirement previously (and incorrectly) asserted the selector was carried in the ACF byte_message_info evt field's low three bits -- verified against Figure 39 directly, that claim was never true of TC18 and was itself the bug (evt[2:0] instead carries CAN's ordinary TC18 §13.5 Table 33 Row-2 meaning: 000b plain, 111b configuration-write, else UNSUPPORTED_CMD). Found and fixed while investigating this repo's Table 33 centralization.",
+      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 \u00a713.7.11.3 Table 57 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved, left unassigned to any enumerator. CORRECTED (v0.109.0): an earlier revision of this requirement incorrectly asserted the FrameFormat selector was carried in the ACF byte_message_info evt field's low three bits -- verified against Figure 39 directly, that claim was never true of TC18 and was itself a bug (evt[2:0] instead carries CAN's ordinary TC18 \u00a713.5 Table 33 Row-2 meaning: 000b plain, 111b configuration-write, else UNSUPPORTED_CMD); found and fixed while investigating this repo's Table 33 centralization. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried (a) the selector's wire position ('carried in the top 3 bits of the payload's leading quadlet, sharing that quadlet with a 29-bit arbitration_id'), now REQ-CANEP-039's own separate id, and (b) two near-duplicate clauses removed rather than re-split, since each already belongs to a different id's own tested contract: 'rcp_ep_can_frame_format_valid() shall reject [codes 6/7]' restated REQ-CANEP-001's own contract verbatim, and 'causing the decode functions to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT' restated a clause each of REQ-CANEP-017/-020/-027's own reject-taxonomies already own and test. This entry keeps only the enum's own numeric code-assignment fact, the one claim no other id captures.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3 Table 57 + Figure 40, TC18.txt L5842-5872",
+      "tc18": "\u00a713.7.11.3 Table 57 + Figure 40, TC18.txt L5842-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
+    },
+    {
+      "id": "REQ-CANEP-039",
+      "title": "The FrameFormat selector is carried in the top 3 bits of the payload's leading quadlet, sharing it with a 29-bit arbitration_id",
+      "text": "The FrameFormat selector shall be carried in the top 3 bits of the payload's leading quadlet (TC18 \u00a713.7.11.3 Figure 39), sharing that quadlet with a 29-bit arbitration_id -- not the ACF byte_message_info evt field, an earlier, incorrect design this requirement family's own history (see REQ-CANEP-031) already documents and corrected (v0.109.0). Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-031's own prior text, which bundled this wire-position contract with that entry's own enum code-assignment fact (and two now-removed near-duplicate clauses already owned by REQ-CANEP-001/-017/-020/-027) under one id -- see REQ-CANEP-031 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3 Table 57 + Figure 40, TC18.txt L5842-5872",
       "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CANEP-032",
-      "title": "Remote frames are not supported, and an 11-bit CAN ID is right-aligned in the CAN ID field",
-      "text": "The CAN endpoint shall not support sending remote frames: c-RCP exposes no remote-frame flag, encode function, or decode outcome anywhere in ep_can.h/ep_can.c, so every frame this endpoint encodes or decodes is a data frame. An 11-bit CAN identifier shall be right-aligned within the CAN ID field: rcp_ep_can_encode_frame_request()/_encode_frame_response() write arbitration_id via write_prefix()'s big-endian put_u32() into the fixed 4-octet identifier prefix, leaving the unused high bits zero, and rcp_ep_can_arbitration_id_valid() bounds a base-width identifier at 0x7FF so no bit can escape that alignment.",
+      "title": "The CAN endpoint does not support sending remote frames",
+      "text": "The CAN endpoint shall not support sending remote frames: c-RCP exposes no remote-frame flag, encode function, or decode outcome anywhere in ep_can.h/ep_can.c, so every frame this endpoint encodes or decodes is a data frame. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533): this entry's own prior text also carried an unrelated wire-layout contract -- 'an 11-bit CAN identifier is right-aligned within the CAN ID field' -- under the same id, two facts about two different topics joined only by both being true of this module. That right-alignment contract is now REQ-CANEP-040's own separate id; this entry keeps only its own remote-frame-support contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.11.3, TC18.txt L5887"
+      "tc18": "\u00a713.7.11.3, TC18.txt L5887"
+    },
+    {
+      "id": "REQ-CANEP-040",
+      "title": "An 11-bit CAN identifier is right-aligned within the CAN ID field",
+      "text": "An 11-bit CAN identifier shall be right-aligned within the CAN ID field: rcp_ep_can_encode_frame_request()/_encode_frame_response() write arbitration_id via write_prefix()'s big-endian put_u32() into the fixed 4-octet identifier prefix, leaving the unused high bits zero, and rcp_ep_can_arbitration_id_valid() bounds a base-width identifier at 0x7FF so no bit can escape that alignment. Split 2026-08-18 (c-RCP-18-tracker, REQ-CANEP-* atomicity audit, issue #533) out of REQ-CANEP-032's own prior text, which bundled this right-alignment contract with that entry's own remote-frame-support contract under one id -- see REQ-CANEP-032 for that half and its own history.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.3, TC18.txt L5887"
     },
     {
       "id": "REQ-ISELED-025",
@@ -13162,7 +13256,7 @@
       "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5916-5961",
       "tc18_master_id": "TC18-13.7.12.2-001"
     },
-        {
+    {
       "id": "REQ-LINEP-023",
       "title": "RETIRED -- duplicated REQ-LINEP-030's TX_DONE AND-of-both-conditions rule (near-duplicate ids describing the same rule)",
       "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- added when issue #201 introduced trailing_time_expired as rcp_ep_lin_trigger_fires()'s second, caller-classified boolean parameter -- described the identical TX_DONE AND-of-both-conditions rule REQ-LINEP-006 (post its own 2026-08-13 correction) already restated in formal shall-statement form, both citing the same TC18-13.7.10.1-002 master id -- the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated into REQ-RMAP-085 by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is now REQ-LINEP-030; this entry's own design-rationale content (no dedicated Table 55 wire register for \"the configured trailing time\"; trailing_time_expired is caller-classified, not derived from a modeled clock) is preserved there. No code or test carries this id's tag any longer.",
@@ -13185,7 +13279,7 @@
       "tc18": "§13.7.10.2 Table 55, TC18.txt L5697-5714",
       "tc18_master_id": "TC18-13.7.10.2-001"
     },
-        {
+    {
       "id": "REQ-LINEP-028",
       "title": "rcp_ep_lin_render_registers() serializes the EP_func register block per Table 55's offsets",
       "text": "rcp_ep_lin_render_registers() shall serialize cfg's EP_func registers into out[0..RCP_EP_LIN_EP_FUNC_LEN) exactly as a configuration read of the whole block would report them, per Table 55's offsets. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two entirely different functions' behavior under one id -- rcp_ep_lin_render_registers()'s own serialization contract (already independently tested by test_render_registers_matches_table_offsets) and rcp_ep_lin_encode_reconfig_request()'s own separate wire-encoding contract (already independently tested by test_reconfig_request_round_trip / test_encode_reconfig_request_rejects_empty_data) -- the same class of violation REQ-AUTH-009 (#519's own seed example) demonstrated: multiple functions' behavior under one id, not one function's one switch/if-arm outcome. rcp_ep_lin_encode_reconfig_request()'s own contract is now REQ-LINEP-036's own id. This entry keeps only rcp_ep_lin_render_registers()'s own serialization contract.",
@@ -13209,7 +13303,7 @@
       "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
       "tc18_master_id": "TC18-12.7.1-002"
     },
-        {
+    {
       "id": "REQ-LINEP-029",
       "title": "rcp_ep_lin_apply_reconfig() rejects a write extending past the EP_func block, leaving cfg unchanged",
       "text": "rcp_ep_lin_apply_reconfig() shall return RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE and leave cfg entirely unchanged when start_address + the payload's data length exceeds RCP_EP_LIN_EP_FUNC_LEN, matching \u00a712.7.1's own 'such a payload is to be ignored' rule. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled three of rcp_ep_lin_apply_reconfig()'s own independently-testable outcomes -- this out-of-range rejection (already tested by test_apply_reconfig_rejects_write_past_ep_len), the successful patch-and-adopt behavior including its read-only-register-skip rule (already tested by test_apply_reconfig_writes_clk_divider / test_apply_reconfig_writes_multi_register_span / test_apply_reconfig_ignores_read_only_registers) -- plus a wholly different function, rcp_ep_lin_reconfig_strerror()'s own never-NULL contract (already tested by test_reconfig_strerror_never_null), all under one id. The successful patch/read-only-skip clause is now REQ-LINEP-038's own id; rcp_ep_lin_reconfig_strerror()'s own contract is REQ-LINEP-039's own id. This entry also newly documents (previously untraced in any REQ-LINEP-* text, despite already being implemented and independently tested by test_apply_reconfig_rejects_payload_without_data) the function's third outcome, the too-short-payload rejection, now REQ-LINEP-037's own id. This entry keeps only the out-of-range rejection.",
@@ -13269,7 +13363,7 @@
       "tc18": "§13.7.10.1, TC18.txt L5694-5695; §13.5.1, TC18.txt L4134-4142",
       "tc18_master_id": "TC18-13.5.1-002"
     },
-        {
+    {
       "id": "REQ-LINEP-026",
       "title": "RETIRED -- duplicated REQ-LINEP-016's evt=0 encoding contract (near-duplicate ids describing the same rule)",
       "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- \"rcp_ep_lin_encode_command_request() shall have no compare_mode parameter of any kind; it always encodes evt = 0\" -- explicitly cross-referenced REQ-LINEP-016 (\"See REQ-LINEP-016\") for the same rule, both citing the same TC18-13.5-001 master id. REQ-LINEP-016's own text already asserts the same 'evt = 0' encoding fact as part of that function's one full encode contract, independently tested (test_command_request_uses_read_direction_op / test_command_request_round_trip_carries_raw_bytes decode the encoded frame's evt field back). This entry's own remaining assertion -- the absence of a compare_mode parameter from the function's signature -- is a static API-shape fact, not a runtime behavior a test can independently verify beyond what REQ-LINEP-016 already covers; the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is REQ-LINEP-016. No code or test carries this id's tag any longer.",
@@ -13836,7 +13930,6 @@
       "status": "implemented",
       "tc18": "§13.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)",
       "tc18_master_id": "TC18-13.5.1-002"
-    }
-  ],
+    }],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."
 }

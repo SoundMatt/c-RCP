@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.449.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-CANEP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-CANEP-*` (`src/ep_can.c`/`include/rcp/ep_can.h`),
+Group 2's second batch, 4/32 proxy-flagged -- triaged all 32 in full
+rather than only the 4 flagged, per the tracker's own warning that the
+REQ-RMAP-* batch found real bundling with zero "shall" occurrences the
+proxy missed entirely (found here too: `-028`/`-030`/`-032`).
+
+8 ids split into 8 new ones (`REQ-CANEP-033..040`): `-016`
+(precondition-rejection vs. successful-encoding, the encoder's own
+version of the request decoder's already-split `-017`/`-018` pattern),
+`-023` (precondition-failure vs. successful delegation to
+`fragment.h`), `-024` (general multi-fragment plan-correctness vs. the
+degenerate single-fragment-identical-to-unfragmented-encoder special
+case), `-027` (reject-taxonomy vs. successful-populate, the same
+reject/success split already established for every sibling decode
+function in this module), `-028` (register-block contract vs. an
+unrelated `can_ep_enable&clr` wire-bit defect fix from a different,
+later issue bundled into the same id), `-030` (setter/storage contract
+vs. a second function's own validator contract, self-described in the
+prior text as "closing this requirement's own ... half"), `-031`
+(enum code assignment vs. wire position, also trimming two
+near-duplicate clauses that restated `-001`'s and
+`-017`/`-020`/`-027`'s own already-tested contracts verbatim), and
+`-032` (remote-frame-support absence vs. 11-bit right-alignment, two
+unrelated facts joined only by both being true of this module).
+
+Tags moved/duplicated to sit above the exact function/test per split
+(not file-header-only) -- including `-031`/`-039`, which previously had
+no per-function tag anywhere in `src/ep_can.c` at all, only the
+file-header stack. Two new focused tests
+(`test_reassembled_decode_rejects_bad_frame_format`,
+`test_reassembled_decode_round_trip_recovers_fields`) closed real gaps
+`-027`'s prior bundling had hidden. Every split mutation-tested against
+a real injected defect, reverted after confirming -- including a
+cross-function mutation (corrupting the plain single-frame encoder to
+prove `-035` depends on a byte-identity guarantee `-024`'s own tests
+never check).
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1182/1182 requirements, 512/512 functions).
+
+**Next**: other Group 2 (`REQ-ADC-*`, `REQ-GPIO-*`, `REQ-I2C-*`,
+`REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-SPI-*`, `REQ-UART-*`,
+`REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4 prefixes remain, tracked as
+separate batches against the same tracker.
+
 ### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-ISELED-*: requirement-atomicity audit, Group 2 per-endpoint)
 
