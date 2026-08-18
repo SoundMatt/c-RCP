@@ -58,7 +58,7 @@ arbitrary TC18 peer.")*
 | `<rcp/fragment.h>` | Multi-segment request/response fragmentation |
 | `<rcp/power.h>` | Normal/StandBy/Sleep/Unpowered power-mode model and WakeUp handshake |
 | `<rcp/ep_gpio.h>`, `<rcp/ep_spi.h>`, `<rcp/ep_i2c.h>`, `<rcp/ep_uart.h>`, `<rcp/ep_adc.h>`, `<rcp/ep_pwm.h>`, `<rcp/ep_can.h>`, `<rcp/ep_lin.h>`, `<rcp/ep_mdio.h>`, `<rcp/ep_iseled.h>`, `<rcp/ep_wakeup.h>` | Per-endpoint-type request/response codecs |
-| `<rcp/request_cancel.h>`, `<rcp/request_chained.h>`, `<rcp/request_compound.h>`, `<rcp/request_sequencer.h>`, `<rcp/request_timed.h>`, `<rcp/request_triggered.h>` | The request-kind taxonomy (execution priority: cancellation > triggered > timed > compound > compound-wait > chained > standard) |
+| `<rcp/request.h>`, `<rcp/request_sequencer.h>` | The request-kind taxonomy (compound, compound-wait, triggered, chained, timed, cancellation; execution priority: cancellation > triggered > timed > compound > compound-wait > chained > standard) |
 | `<rcp/mock.h>` | In-process RC-Server/endpoint test double — zero I/O, default for unit tests |
 | `<rcp/errors.h>` | Numbered TC18 wire error codes (`rcp_wire_error_t`) |
 | `<relay/relay.h>` | Shared `rcp_context_t` (deadline) and error-condition types |

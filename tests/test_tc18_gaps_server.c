@@ -74,10 +74,8 @@
 #include <rcp/powerstate.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/request_compound.h>
+#include <rcp/request.h>
 #include <rcp/request_sequencer.h>
-#include <rcp/request_timed.h>
-#include <rcp/request_triggered.h>
 #include <rcp/server.h>
 #include <rcp/watchdog.h>
 

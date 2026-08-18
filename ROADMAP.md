@@ -19106,6 +19106,72 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.424.0 -- 2026-08-17 (c-RCP-165: unify the 5-file conditional-request
+split into `request.h`/`request.c`)
+
+Closes issue #165 (`[c-RCP-AUDIT-03]`). A prior pass on this same issue
+deferred the refactor, citing concurrent multi-agent batch-work risk as
+its reason; that generic concern was explicitly overridden for this
+pass (the agent runs in its own isolated worktree, so concurrent work
+on other issues cannot corrupt local state), and no new concrete
+technical blocker turned up on re-verification, so the refactor
+proceeded.
+
+Merges `src/request_{compound,triggered,chained,timed,cancel}.c` and
+their five matching `include/rcp/request_*.h` headers (2558 lines
+across 10 files) into one `include/rcp/request.h` / `src/request.c`
+pair, matching cpp-RCP's `include/rcp/request.hpp` and rust-RCP's
+`src/request.rs` -- RELAY's `docs/RCP-ARCHITECTURE.md` canonical choice
+#4's named target shape. Pure organizational merge: every function,
+type, constant, and `REQ-CMP-*`/`REQ-TRIG-*`/`REQ-CHAIN-*`/
+`REQ-TIMED-*`/`REQ-CANCEL-*` requirement id is byte-for-byte unchanged,
+only the file boundary moved. The one unavoidable code change is
+collapsing the five originally-split translation units' identical
+private `put_u64()` byte-order helpers into the single copy `request.c`
+now needs (five duplicate `static` definitions in one translation unit
+would not compile) -- an ODR consequence of the merge, not a
+discretionary simplification.
+
+Two of canonical choice #4's other named properties turned out to
+already exist as their own separate, already-shared modules before this
+merge, and this issue's own stated scope (the five originally-split
+files only) leaves them as-is: `request_sequencer.h`/`c` already owns
+the one shared sequencer-state bank (`REQ-SEQ-*`), and `scheduler.h`/`c`
+already owns the one shared request-kind classification enum
+(`rcp_sched_kind_t`) and cross-kind execution-priority ordering
+(`REQ-SCHED-*`) -- the direct functional equivalent of cpp-RCP's
+`RequestCategory`/`priority_rank`/`select_next_due`, just organized as
+its own module rather than folded into `request.hpp` the way cpp-RCP
+does it.
+
+Updated every includer (`scheduler.h`, `tsn.c`, `mock.c`, 13 test files)
+to the new `#include <rcp/request.h>`, `CMakeLists.txt`'s source list,
+and `README.md`'s module table. Rebased four times past concurrent
+CFUSA/coverage work landing on `main` during this PR's own CI cycle:
+v0.419.0's CY001 `src/` sub-effort, v0.420.0's CY001 `tests/`
+sub-effort, v0.421.0's CY006 batch 2, and issue #520's c-RCP-19
+`adapt.c` coverage increment (below, which took the v0.423.0 slot this
+entry originally targeted -- test-only, no source overlap) -- all
+carried forward into the merge rather than lost. The `src/` half's
+`rcp_memcpy_bounded()` conversion (`src/mem_bounded.h`) now lives in
+the merged `request.c`'s four payload-copy sites (compound, triggered,
+chained, timed).
+
+**Verification**: clean rebuild, 0 new errors/warnings; full 67-test
+suite green, assertions in every `rcp_request_*`/`rcp_scheduler`/
+`rcp_conditional_dispatch` test file byte-for-byte unchanged from before
+the merge; ASan/UBSan build (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`) green, 67/67; `cfusa check` 0 errors;
+`cfusa trace --req-coverage 100 --sec-tested 100` both metrics 100%.
+Mutation-tested twice: inverting the merged `rcp_chained_advance()`'s
+`cs`-bit branch broke 4 of 17 `rcp_request_chained` assertions as
+expected (then reverted, reconfirmed green); corrupting one byte offset
+in the now-single shared `put_u64()` broke `rcp_request_compound`,
+`rcp_request_triggered`, and `rcp_request_timed` as expected (then
+reverted, reconfirmed green) -- direct evidence the collapsed helper is
+genuinely exercised by multiple request kinds, not dead code the merge
+accidentally introduced.
+
 ### v0.423.0 -- 2026-08-18 (c-RCP-19: adapt.c dispatch-table branch/line
 coverage closed to its structural ceiling)
 

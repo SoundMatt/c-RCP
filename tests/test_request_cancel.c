@@ -18,7 +18,7 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
-#include <rcp/request_cancel.h>
+#include <rcp/request.h>
 
 #include <string.h>
 

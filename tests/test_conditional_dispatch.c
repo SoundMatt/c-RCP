@@ -62,12 +62,8 @@
 #include <rcp/lifecycle.h>
 #include <rcp/mock.h>
 #include <rcp/rcp.h>
-#include <rcp/request_cancel.h>
-#include <rcp/request_chained.h>
-#include <rcp/request_compound.h>
+#include <rcp/request.h>
 #include <rcp/request_sequencer.h>
-#include <rcp/request_timed.h>
-#include <rcp/request_triggered.h>
 #include <rcp/scheduler.h>
 #include <rcp/server.h>
 

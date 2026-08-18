@@ -17,7 +17,7 @@
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/rcp.h>
-#include <rcp/request_cancel.h>
+#include <rcp/request.h>
 #include <rcp/scheduler.h>
 #include <rcp/tsn.h>
 
