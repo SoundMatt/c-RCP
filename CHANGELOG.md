@@ -34,6 +34,41 @@ the rationale.
 
 ## Releases
 
+### v0.419.0 -- 2026-08-18 (c-RCP-16 items 3-5: real MC/DC (informational), freedom-from-interference, AUDIT_PACK reframe)
+
+Continuation pass on c-RCP-16 (issue #518); items 1-2 landed in
+v0.417.0/PR #528. This lands items 3-5, closing out the issue's full
+five-item suggested approach.
+
+Item 3 (real, non-branch-proxy MC/DC, informational): new `cfusa-mcdc`
+CI job builds a second, clang `-fcoverage-mcdc`-instrumented test
+suite, exports real per-condition MC/DC data via `llvm-cov export`,
+and reports it through `cfusa coverage --mcdc-file` as an
+informational (non-gating) metric. Found and worked around a real
+upstream schema mismatch in `cfusa` v0.5.54's `--mcdc-file` parser
+(expects an object-keyed shape that does not match genuine `llvm-cov
+export` output; filed as `SoundMatt/c-FuSa#129`) via
+`scripts/mcdc_translate.py`, a narrow, tested (`scripts/test_mcdc_translate.py`)
+format adapter -- verified end-to-end against this repo's actual test
+suite: 808 real MC/DC condition records, 53.96% covered.
+
+Item 4 (freedom-from-interference, `SEOOC_BOUNDARY.md` §4 + AoU-8):
+corrects the issue's own stale premise (a QM legacy Zone/Command
+surface, actually removed at v0.91.0) and documents the real current
+`.fusa-reqs.json` scope partition plus its concrete
+interference-relevant finding -- `alloc.c`'s process-wide,
+unsynchronized allocator-hook table, settable by unrestricted public
+API, that every one of 46 `src/*.c` files' allocations routes through.
+
+Item 5 (`AUDIT_PACK.md` §2 reframe): explicit integrator-facing SEOOC
+evidence-package framing added to §2's own intro, cross-referencing
+`SEOOC_BOUNDARY.md`; corrected several stale legacy-scope references
+across `AUDIT_PACK.md`/`SAFETY_PLAN.md`.
+
+Docs+CI-only; no source/requirement changes. Full 67-test suite
+unchanged; ASan/UBSan clean; `cfusa` (v0.5.54) `check`: 0 errors;
+`trace --req-coverage 100 --sec-tested 100`: 100%/100%.
+
 ### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID pass + FTTI cross-check test, closing HARA structural gaps)
 
 Closes out issue #524 (`c-RCP-22`)'s two remaining gaps; gaps 1-3 were

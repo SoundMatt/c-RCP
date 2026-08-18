@@ -19106,6 +19106,89 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.419.0 -- 2026-08-18 (c-RCP-16 items 3-5: real MC/DC (informational),
+freedom-from-interference, AUDIT_PACK reframe)
+
+Continuation pass on c-RCP-16 (issue #518); items 1-2 landed in PR
+#528/v0.417.0. This lands items 3-5, the remainder of the issue's
+suggested approach.
+
+**Item 3 -- real (non-branch-proxy) MC/DC evidence, informational.**
+New `cfusa-mcdc` CI job builds a second, separately
+clang `-fcoverage-mcdc`-instrumented copy of the test suite, exports
+real per-condition LLVM MC/DC data via `llvm-cov export`, and feeds it
+to `cfusa coverage --mcdc-file` as an informational (`|| true`) metric
+-- per the issue's own suggested sequencing, not yet a hard gate.
+Discovered along the way: `cfusa` v0.5.54's `--mcdc-file` parser scans
+for an object-keyed JSON shape
+(`{"covered_true_count":N,"covered_false_count":M}` per condition)
+that does not match real `llvm-cov export --format=text` output at
+all -- verified directly end-to-end (`clang -fcoverage-mcdc`,
+`llvm-profdata merge`, `llvm-cov export`): the real schema is a
+positional array whose 10th element is a plain boolean array (`grep -c
+covered_true_count` on genuine `llvm-cov` output is always 0). Filed
+upstream as `SoundMatt/c-FuSa#129`; fixing the parser itself is out of
+this repo's scope (explicitly excluded by c-RCP-16) and this repo
+can't unilaterally change a tool shared across the whole x-RCP
+ecosystem. `scripts/mcdc_translate.py` is a narrow, tested format
+adapter (`scripts/test_mcdc_translate.py`, 5 tests against real
+`llvm-cov export` fixtures, including two deliberately-malformed
+records that must hard-fail rather than silently mis-parse) that
+re-encodes each real per-condition "independence pair covered"
+boolean into cfusa's expected shape -- not fabricated coverage data,
+a format transcode of a real fact `llvm-cov` already computed.
+Verified end-to-end against this repo's actual 67-binary test suite
+before landing: 808 real MC/DC condition records, 53.96% covered,
+exactly reproducing `cfusa`'s own pass/fail arithmetic on both a
+synthetic 100%-covered and a synthetic 50%-covered two-condition
+fixture used as the translator's regression tests.
+
+**Item 4 -- freedom-from-interference argument.** New
+`SEOOC_BOUNDARY.md` §4 (plus AoU-8). First corrects the issue's own
+now-stale premise: it described a QM `scope: "legacy-compat"`
+Zone/Command surface "still linked into the same binary" -- verified
+against current HEAD that this surface was fully removed at v0.91.0
+(`src/rcp.c` is 65 lines of generic error-string/byte-buffer helpers
+today, `tests/legacy_mock.*` no longer exists, and `legacy-compat`
+does not appear as a `scope` value anywhere in `.fusa-reqs.json`
+anymore). Documents the real current partition instead (1095
+requirements: `tc18` 947 [859 ASIL-B/30 ASIL-A/58 QM], `tc18-gap` 136
+[10 ASIL-B/126 QM], `retired` 6, `internal` 6 QM) and its one concrete,
+verified interference-relevant finding: the QM/ASIL boundary is
+function-level, not file-level (`src/lifecycle.c` alone carries
+ASIL-A, ASIL-B, and QM `//cfusa:req` tags in the same translation
+unit), and `alloc.c`'s allocator-hook table (`REQ-ALLOC-001..006`,
+`scope: "internal"`, QM) is a single process-wide, unsynchronized
+global every one of 46 `src/*.c` files' allocations routes through --
+`rcp_alloc_set_hooks()` is unrestricted public API with no ASIL/scope
+gate, so a QM-rated call site anywhere in an integrator's own
+application can redirect allocation for the entire library, ASIL-B
+code paths included.
+
+**Item 5 -- reframe `AUDIT_PACK.md` §2.** Added an explicit
+integrator-facing SEOOC evidence-package framing to §2's intro itself
+(not just the §2a this section sits alongside, added in v0.417.0):
+the derogation table below it is evidence an integrator's own
+item-level ASIL-D HARA can draw on, not a claim c-RCP itself is
+ASIL-D-rated or -obligated, cross-referencing `SEOOC_BOUNDARY.md`.
+Also corrected several now-stale "854 requirements / 75
+scope: legacy-compat" references throughout `AUDIT_PACK.md` and
+`SAFETY_PLAN.md` that predated the same v0.91.0 removal item 4 found.
+
+Docs+CI-only change; no source file behavior touched, no requirement
+added or modified. Full 67-test suite unchanged; ASan/UBSan clean;
+freshly built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100%, byte-for-byte
+unchanged from baseline (`.fusa-reqs.json` untouched by this
+revision).
+
+Issue #518 (c-RCP-16) closed: all five items of its suggested approach
+are now landed (1-2 in v0.417.0, 3-5 here). Item 3's own ceiling is
+0% hard-gated (informational only, by the issue's own explicit
+sequencing) and its true structural ceiling is whatever the real
+53.96%-and-rising number reaches as coverage work continues
+elsewhere -- not a number this revision claims to have closed further.
+
 ### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID
 pass + FTTI cross-check test)
 
