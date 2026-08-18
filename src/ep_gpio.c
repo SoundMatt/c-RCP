@@ -208,7 +208,7 @@ bool rcp_ep_gpio_trigger_signal_number(uint8_t pin_index, rcp_ep_gpio_trigger_t 
     }
 }
 
-//cfusa:req REQ-GPIO-035
+//cfusa:req REQ-GPIO-044
 void rcp_ep_gpio_debounce_state_init(rcp_ep_gpio_debounce_state_t *s)
 {
     memset(s, 0, sizeof(*s));
@@ -410,6 +410,9 @@ const char *rcp_ep_gpio_reconfig_strerror(rcp_ep_gpio_reconfig_errc_t e)
 }
 
 //cfusa:req REQ-GPIO-013
+//cfusa:req REQ-GPIO-040
+//cfusa:req REQ-GPIO-041
+//cfusa:req REQ-GPIO-042
 //cfusa:req REQ-GPIO-038
 //cfusa:req REQ-GPIO-039
 rcp_ep_gpio_reconfig_errc_t
@@ -451,7 +454,7 @@ rcp_ep_gpio_apply_reconfig(rcp_ep_gpio_functional_cfg_t *cfg,
     return RCP_EP_GPIO_RECONFIG_OK;
 }
 
-//cfusa:req REQ-GPIO-038
+//cfusa:req REQ-GPIO-043
 rcp_bytes_t rcp_ep_gpio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                  uint16_t start_address,
                                                  const uint8_t *data, size_t data_len,
@@ -503,7 +506,7 @@ const char *rcp_ep_gpio_strerror(rcp_ep_gpio_errc_t e)
 }
 
 //cfusa:req REQ-GPIO-033
-//cfusa:req REQ-GPIO-012
+//cfusa:req REQ-GPIO-046
 rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e)
 {
     switch (e) {
@@ -585,7 +588,7 @@ rcp_bytes_t rcp_ep_gpio_encode_write_request(rcp_byte_bus_id_t byte_bus_id, uint
 
 //cfusa:req REQ-GPIO-028
 //cfusa:req REQ-GPIO-029
-//cfusa:req REQ-GPIO-012
+//cfusa:req REQ-GPIO-045
 rcp_ep_gpio_errc_t rcp_ep_gpio_decode_write_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      uint32_t *out_bitmask, uint8_t *out_evt,

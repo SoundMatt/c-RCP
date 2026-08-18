@@ -11,8 +11,6 @@
 //cfusa:test REQ-GPIO-009
 //cfusa:test REQ-GPIO-010
 //cfusa:test REQ-GPIO-011
-//cfusa:test REQ-GPIO-012
-//cfusa:test REQ-GPIO-013
 //cfusa:test REQ-GPIO-014
 //cfusa:test REQ-GPIO-015
 //cfusa:test REQ-GPIO-016
@@ -35,7 +33,6 @@
 //cfusa:test REQ-GPIO-035
 //cfusa:test REQ-GPIO-036
 //cfusa:test REQ-GPIO-037
-//cfusa:test REQ-GPIO-038
 //cfusa:test REQ-GPIO-039
 #include "unity.h"
 
@@ -161,6 +158,7 @@ static void test_apply_write_sub_saturates_at_lower_boundary(void)
     TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(1u, 0u, RCP_EP_GPIO_WRITE_SUB));
 }
 
+//cfusa:test REQ-GPIO-012
 static void test_apply_write_reserved4_is_noop(void)
 {
     TEST_ASSERT_EQUAL_UINT32(0x1234u,
@@ -173,6 +171,7 @@ static void test_apply_write_reserved4_is_noop(void)
  * wire-value enum casts a decoder would actually produce, not just the
  * named constants, so a future accidental re-shuffle of the enum values
  * themselves (not just their names) would still be caught. */
+//cfusa:test REQ-GPIO-012
 static void test_apply_write_wire_value_4_is_reserved_noop(void)
 {
     TEST_ASSERT_EQUAL_UINT32(0x1234u,
@@ -446,6 +445,7 @@ static void test_set_pin_trigger_applies_when_authorized(void)
 /* ── The EP_func register block (evt[2:0] == 111b) ────────────────────────────
  * ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013). */
 
+//cfusa:test REQ-GPIO-038
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -473,6 +473,7 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_HEX8(0x22u, block[0x28]);                          /* debounce_IO31 */
 }
 
+//cfusa:test REQ-GPIO-013
 static void test_apply_reconfig_writes_clk_divider(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -483,6 +484,7 @@ static void test_apply_reconfig_writes_clk_divider(void)
     TEST_ASSERT_EQUAL_HEX8(0x2Au, cfg.clk_divider);
 }
 
+//cfusa:test REQ-GPIO-013
 static void test_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -496,6 +498,7 @@ static void test_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_HEX8(0xBBu, cfg.debounce[1]);
 }
 
+//cfusa:test REQ-GPIO-042
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -519,6 +522,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     TEST_ASSERT_TRUE(cfg.common.ep_enable);
 }
 
+//cfusa:test REQ-GPIO-041
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -533,6 +537,7 @@ static void test_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_HEX8(0x99u, cfg.debounce[31]); /* whole write ignored */
 }
 
+//cfusa:test REQ-GPIO-040
 static void test_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -545,6 +550,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
                       rcp_ep_gpio_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-GPIO-043
 static void test_reconfig_request_round_trip(void)
 {
     const uint8_t data[2] = {0x11u, 0x22u};
@@ -831,6 +837,29 @@ static void test_response_decode_rejects_short_frame(void)
         rcp_ep_gpio_decode_response(too_short, sizeof(too_short), 2, &bitmask, &timed, &ts, &txn));
 }
 
+/* ── REQ-GPIO-044: debounce state init ─────────────────────────────────────── */
+
+/* Split 2026-08-18 (c-RCP-18-tracker, REQ-GPIO-* atomicity audit, issue
+ * #533) out of REQ-GPIO-035: every debounce test below already calls
+ * rcp_ep_gpio_debounce_state_init() first, but none of them independently
+ * asserted its own zero-init postcondition before any sample was fed in --
+ * this test does, checking the struct's own fields directly rather than
+ * inferring them from debounce_sample()'s first return value. */
+//cfusa:test REQ-GPIO-044
+static void test_debounce_state_init_zeroes(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+
+    memset(&s, 0xAA, sizeof(s));
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    TEST_ASSERT_FALSE(s.has_settled);
+    TEST_ASSERT_FALSE(s.settled_value);
+    TEST_ASSERT_FALSE(s.has_candidate);
+    TEST_ASSERT_FALSE(s.candidate_value);
+    TEST_ASSERT_EQUAL_UINT8(0u, s.consecutive_count);
+}
+
 /* ── REQ-GPIO-035: debounce filtering ─────────────────────────────────────── */
 
 static void test_debounce_zero_means_no_debounce(void)
@@ -1028,6 +1057,7 @@ int main(void)
     RUN_TEST(test_response_decode_rejects_bad_payload_len);
     RUN_TEST(test_response_decode_rejects_short_frame);
 
+    RUN_TEST(test_debounce_state_init_zeroes);
     RUN_TEST(test_debounce_zero_means_no_debounce);
     RUN_TEST(test_debounce_settles_after_n_consecutive_samples);
     RUN_TEST(test_debounce_differing_sample_resets_the_run);
