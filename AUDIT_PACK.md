@@ -122,6 +122,40 @@ MC/DC (Modified Condition/Decision Coverage) is not separately
 instrumented — DO-178C DAL-B applicability (§4) notes this as an open
 item, not resolved by branch coverage alone.
 
+**Platform-conditional carve-out (issue #520 category 3).** `ci.yml`'s
+`coverage` job runs on `ubuntu-22.04` only. Three first-party files
+carry a `#if defined(_WIN32)` block that is real code compiled and
+exercised by the hard-gated `windows-2022 / msvc` `build-and-test`
+matrix leg on every PR, but it is structurally unreachable by the
+Linux runner that produces `coverage.info`, no matter how much
+test-writing effort targets it:
+
+- `src/platform.c`'s Win32 mutex/condvar/thread wrappers
+  (`InitializeCriticalSection`/`CreateThread`/`SleepConditionVariableCS`
+  and siblings) -- a full, working implementation, not a stub
+- `src/clock.c`'s Win32 monotonic/wall-clock read path
+  (`QueryPerformanceCounter`/`GetSystemTimeAsFileTime`) -- likewise a
+  full working implementation
+- `src/udp.c`'s `#else /* !RCP_UDP_POSIX */` branch -- by contrast, a
+  deliberate fail-closed *stub* ("no winsock implementation yet", per
+  its own comment; `ROADMAP.md` tracks the real implementation as
+  future work), every entry point returning `RCP_ERR_CLOSED`/`RCP_OK`
+  without touching a socket. Structurally unreachable from the Linux
+  `coverage` job for the same reason as the other two, but note the
+  underlying gap here is a missing feature, not missing tests.
+
+This is a permanent, reasoned carve-out, not a backlog item: the fix
+would be running `coverage` on `windows-2022` too and merging both
+runners' `coverage.info` files, a CI-topology change out of scope for
+a documentation note, not a test-writing gap in these three files
+themselves. `src/l2.c`'s `__linux__`-conditional `AF_PACKET` path is
+the mirror image — it *is* exercised for real, by the separate
+`l2-transport-veth` job's actual root-privileged veth round trip
+(`CAP_NET_RAW`, outside `coverage`'s own unprivileged `ctest`
+invocation) — so its number inside `coverage.info` under-reports real
+exercise rather than reflecting a genuine gap, and is not comparable
+to the three `_WIN32` files above on that basis.
+
 ---
 
 ## 4. DO-178C (DAL-B) Applicability

@@ -10,12 +10,17 @@
 //cfusa:test REQ-SHMEM-009
 #include "unity.h"
 
+#include <stdlib.h>
+
+#include <rcp/alloc.h>
 #include <rcp/avtp.h>
 #include <rcp/rcp.h>
 #include <rcp/shmem.h>
 
+#include "platform.h" /* rcp_thread_start()/rcp_sleep_ms() -- see below */
+
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a fault-injection hook across tests */
 
 //cfusa:test REQ-SHMEM-001
 static void test_pair_new_returns_two_usable_sides(void)
@@ -234,6 +239,126 @@ static void test_pair_state_freed_after_releasing_both_sides(void)
     rcp_avtp_transport_release(b);
 }
 
+/* ── Allocation-failure paths (issue #520 category 2) ───────────────────────
+ *
+ * rcp_shmem_avtp_pair_new()'s three cleanup-on-partial-failure blocks were
+ * entirely unexercised. It makes 5 rcp_calloc() calls in a fixed order --
+ * core, a_to_b_items, b_to_a_items, side a, side b -- so a call-counting
+ * fault-injection hook (alloc.h's own harness) can fail exactly the Nth
+ * one and leave the rest to the real allocator, hitting each of the three
+ * distinct cleanup paths individually. */
+
+static int g_calloc_call_count;
+static int g_calloc_fail_at_call; /* 1-indexed; 0 means never fail */
+
+static void *counting_calloc(size_t nmemb, size_t size)
+{
+    g_calloc_call_count++;
+    if (g_calloc_call_count == g_calloc_fail_at_call) return NULL;
+    return calloc(nmemb, size);
+}
+
+static void reset_counting_calloc(int fail_at_call)
+{
+    rcp_alloc_hooks_t hooks = {0};
+    g_calloc_call_count   = 0;
+    g_calloc_fail_at_call = fail_at_call;
+    hooks.calloc_fn = counting_calloc;
+    rcp_alloc_set_hooks(&hooks);
+}
+
+static void test_pair_new_returns_alloc_error_when_core_allocation_fails(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+
+    reset_counting_calloc(1); /* the core struct itself, first call */
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_ERR_ALLOC, rcp_shmem_avtp_pair_new(true, 2, &a, &b));
+    TEST_ASSERT_NULL(a);
+    TEST_ASSERT_NULL(b);
+}
+
+static void test_pair_new_frees_partial_state_when_queue_allocation_fails(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+
+    reset_counting_calloc(2); /* a_to_b_items, after core succeeds */
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_ERR_ALLOC, rcp_shmem_avtp_pair_new(true, 2, &a, &b));
+    TEST_ASSERT_NULL(a);
+    TEST_ASSERT_NULL(b);
+}
+
+static void test_pair_new_frees_partial_state_when_side_allocation_fails(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+
+    reset_counting_calloc(4); /* side a, after core + both queues succeed */
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_ERR_ALLOC, rcp_shmem_avtp_pair_new(true, 2, &a, &b));
+    TEST_ASSERT_NULL(a);
+    TEST_ASSERT_NULL(b);
+}
+
+/* ── The genuine blocking wait (issue #520 category 2) ───────────────────────
+ *
+ * shmem_side_recv()'s rcp_cond_wait() call (the no-deadline branch,
+ * distinct from rcp_cond_timedwait_until()) only runs when recv() is
+ * called on an empty queue with a background (no-deadline) context -- no
+ * existing test in this file calls recv() before send() has already
+ * queued something, so it was never actually exercised. A second thread
+ * blocks in exactly that call while the main thread, after a short delay
+ * to let it get there, sends the frame that wakes it. */
+
+static rcp_avtp_transport_t *g_blocking_recv_side;
+static int                    g_blocking_recv_ec = -1;
+static uint8_t                 g_blocking_recv_buf[16];
+static size_t                   g_blocking_recv_len;
+
+static void blocking_recv_thread(void *arg)
+{
+    rcp_context_t ctx = rcp_context_background();
+    (void)arg;
+    g_blocking_recv_ec = rcp_avtp_transport_recv(g_blocking_recv_side, &ctx, g_blocking_recv_buf,
+                                                  sizeof(g_blocking_recv_buf),
+                                                  &g_blocking_recv_len);
+}
+
+static void test_recv_wakes_from_blocking_wait_when_peer_sends(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+    rcp_thread_t           t;
+    uint8_t                 frame[] = {0xAA, 0xBB};
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(true, 4, &a, &b));
+
+    g_blocking_recv_side = b;
+    g_blocking_recv_ec   = -1;
+    TEST_ASSERT_EQUAL(0, rcp_thread_start(&t, blocking_recv_thread, NULL));
+
+    /* No portable "the other thread is now inside rcp_cond_wait" signal
+     * exists (that's the whole point of the primitive) -- a short sleep
+     * here is a deliberate, common tradeoff, not a race that can produce
+     * a false failure: if the thread hasn't reached the wait yet, this
+     * send() just makes its non-blocking fast-path check succeed instead,
+     * and the assertions below still hold either way. */
+    rcp_sleep_ms(50);
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(a, frame, sizeof(frame)));
+
+    rcp_thread_join(t);
+    TEST_ASSERT_EQUAL(RCP_OK, g_blocking_recv_ec);
+    TEST_ASSERT_EQUAL_UINT(sizeof(frame), g_blocking_recv_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame, g_blocking_recv_buf, sizeof(frame));
+
+    rcp_avtp_transport_release(a);
+    rcp_avtp_transport_release(b);
+}
+
 //cfusa:test REQ-SHMEM-001
 static void test_pair_shares_time_sync_supported(void)
 {
@@ -262,6 +387,10 @@ int main(void)
     RUN_TEST(test_releasing_one_side_leaves_other_usable_until_closed);
     RUN_TEST(test_pair_state_freed_after_releasing_both_sides);
     RUN_TEST(test_pair_shares_time_sync_supported);
+    RUN_TEST(test_pair_new_returns_alloc_error_when_core_allocation_fails);
+    RUN_TEST(test_pair_new_frees_partial_state_when_queue_allocation_fails);
+    RUN_TEST(test_pair_new_frees_partial_state_when_side_allocation_fails);
+    RUN_TEST(test_recv_wakes_from_blocking_wait_when_peer_sends);
 
     return UNITY_END();
 }
