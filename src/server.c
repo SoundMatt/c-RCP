@@ -146,6 +146,7 @@ void rcp_server_endpoint_set_admission_suspended(rcp_server_endpoint_t *ep, bool
 }
 
 //cfusa:req REQ-SRV-003
+//cfusa:req REQ-SRV-023
 bool rcp_server_endpoint_drain_one(rcp_server_endpoint_t *ep, rcp_bytes_t *out_frame)
 {
     size_t i;
@@ -296,7 +297,23 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                                out_error, NULL);
 }
 
+//cfusa:req REQ-SRV-004
 //cfusa:req REQ-SRV-016
+//cfusa:req REQ-SRV-019
+//cfusa:req REQ-SRV-024
+//cfusa:req REQ-SRV-025
+//cfusa:req REQ-SRV-026
+//cfusa:req REQ-SRV-042
+/* REQ-SRV-004/019/024/025/026/042 (c-RCP-18 requirement-atomicity audit,
+ * issue #533): moved/duplicated here from the stack currently sitting above
+ * admit_under_tscf_gate() (this file, above) -- that stack's own tags
+ * remain in place (not this batch's ids to touch), but the classify/route/
+ * decode-and-store/out_request_type/compound-wait-evt logic those specific
+ * ids describe is actually implemented in THIS function, not in
+ * admit_under_tscf_gate() (a shared TSCF-postponement helper this function
+ * calls for two of its own branches). Per CONTRIBUTING.md's "Writing a
+ * requirement" tag-placement rule, each tag now also sits directly above
+ * the function that actually implements the one behaviour it names. */
 rcp_server_admit_t rcp_server_endpoint_admit_with_ack(rcp_server_endpoint_t *ep,
                                                        const uint8_t *frame, size_t frame_len,
                                                        uint32_t now, bool tv,
@@ -576,6 +593,7 @@ static bool start_condition_holds(const rcp_server_pending_t *slot,
 
 /* Arms slot's exec_delay timer at ctx->now if its own start condition has
  * just begun to hold. Returns whether slot is armed afterwards. */
+//cfusa:req REQ-SRV-038
 static bool arm_if_startable(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
 {
     if (slot->armed) return true;
@@ -758,6 +776,12 @@ static bool is_due(rcp_server_pending_t *slot, const rcp_server_endpoint_t *ep,
 //cfusa:req REQ-SRV-020
 //cfusa:req REQ-SRV-015
 //cfusa:req REQ-SRV-016
+//cfusa:req REQ-SRV-027
+//cfusa:req REQ-SRV-028
+//cfusa:req REQ-SRV-029
+//cfusa:req REQ-SRV-030
+//cfusa:req REQ-SRV-031
+//cfusa:req REQ-SRV-032
 bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
                                      const rcp_server_tick_ctx_t *ctx, size_t *out_index)
 {
@@ -790,6 +814,11 @@ bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
 //cfusa:req REQ-SRV-009
 //cfusa:req REQ-SRV-010
 //cfusa:req REQ-SRV-020
+//cfusa:req REQ-SRV-033
+//cfusa:req REQ-SRV-034
+//cfusa:req REQ-SRV-035
+//cfusa:req REQ-SRV-036
+//cfusa:req REQ-SRV-037
 bool rcp_server_endpoint_complete(rcp_server_endpoint_t *ep, size_t index,
                                    const rcp_server_tick_ctx_t *ctx)
 {
@@ -908,6 +937,7 @@ bool rcp_server_gptp_trigger_evaluate(rcp_server_gptp_trigger_state_t *s, bool l
 }
 
 //cfusa:req REQ-SRV-012
+//cfusa:req REQ-SRV-039
 bool rcp_server_endpoint_chain_predecessor_done(rcp_server_endpoint_t *ep, size_t index,
                                                  uint32_t now)
 {
@@ -944,7 +974,7 @@ size_t rcp_server_endpoint_cancel_all(rcp_server_endpoint_t *ep)
     return removed;
 }
 
-//cfusa:req REQ-SRV-013
+//cfusa:req REQ-SRV-040
 rcp_cancel_result_t rcp_server_endpoint_cancel_single(rcp_server_endpoint_t *ep,
                                                        uint8_t clear_transaction_num,
                                                        rcp_cancel_lifecycle_t state)
@@ -982,7 +1012,7 @@ static size_t purge_non_safety(rcp_server_endpoint_t *ep)
     return removed;
 }
 
-//cfusa:req REQ-SRV-013
+//cfusa:req REQ-SRV-041
 size_t rcp_server_endpoint_cancel_non_safestate(rcp_server_endpoint_t *ep)
 {
     return purge_non_safety(ep);

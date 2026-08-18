@@ -21,6 +21,25 @@
 //cfusa:test REQ-SRV-020
 //cfusa:test REQ-SRV-021
 //cfusa:test REQ-SRV-022
+//cfusa:test REQ-SRV-024
+//cfusa:test REQ-SRV-025
+//cfusa:test REQ-SRV-026
+//cfusa:test REQ-SRV-027
+//cfusa:test REQ-SRV-028
+//cfusa:test REQ-SRV-029
+//cfusa:test REQ-SRV-030
+//cfusa:test REQ-SRV-031
+//cfusa:test REQ-SRV-032
+//cfusa:test REQ-SRV-033
+//cfusa:test REQ-SRV-034
+//cfusa:test REQ-SRV-035
+//cfusa:test REQ-SRV-036
+//cfusa:test REQ-SRV-037
+//cfusa:test REQ-SRV-038
+//cfusa:test REQ-SRV-039
+//cfusa:test REQ-SRV-040
+//cfusa:test REQ-SRV-041
+//cfusa:test REQ-SRV-042
 //cfusa:test REQ-ACF-024
 //cfusa:test REQ-ACF-031
 //cfusa:test REQ-ACF-033
@@ -230,6 +249,7 @@ static bool tick(rcp_mock_server_t *srv, const rcp_server_tick_ctx_t *ctx)
 
 /* The whole routing change must be invisible to a plain, non-repurposed
  * request: it still executes immediately, exactly as before. */
+//cfusa:test REQ-SRV-004
 static void test_standard_request_still_executes_immediately(void)
 {
     handler_log_t log;
@@ -268,7 +288,61 @@ static rcp_bytes_t make_compound(uint8_t request_type, uint8_t seq, uint8_t star
     return rcp_compound_encode_request(request_type, 1, &step, 0u, txn, NULL, 0);
 }
 
+/* REQ-SRV-024 (cancellation opcode -> RCP_SERVER_ADMIT_CANCELLATION,
+ * never stored), REQ-SRV-025 (every other conditional kind -> decoded and
+ * stored, RCP_SERVER_ADMIT_PENDING), and REQ-SRV-026 (*out_request_type
+ * always written) were split from REQ-SRV-004 by the c-RCP-18
+ * requirement-atomicity audit (issue #533). This test calls
+ * rcp_server_endpoint_admit() directly -- bypassing the mock server layer,
+ * whose own RCP_MOCK_DISPATCH_* codes are one level removed from the
+ * RCP_SERVER_ADMIT_* enum and *out_request_type these three ids actually
+ * describe -- so each clause's own return value and out_request_type are
+ * checked directly, not inferred through a translated result code. */
+//cfusa:test REQ-SRV-024
+//cfusa:test REQ-SRV-025
+//cfusa:test REQ-SRV-026
+static void test_admit_reports_cancellation_and_conditional_with_request_type(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           clear;
+    rcp_bytes_t           compound;
+    uint8_t               request_type;
+    size_t                idx = 0;
+
+    rcp_server_endpoint_init(&ep, true);
+
+    /* A cancellation opcode: reported as RCP_SERVER_ADMIT_CANCELLATION,
+     * carrying its own opcode byte in *out_request_type, and never
+     * reaching the conditional-request store (REQ-SRV-024/026). */
+    clear         = rcp_cancel_encode_clear_all(1, 83);
+    request_type  = 0xFFu;
+    TEST_ASSERT_NOT_NULL(clear.data);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_CANCELLATION,
+                       rcp_server_endpoint_admit(&ep, clear.data, clear.len, 0u, false, 0u, 0u,
+                                                 &request_type, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_CLEAR_ALL, request_type);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_server_endpoint_pending_count(&ep));
+    rcp_bytes_free(&clear);
+
+    /* Every other conditional kind (Compound, here): decoded and stored,
+     * RCP_SERVER_ADMIT_PENDING, *out_request_type carrying its own opcode
+     * byte (REQ-SRV-025/026). */
+    compound      = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0, RCP_SEQUENCER_POWER_ON_STATE,
+                                   0, 0, 0, 84);
+    request_type  = 0xFFu;
+    TEST_ASSERT_NOT_NULL(compound.data);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, compound.data, compound.len, 0u, false, 0u,
+                                                 0u, &request_type, &idx, NULL));
+    TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND, request_type);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_server_endpoint_pending_count(&ep));
+    rcp_bytes_free(&compound);
+
+    rcp_server_endpoint_destroy(&ep);
+}
+
 //cfusa:test REQ-MOCK-027
+//cfusa:test REQ-SRV-009
 //cfusa:test REQ-SRV-021
 static void test_compound_waits_for_its_sequencer_state(void)
 {
@@ -404,10 +478,52 @@ static void test_compound_wait_requires_the_wait_condition(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-SRV-027 (split from REQ-SRV-006 by the c-RCP-18 requirement-
+ * atomicity audit, issue #533): unlike the plain Compound kind
+ * (test_compound_never_fires_while_endpoint_busy(), REQ-SRV-006), a
+ * Compound Wait request's own TC18 Table 29 row carries no endpoint-idle
+ * gate at all -- it fires as soon as its wait condition matches, whatever
+ * ctx.endpoint_idle is. A regression that (re-)introduced an idle gate
+ * for this kind -- exactly the historical bug REQ-SRV-006's own text
+ * documents happening to the Compound kind (issue #256 Group H) -- would
+ * fail only this test, not test_compound_wait_requires_the_wait_condition
+ * above (which never varies ctx.endpoint_idle from its base_ctx() default
+ * of true). */
+//cfusa:test REQ-SRV-027
+static void test_compound_wait_fires_while_endpoint_busy(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+    const uint8_t target[2]           = {0x01, 0x02};
+    const uint8_t matching_status[2]  = {0x01, 0x02};
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state   = 7;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x0u, 14,
+                                         target, sizeof(target));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    ctx.endpoint_idle       = false; /* the endpoint is busy the whole time */
+    ctx.current_status      = matching_status;
+    ctx.current_status_len  = sizeof(matching_status);
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_COMPOUND_WAIT, log.opcode[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* Two pending COMPOUND_WAIT requests on the same endpoint, each with its
  * own independent byte_msg_payload target, must be evaluated
  * independently against the shared current status -- a single flat
  * "the" wait condition cannot represent this. */
+//cfusa:test REQ-SRV-033
+//cfusa:test REQ-SRV-042
 static void test_two_pending_compound_waits_have_independent_targets(void)
 {
     handler_log_t log;
@@ -598,6 +714,7 @@ static void test_compound_admission_permitted_when_no_sequencer_table_configured
  * "request shall be ignored and an err-response with error code =
  * UNSUPPORTED_CMD shall be sent". Admission must reject it outright
  * rather than storing it as a request that can simply never match. */
+//cfusa:test REQ-SRV-019
 static void test_compound_wait_reserved_evt_is_rejected_at_admission(void)
 {
     handler_log_t log;
@@ -997,6 +1114,7 @@ static void test_triggered_threshold_delays_execution(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-SRV-028
 static void test_triggered_never_fires_while_endpoint_busy(void)
 {
     handler_log_t log;
@@ -1015,6 +1133,40 @@ static void test_triggered_never_fires_while_endpoint_busy(void)
     ctx.endpoint_idle = true;
     TEST_ASSERT_TRUE(tick(srv, &ctx));
     TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-034 (split from REQ-SRV-009, c-RCP-18 requirement-atomicity
+ * audit, issue #533): rcp_server_endpoint_complete() must not advance any
+ * sequencer state for a Triggered request (nor Timed/Chained, which share
+ * the same completion default) -- a regression that wrongly treated one
+ * of these like Compound/Compound-Wait would silently mutate a
+ * sequencer's state it has no business touching. */
+//cfusa:test REQ-SRV-034
+static void test_triggered_completion_does_not_touch_any_sequencer_state(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t frame = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 0, 0, 0, 0, 181);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+    uint8_t before = 0, after = 0;
+
+    /* Sequencer 2 starts at a known, non-default state; nothing about
+     * this Triggered request references it. */
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(rcp_mock_server_sequencers(srv), 2, 7));
+    TEST_ASSERT_TRUE(rcp_sequencer_get_state(rcp_mock_server_sequencers(srv), 2, &before));
+    TEST_ASSERT_EQUAL_UINT8(7, before);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_notify_trigger(srv, 0, 0));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    TEST_ASSERT_TRUE(rcp_sequencer_get_state(rcp_mock_server_sequencers(srv), 2, &after));
+    TEST_ASSERT_EQUAL_UINT8(7, after); /* untouched by rcp_server_endpoint_complete() */
 
     rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
@@ -1135,6 +1287,8 @@ static void test_gptp_lock_state_respects_source_ep(void)
 
 /* ── Timed: presentation-time gated execution ─────────────────────────────── */
 
+//cfusa:test REQ-SRV-029
+//cfusa:test REQ-SRV-037
 static void test_timed_waits_for_its_presentation_time(void)
 {
     handler_log_t log;
@@ -1164,6 +1318,7 @@ static void test_timed_waits_for_its_presentation_time(void)
 
 /* Without a locked gPTP time base a presentation_time cannot be evaluated
  * at all, so a timed request never becomes due. */
+//cfusa:test REQ-SRV-029
 static void test_timed_never_due_without_gptp_lock(void)
 {
     handler_log_t log;
@@ -1259,6 +1414,7 @@ static void test_compound_admission_unaffected_by_time_sync_not_supported(void)
 
 /* ── Safety-tagged (0x8x) requests are gated on the safe state ────────────── */
 
+//cfusa:test REQ-SRV-007
 static void test_safety_tagged_request_waits_for_safe_state(void)
 {
     handler_log_t log;
@@ -1286,6 +1442,75 @@ static void test_safety_tagged_request_waits_for_safe_state(void)
 
     rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-032 (split from REQ-SRV-007, c-RCP-18 requirement-atomicity
+ * audit, issue #533): a NON-safety-tagged request's due-ness must be
+ * unaffected by ctx.in_safe_state -- unlike the safety-tagged case just
+ * above, it fires the same whether in_safe_state is false or true. A
+ * regression that wrongly extended the safe-state gate to every request
+ * (not just safety-tagged ones) would fail this test's first phase (a
+ * plain compound request refusing to fire while in_safe_state is false)
+ * without necessarily failing test_safety_tagged_request_waits_for_
+ * safe_state() above, which never exercises the non-safety-tagged case at
+ * all. */
+//cfusa:test REQ-SRV-032
+static void test_non_safety_request_unaffected_by_in_safe_state(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t first  = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                        RCP_SEQUENCER_POWER_ON_STATE, 4, 0, 0, 45);
+    rcp_bytes_t second = make_compound(RCP_REQUEST_TYPE_COMPOUND, 1,
+                                        RCP_SEQUENCER_POWER_ON_STATE, 4, 0, 0, 46);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(first.data);
+    TEST_ASSERT_NOT_NULL(second.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &first));
+
+    /* Not safety-tagged: fires even though in_safe_state is false. */
+    ctx.in_safe_state = false;
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_COMPOUND, log.opcode[0]);
+
+    /* And equally fires when in_safe_state is true -- genuinely
+     * unaffected either way, not merely "also permitted when false". */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &second));
+    ctx.in_safe_state = true;
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(2, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_COMPOUND, log.opcode[1]);
+
+    rcp_bytes_free(&first);
+    rcp_bytes_free(&second);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-031 (split from REQ-SRV-006, c-RCP-18 requirement-atomicity
+ * audit, issue #533): rcp_server_endpoint_select_due() reports no request
+ * as due, and leaves *out_index untouched, when nothing in the store
+ * qualifies -- including the trivial case of an empty store, never
+ * covered by any of the "not yet due" tests above (each of which has a
+ * real pending request whose OWN condition just hasn't been met yet, not
+ * an empty store with nothing to evaluate at all). */
+//cfusa:test REQ-SRV-031
+static void test_select_due_reports_nothing_due_with_an_empty_store(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_server_tick_ctx_t ctx;
+    size_t out_index = 12345u;
+
+    rcp_server_endpoint_init(&ep, true);
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+    ctx.gptp_locked   = true;
+
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &out_index));
+    TEST_ASSERT_EQUAL_size_t(12345u, out_index); /* left untouched */
+
+    rcp_server_endpoint_destroy(&ep);
 }
 
 /* ── Priority ordering across kinds ───────────────────────────────────────── */
@@ -1360,6 +1585,8 @@ static void test_equal_rank_requests_execute_in_arrival_order(void)
 
 /* ── Repetitions ──────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-SRV-010
+//cfusa:test REQ-SRV-036
 static void test_repeat_count_controls_how_often_a_request_runs(void)
 {
     handler_log_t log;
@@ -1388,6 +1615,7 @@ static void test_repeat_count_controls_how_often_a_request_runs(void)
 
 /* The all-ones sentinel is never decremented, so the request survives
  * every execution. */
+//cfusa:test REQ-SRV-035
 static void test_infinite_repeat_count_is_never_exhausted(void)
 {
     handler_log_t log;
@@ -1413,6 +1641,7 @@ static void test_infinite_repeat_count_is_never_exhausted(void)
 
 /* ── Cancellation ─────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-SRV-013
 static void test_clear_all_empties_the_request_store(void)
 {
     handler_log_t log;
@@ -1437,6 +1666,7 @@ static void test_clear_all_empties_the_request_store(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-SRV-040
 static void test_clear_single_removes_only_its_target(void)
 {
     handler_log_t log;
@@ -1503,6 +1733,7 @@ static void test_clear_single_not_found_sends_request_not_found_error(void)
 
 /* clear-non-safestate (0x06) removes the ordinary requests and leaves the
  * safety sequence intact. */
+//cfusa:test REQ-SRV-041
 static void test_clear_non_safestate_keeps_safety_tagged_requests(void)
 {
     handler_log_t log;
@@ -2000,7 +2231,13 @@ static void test_chained_first_in_frame_sends_per_member_error_responses(void)
 }
 
 /* A chained member following a real predecessor is stored, and executes
- * once its chain_exec_delay elapses. */
+ * once its chain_exec_delay elapses. REQ-SRV-037 (c-RCP-18
+ * requirement-atomicity audit, issue #533, split from REQ-SRV-010): a
+ * chained request carries no repetition sub-field and is always removed
+ * once it executes -- the final pending_count assertion below is that
+ * split's own dedicated evidence (a bug that left it in the store after
+ * firing would fail only that assertion). */
+//cfusa:test REQ-SRV-037
 static void test_chained_member_after_predecessor_executes(void)
 {
     handler_log_t log;
@@ -2041,10 +2278,204 @@ static void test_chained_member_after_predecessor_executes(void)
 
     TEST_ASSERT_EQUAL_size_t(2, log.count);
     TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_CHAINED, log.opcode[1]);
+    /* REQ-SRV-037: no repetition sub-field -- always removed on
+     * completion, unlike Compound/Compound-Wait/Triggered's own
+     * repeat_count-gated removal. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
 
     rcp_bytes_free(&lead);
     rcp_bytes_free(&member);
     rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-030 (split from REQ-SRV-006, c-RCP-18 requirement-atomicity
+ * audit, issue #533): a Chained request's own TC18 Table 29 row carries
+ * the same endpoint-idle gate as Triggered -- unlike Compound Wait
+ * (REQ-SRV-027), which has none. Mirrors test_compound_never_fires_
+ * while_endpoint_busy()/test_triggered_never_fires_while_endpoint_busy()
+ * exactly, just for the Chained kind, which (before this audit) had no
+ * dedicated test proving the gate applies to it at all. */
+//cfusa:test REQ-SRV-030
+static void test_chained_never_fires_while_endpoint_busy(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_acf_byte_message_info_t info = {0};
+    rcp_bytes_t lead;
+    rcp_bytes_t member;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
+    rcp_mock_frame_member_result_t results[4];
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+    size_t n;
+
+    info.byte_bus_id     = 1;
+    info.transaction_num = 141;
+    lead = rcp_acf_encode_abb(&info, NULL, 0);
+    TEST_ASSERT_NOT_NULL(lead.data);
+
+    /* chain_exec_delay == 0: the delay is already elapsed the instant its
+     * predecessor finalizes -- only ctx.endpoint_idle stands in the way. */
+    member = rcp_chained_encode_member(1, 0, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 142, NULL, 0);
+    TEST_ASSERT_NOT_NULL(member.data);
+    frame_len = concat2(frame, sizeof(frame), &lead, &member);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
+    TEST_ASSERT_EQUAL_size_t(1, log.count); /* the lead only, so far */
+
+    ctx.endpoint_idle = false;
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    ctx.endpoint_idle = true;
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(2, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_CHAINED, log.opcode[1]);
+
+    rcp_bytes_free(&lead);
+    rcp_bytes_free(&member);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-038 (split from REQ-SRV-012, c-RCP-18 requirement-atomicity
+ * audit, issue #533): once rcp_server_endpoint_chain_predecessor_done()
+ * has recorded the instant a chained request's chain_exec_delay is
+ * measured from, a later evaluation (arm_if_startable(), called on every
+ * tick) must not restart that timer. Ticking once before the delay would
+ * naturally elapse both (a) proves the request isn't due yet, and (b)
+ * gives arm_if_startable() a chance to wrongly re-stamp armed_at at that
+ * intermediate tick's own `now` -- a mutation removing arm_if_startable()'s
+ * CHAINED-kind exclusion would make the request due only at
+ * (this intermediate now + chain_exec_delay), not the boundary this test
+ * checks at exactly chain_exec_delay after predecessor finalization. */
+//cfusa:test REQ-SRV-038
+static void test_chained_delay_not_restarted_by_an_earlier_evaluation(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_acf_byte_message_info_t info = {0};
+    rcp_bytes_t lead;
+    rcp_bytes_t member;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
+    rcp_mock_frame_member_result_t results[4];
+    rcp_server_tick_ctx_t ctx;
+    size_t n;
+
+    info.byte_bus_id     = 1;
+    info.transaction_num = 151;
+    lead = rcp_acf_encode_abb(&info, NULL, 0);
+    TEST_ASSERT_NOT_NULL(lead.data);
+
+    /* chain_exec_delay == 10, predecessor finalizes at admission (mock.c's
+     * own rcp_server_endpoint_chain_predecessor_done() call uses now=0). */
+    member = rcp_chained_encode_member(1, 10, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 152, NULL, 0);
+    TEST_ASSERT_NOT_NULL(member.data);
+    frame_len = concat2(frame, sizeof(frame), &lead, &member);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
+
+    /* An intermediate tick, well before the delay elapses from instant 0,
+     * which is also the FIRST tick to call arm_if_startable() on this
+     * slot -- exactly where a "restart the timer" regression would strike. */
+    ctx = base_ctx(5);
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count); /* the lead only */
+
+    /* Due at exactly now=10 (0 + chain_exec_delay) only if armed_at is
+     * still 0, i.e. the intermediate tick above did not restart it. */
+    ctx = base_ctx(10);
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(2, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_CHAINED, log.opcode[1]);
+
+    rcp_bytes_free(&lead);
+    rcp_bytes_free(&member);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-SRV-012 (starts a chained request's delay timer at the
+ * predecessor's finalization) and REQ-SRV-039 (returns false, changing
+ * nothing, for a non-chained-request index): rcp_server_endpoint_chain_
+ * predecessor_done() itself had ZERO direct unit test before the c-RCP-18
+ * requirement-atomicity audit (issue #533) -- every existing chained-
+ * request test only exercised it indirectly through src/mock.c's own
+ * end-to-end dispatch (rcp_mock_server_dispatch_frame()). These two call
+ * it directly against a raw rcp_server_endpoint_t. */
+//cfusa:test REQ-SRV-012
+static void test_chain_predecessor_done_marks_finalized_and_starts_timer(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t            member = rcp_chained_encode_member(
+        1, 10 /* chain_exec_delay */, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 161, NULL, 0);
+    size_t                 idx = 0;
+    uint8_t                request_type = 0xFFu;
+    rcp_server_tick_ctx_t  ctx;
+    size_t                 due_idx;
+
+    TEST_ASSERT_NOT_NULL(member.data);
+    rcp_server_endpoint_init(&ep, true);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, member.data, member.len, 0u, false, 0u, 0u,
+                                                 &request_type, &idx, NULL));
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+    ctx.gptp_locked   = true;
+
+    /* Before the predecessor finalizes, the request has no start
+     * condition at all -- never due, however far time moves. */
+    ctx.now = 1000;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &due_idx));
+
+    TEST_ASSERT_TRUE(rcp_server_endpoint_chain_predecessor_done(&ep, idx, 1000u));
+
+    /* Its own chain_exec_delay (10) is now measured from now=1000: not
+     * yet due at 1005, due at 1010. */
+    ctx.now = 1005;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &due_idx));
+    ctx.now = 1010;
+    TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &due_idx));
+    TEST_ASSERT_EQUAL_size_t(idx, due_idx);
+
+    rcp_bytes_free(&member);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+//cfusa:test REQ-SRV-039
+static void test_chain_predecessor_done_returns_false_for_non_chained_index(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           compound = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                                     RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 171);
+    size_t                idx = 0;
+    uint8_t               request_type = 0xFFu;
+
+    rcp_server_endpoint_init(&ep, true);
+
+    /* Out of range. */
+    TEST_ASSERT_FALSE(rcp_server_endpoint_chain_predecessor_done(&ep, RCP_SERVER_MAX_PENDING, 5u));
+    /* In range, but not in use (nothing admitted yet). */
+    TEST_ASSERT_FALSE(rcp_server_endpoint_chain_predecessor_done(&ep, 0, 5u));
+
+    /* In use, but a different kind (Compound, not Chained). */
+    TEST_ASSERT_NOT_NULL(compound.data);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, compound.data, compound.len, 0u, false, 0u,
+                                                 0u, &request_type, &idx, NULL));
+    TEST_ASSERT_FALSE(rcp_server_endpoint_chain_predecessor_done(&ep, idx, 5u));
+    /* Unaffected: still present, not silently corrupted into looking
+     * chained. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_server_endpoint_pending_count(&ep));
+
+    rcp_bytes_free(&compound);
+    rcp_server_endpoint_destroy(&ep);
 }
 
 /* ── ep_enable gates conditional-request execution (REQ-SRV-015/016
@@ -2416,11 +2847,13 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_standard_request_still_executes_immediately);
+    RUN_TEST(test_admit_reports_cancellation_and_conditional_with_request_type);
 
     RUN_TEST(test_compound_waits_for_its_sequencer_state);
     RUN_TEST(test_compound_never_fires_while_endpoint_busy);
     RUN_TEST(test_compound_exec_delay_holds_execution_back);
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
+    RUN_TEST(test_compound_wait_fires_while_endpoint_busy);
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
     RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
     RUN_TEST(test_compound_wait_reserved_evt_sends_err_response);
@@ -2438,6 +2871,7 @@ int main(void)
     RUN_TEST(test_triggered_executes_only_on_its_own_trigger);
     RUN_TEST(test_triggered_threshold_delays_execution);
     RUN_TEST(test_triggered_never_fires_while_endpoint_busy);
+    RUN_TEST(test_triggered_completion_does_not_touch_any_sequencer_state);
     RUN_TEST(test_gptp_lock_established_arms_a_waiting_triggered_request);
     RUN_TEST(test_gptp_lock_signals_are_not_conflated);
     RUN_TEST(test_gptp_lock_state_respects_source_ep);
@@ -2448,7 +2882,9 @@ int main(void)
     RUN_TEST(test_compound_admission_unaffected_by_time_sync_not_supported);
 
     RUN_TEST(test_safety_tagged_request_waits_for_safe_state);
+    RUN_TEST(test_non_safety_request_unaffected_by_in_safe_state);
 
+    RUN_TEST(test_select_due_reports_nothing_due_with_an_empty_store);
     RUN_TEST(test_due_requests_execute_in_priority_order);
     RUN_TEST(test_equal_rank_requests_execute_in_arrival_order);
 
@@ -2470,6 +2906,10 @@ int main(void)
     RUN_TEST(test_chained_first_in_frame_is_chain_error);
     RUN_TEST(test_chained_first_in_frame_sends_per_member_error_responses);
     RUN_TEST(test_chained_member_after_predecessor_executes);
+    RUN_TEST(test_chained_never_fires_while_endpoint_busy);
+    RUN_TEST(test_chained_delay_not_restarted_by_an_earlier_evaluation);
+    RUN_TEST(test_chain_predecessor_done_marks_finalized_and_starts_timer);
+    RUN_TEST(test_chain_predecessor_done_returns_false_for_non_chained_index);
 
     RUN_TEST(test_disabled_endpoint_queues_compound_request_without_executing_it);
     RUN_TEST(test_disabled_endpoint_queues_triggered_request_without_executing_it);

@@ -19106,6 +19106,86 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.439.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-SRV-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-SRV-*` prefix (`src/server.c`, `include/rcp/server.h`,
+`tests/test_server.c`, `tests/test_conditional_dispatch.c`) -- all 22
+requirements read in full against their actual code/test tags, not
+just the 2+-"shall" proxy (which flagged 11 of the 22).
+
+9 of the 11 proxy-flagged ids were genuinely bundled: `REQ-SRV-003`
+(1 new id), `-004` (3 new), `-006` (5 new -- it bundled all five
+request kinds' own execution condition, plus the "nothing due"
+default, under one id), `-007` (1 new), `-009` (2 new), `-010` (3 new
+-- the whole repetition rule), `-012` (2 new -- and had **zero direct
+unit test** before this audit), `-013` (2 new -- all three
+cancellation functions under one id), `-019` (1 new). Total: 20 new
+ids, `REQ-SRV-023` through `REQ-SRV-042`. The other 2 (`REQ-SRV-011`,
+`-020`) were confirmed atomic despite the flag -- each is one
+observable behaviour with a compound object, the legitimate pattern
+`CONTRIBUTING.md` distinguishes from a real bundle.
+
+Tag placement was corrected alongside the split, not just added:
+`REQ-SRV-004`/`019`/`024`/`025`/`026`/`042`'s tags now also sit
+directly above `rcp_server_endpoint_admit_with_ack()` (the function
+that actually implements the classify/route/decode-and-store logic
+they describe) -- duplicated there, since the pre-existing stack
+sat above `admit_under_tscf_gate()`, a shared helper that function
+calls for two of its own branches, not the function itself; that
+pre-existing stack is left in place (ids outside this batch still
+own tags there). `REQ-SRV-013`'s tag was narrowed off
+`cancel_single()`/`cancel_non_safestate()` (now `REQ-SRV-040`/`041`
+respectively) since it no longer describes those functions.
+`REQ-SRV-038` (the chained delay "never restarts") turned out to be
+`arm_if_startable()`'s own CHAINED-kind exclusion, not
+`rcp_server_endpoint_chain_predecessor_done()` itself, so its tag
+sits on the function that actually implements it.
+
+Nine brand-new tests close real gaps rather than re-tagging a shared
+assertion: direct-call `rcp_server_endpoint_admit()` coverage for
+`REQ-SRV-024`/`025`/`026` (out_request_type/cancellation-report/
+conditional-store, one level below the mock server's translated
+result codes); `test_compound_wait_fires_while_endpoint_busy`
+(`REQ-SRV-027` -- no existing test had ever set
+`ctx.endpoint_idle = false` for a pending Compound Wait request, so a
+regression reintroducing the historical idle-gate bug this codebase
+already fixed once for Compound would have gone uncaught);
+`test_chained_never_fires_while_endpoint_busy` (`REQ-SRV-030`);
+`test_select_due_reports_nothing_due_with_an_empty_store`
+(`REQ-SRV-031`); `test_non_safety_request_unaffected_by_in_safe_state`
+(`REQ-SRV-032`);
+`test_triggered_completion_does_not_touch_any_sequencer_state`
+(`REQ-SRV-034`);
+`test_chained_delay_not_restarted_by_an_earlier_evaluation`
+(`REQ-SRV-038`); and two tests calling
+`rcp_server_endpoint_chain_predecessor_done()` directly for the first
+time ever (`REQ-SRV-012`/`039`), closing the zero-test gap the prior
+triage pass flagged.
+
+Every one of these nine, plus one representative re-tagged-only split
+(`REQ-SRV-041`), was mutation-tested against a real injected defect in
+`src/server.c` -- reintroducing the exact bug each id now names,
+confirming the intended test (and only the tests genuinely dependent
+on that code path) fails, then reverting. All caught cleanly; several
+mutations (the `out_request_type` and `in_safe_state` ones especially)
+also broke a wide, expected swath of pre-existing tests, confirming
+those code paths are load-bearing well beyond this batch's own new
+assertions.
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's
+exact flags) clean, 67/67 passing; pinned `cfusa` v0.5.54: `check` 0
+errors (555 warnings/1435 infos, unchanged from baseline); `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (1120/1120 reqs,
+512/512 functions), gates unregressed.
+
+**Next**: continuing issue #533's Group 3 batches -- `REQ-DL-*`/
+`REQ-AUTH-*`/`REQ-ADMIN-*`/`REQ-CFG-*` are tracked as separate
+concurrent batches by other sessions against the same tracker.
+
 ### v0.438.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch:
 REQ-CFG-* requirement-atomicity audit)
 
