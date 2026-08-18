@@ -29,6 +29,16 @@
 //cfusa:test REQ-ISELED-029
 //cfusa:test REQ-ISELED-030
 //cfusa:test REQ-ISELED-031
+//cfusa:test REQ-ISELED-032
+//cfusa:test REQ-ISELED-033
+//cfusa:test REQ-ISELED-034
+//cfusa:test REQ-ISELED-035
+//cfusa:test REQ-ISELED-036
+//cfusa:test REQ-ISELED-037
+//cfusa:test REQ-ISELED-038
+//cfusa:test REQ-ISELED-039
+//cfusa:test REQ-ISELED-040
+//cfusa:test REQ-ISELED-042
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -76,6 +86,7 @@ static void test_symbol_encode_distinct_parity_for_all_zero_and_all_one_nibbles(
     TEST_ASSERT_NOT_EQUAL(sym0, sym_f);
 }
 
+//cfusa:test REQ-ISELED-002
 static void test_symbol_decode_rejects_bad_parity(void)
 {
     uint8_t valid = rcp_ep_iseled_symbol_encode(0x03);
@@ -83,6 +94,20 @@ static void test_symbol_decode_rejects_bad_parity(void)
     uint8_t decoded = 0xFF;
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_symbol_decode(corrupted, &decoded));
+}
+
+/* REQ-ISELED-032 (split 2026-08-18, issue #533, from REQ-ISELED-002): a
+ * dedicated, independent assertion for the valid-parity accept-and-decode
+ * clause, not inherited in passing from test_symbol_encode_round_trips_
+ * every_nibble()'s own REQ-ISELED-001 round trip. */
+//cfusa:test REQ-ISELED-032
+static void test_symbol_decode_accepts_valid_parity_and_sets_nibble(void)
+{
+    uint8_t symbol = rcp_ep_iseled_symbol_encode(0x0A); /* valid parity by construction */
+    uint8_t decoded = 0xFF;
+
+    TEST_ASSERT_TRUE(rcp_ep_iseled_symbol_decode(symbol, &decoded));
+    TEST_ASSERT_EQUAL_UINT8(0x0A, decoded);
 }
 
 /* ── bitframe_encoded_len ──────────────────────────────────────────────────── */
@@ -209,15 +234,27 @@ static void test_bitframe_decode_rejects_short_frame_when_crc_expected(void)
 
 /* ── crc8 ───────────────────────────────────────────────────────────────────── */
 
-static void test_crc8_deterministic_and_input_sensitive(void)
+//cfusa:test REQ-ISELED-006
+static void test_crc8_deterministic(void)
+{
+    uint8_t a[3] = {0x01, 0x02, 0x03};
+
+    TEST_ASSERT_EQUAL_UINT8(rcp_ep_iseled_crc8(a, sizeof(a)), rcp_ep_iseled_crc8(a, sizeof(a)));
+}
+
+/* REQ-ISELED-034 (split 2026-08-18, issue #533, from REQ-ISELED-006): a
+ * dedicated, independent assertion for the content-sensitivity clause. */
+//cfusa:test REQ-ISELED-034
+static void test_crc8_differs_for_different_content(void)
 {
     uint8_t a[3] = {0x01, 0x02, 0x03};
     uint8_t b[3] = {0x01, 0x02, 0x04};
 
-    TEST_ASSERT_EQUAL_UINT8(rcp_ep_iseled_crc8(a, sizeof(a)), rcp_ep_iseled_crc8(a, sizeof(a)));
     TEST_ASSERT_NOT_EQUAL(rcp_ep_iseled_crc8(a, sizeof(a)), rcp_ep_iseled_crc8(b, sizeof(b)));
 }
 
+/* REQ-ISELED-033 (split 2026-08-18, issue #533, from REQ-ISELED-006). */
+//cfusa:test REQ-ISELED-033
 static void test_crc8_empty_input(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0x00, rcp_ep_iseled_crc8(NULL, 0));
@@ -229,6 +266,7 @@ static void test_crc8_empty_input(void)
  * the device-provided clock (TC18 Table 55), which arrives on ISP_N --
  * ISP_N is therefore required when use_rcv_clk is true, not when it is
  * false. See ep_iseled.h's own file header for the full citation. */
+//cfusa:test REQ-ISELED-007
 static void test_requires_isp_n(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_iseled_requires_isp_n(true));
@@ -237,16 +275,24 @@ static void test_requires_isp_n(void)
 
 /* ── Transmission-complete trigger ─────────────────────────────────────────── */
 
-static void test_trigger_fires(void)
+//cfusa:test REQ-ISELED-008
+static void test_trigger_fires_none_always_false(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_iseled_trigger_fires(RCP_EP_ISELED_TRIGGER_NONE, true));
     TEST_ASSERT_FALSE(rcp_ep_iseled_trigger_fires(RCP_EP_ISELED_TRIGGER_NONE, false));
+}
+
+/* REQ-ISELED-035 (split 2026-08-18, issue #533, from REQ-ISELED-008). */
+//cfusa:test REQ-ISELED-035
+static void test_trigger_fires_tx_complete_passes_through(void)
+{
     TEST_ASSERT_TRUE(rcp_ep_iseled_trigger_fires(RCP_EP_ISELED_TRIGGER_TX_COMPLETE, true));
     TEST_ASSERT_FALSE(rcp_ep_iseled_trigger_fires(RCP_EP_ISELED_TRIGGER_TX_COMPLETE, false));
 }
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ISELED-009
 static void test_functional_cfg_init_zeroes(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -271,6 +317,7 @@ static void test_functional_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.rcv_timeout);
 }
 
+//cfusa:test REQ-ISELED-010
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t writer = {0};
@@ -320,6 +367,7 @@ static void test_functional_cfg_writable_rcp_configured_requires_authorization(v
         RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
+//cfusa:test REQ-ISELED-011
 static void test_set_bit_clk_divider_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -332,6 +380,8 @@ static void test_set_bit_clk_divider_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT32(0, cfg.iseled_bit_clk_divider);
 }
 
+/* REQ-ISELED-036 (split 2026-08-18, issue #533, from REQ-ISELED-011). */
+//cfusa:test REQ-ISELED-036
 static void test_set_bit_clk_divider_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -345,6 +395,7 @@ static void test_set_bit_clk_divider_applies_when_authorized(void)
     TEST_ASSERT_EQUAL_UINT32(42, cfg.iseled_bit_clk_divider);
 }
 
+//cfusa:test REQ-ISELED-012
 static void test_set_use_rcv_clk_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -357,6 +408,8 @@ static void test_set_use_rcv_clk_rejects_unauthorized(void)
     TEST_ASSERT_FALSE(cfg.iseled_use_rcv_clk);
 }
 
+/* REQ-ISELED-037 (split 2026-08-18, issue #533, from REQ-ISELED-012). */
+//cfusa:test REQ-ISELED-037
 static void test_set_use_rcv_clk_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -370,6 +423,7 @@ static void test_set_use_rcv_clk_applies_when_authorized(void)
     TEST_ASSERT_TRUE(cfg.iseled_use_rcv_clk);
 }
 
+//cfusa:test REQ-ISELED-013
 static void test_set_crc_enable_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -382,6 +436,8 @@ static void test_set_crc_enable_rejects_unauthorized(void)
     TEST_ASSERT_FALSE(cfg.iseled_crc_enable);
 }
 
+/* REQ-ISELED-038 (split 2026-08-18, issue #533, from REQ-ISELED-013). */
+//cfusa:test REQ-ISELED-038
 static void test_set_crc_enable_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -395,6 +451,7 @@ static void test_set_crc_enable_applies_when_authorized(void)
     TEST_ASSERT_TRUE(cfg.iseled_crc_enable);
 }
 
+//cfusa:test REQ-ISELED-014
 static void test_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -407,6 +464,8 @@ static void test_set_trigger_rejects_unauthorized(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ISELED_TRIGGER_NONE, cfg.trigger);
 }
 
+/* REQ-ISELED-039 (split 2026-08-18, issue #533, from REQ-ISELED-014). */
+//cfusa:test REQ-ISELED-039
 static void test_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -590,6 +649,8 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+/* REQ-ISELED-042 (split 2026-08-18, issue #533, from REQ-ISELED-029). */
+//cfusa:test REQ-ISELED-042
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_iseled_reconfig_errc_t codes[] = {
@@ -1057,8 +1118,11 @@ static void test_response_decode_rejects_short_frame(void)
                                        &timed, &ts, &txn));
 }
 
-/* ── REQ-ISELED-025: response fragmentation, bounded by read_size ────────── */
+/* ── REQ-ISELED-025/040: response fragmentation, bounded by read_size ───── */
 
+/* REQ-ISELED-040 (split 2026-08-18, issue #533, from REQ-ISELED-025): the
+ * frame-count calculation, independent of actually producing the frames. */
+//cfusa:test REQ-ISELED-040
 static void test_fragment_count_one_when_capped_data_fits_in_one_fragment(void)
 {
     /* 10 available octets, read_size 10, generous 100-octet cap -> one
@@ -1067,6 +1131,7 @@ static void test_fragment_count_one_when_capped_data_fits_in_one_fragment(void)
     TEST_ASSERT_EQUAL_UINT(1, rcp_ep_iseled_response_fragment_count(10, 10, 100));
 }
 
+//cfusa:test REQ-ISELED-040
 static void test_fragment_count_respects_read_size_ceiling(void)
 {
     /* 1000 octets of decoded data are actually available, but read_size
@@ -1076,6 +1141,7 @@ static void test_fragment_count_respects_read_size_ceiling(void)
     TEST_ASSERT_EQUAL_UINT(1, rcp_ep_iseled_response_fragment_count(1000, 10, 100));
 }
 
+//cfusa:test REQ-ISELED-040
 static void test_fragment_count_splits_capped_data_across_frames(void)
 {
     /* read_size caps at 250; max_fragment_payload of 100 means the
@@ -1090,7 +1156,10 @@ static void test_fragment_count_splits_capped_data_across_frames(void)
  * reassembler plus this module's own already-existing (unmodified)
  * rcp_ep_iseled_decode_response() as the per-fragment decoder, and
  * confirm the reassembled result is exactly the first 200 (not 300)
- * octets of the original data. */
+ * octets of the original data. REQ-ISELED-025 (rcp_ep_iseled_encode_
+ * response_fragmented() itself) -- its own frame-count is REQ-ISELED-040,
+ * exercised above and reused here, not re-asserted. */
+//cfusa:test REQ-ISELED-025
 static void test_fragment_worst_case_response_round_trip_respects_read_size(void)
 {
     uint8_t                    rx[300];
@@ -1164,6 +1233,7 @@ int main(void)
     RUN_TEST(test_symbol_encode_masks_high_bits);
     RUN_TEST(test_symbol_encode_distinct_parity_for_all_zero_and_all_one_nibbles);
     RUN_TEST(test_symbol_decode_rejects_bad_parity);
+    RUN_TEST(test_symbol_decode_accepts_valid_parity_and_sets_nibble);
 
     RUN_TEST(test_bitframe_encoded_len);
 
@@ -1175,12 +1245,14 @@ int main(void)
     RUN_TEST(test_bitframe_decode_rejects_crc_mismatch);
     RUN_TEST(test_bitframe_decode_rejects_short_frame_when_crc_expected);
 
-    RUN_TEST(test_crc8_deterministic_and_input_sensitive);
+    RUN_TEST(test_crc8_deterministic);
+    RUN_TEST(test_crc8_differs_for_different_content);
     RUN_TEST(test_crc8_empty_input);
 
     RUN_TEST(test_requires_isp_n);
 
-    RUN_TEST(test_trigger_fires);
+    RUN_TEST(test_trigger_fires_none_always_false);
+    RUN_TEST(test_trigger_fires_tx_complete_passes_through);
 
     RUN_TEST(test_functional_cfg_init_zeroes);
     RUN_TEST(test_functional_cfg_writable_false_hw_unconfigured);
