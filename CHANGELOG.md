@@ -34,7 +34,7 @@ the rationale.
 
 ## Releases
 
-### v0.444.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
+### v0.446.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
 issue #533 (mirrors #256's pattern), executing the convention #519/PR
@@ -138,7 +138,7 @@ Verification:
   **standalone** (the known v0.5.54 combined-flag reporting bug) --
   100% each (1184/1184 requirements, 512/512 functions).
 
-Version `0.443.0` -> `0.444.0` (`CMakeLists.txt`/`version.h`/
+Version `0.445.0` -> `0.446.0` (`CMakeLists.txt`/`version.h`/
 `.fusa.json` kept in sync).
 
 Scope note: this is one batch of the `[c-RCP-18-tracker]` master
@@ -147,6 +147,219 @@ tracker -- does **not** close issue #533. Other Group 2 prefixes
 `REQ-PWM-*`, `REQ-SPI-*`, `REQ-UART-*`, `REQ-ISELED-*`,
 `REQ-WAKEUP-*`) remain, tracked as separate concurrent batches against
 the same tracker.
+
+### v0.445.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ADC-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-ADC-*` prefix (`src/ep_adc.c`/`include/rcp/ep_adc.h`)
+-- Group 2's tracker-reported count (40 total, 4 proxy-flagged "2+
+shall"). All 40 read in full against their actual `text` and traced
+code/tests, not just the 4 flagged ones, per Group 1's own
+`REQ-RMAP-*` batch finding real bundled requirements the proxy missed
+entirely (0 "shall" occurrences).
+
+9 ids split into 24 (40 originals + 15 new, `REQ-ADC-041..055`):
+
+- `REQ-ADC-004` -> `-004`/`-041`: `rcp_ep_adc_average_interval()`'s
+  exclude-`NO_SIGNAL`-from-mean clause (kept as `-004`) vs. its
+  return-`NO_SIGNAL`-only-when-every-sample-timed-out clause (`-041`)
+  -- both already independently tested before the split, confirming
+  the bundling.
+- `REQ-ADC-011` -> `-011`/`-042`: `rcp_ep_adc_encode_response()`'s
+  success-path big-endian encoding contract (kept as `-011`) vs. its
+  zeroed-return failure path for an invalid `value_count` (`-042`).
+  Also fixed a pre-existing tag-placement bug found while splitting:
+  `-011`'s own `//cfusa:req` tag was misplaced above
+  `rcp_ep_adc_collect_response_values()` -- an unrelated function --
+  instead of `rcp_ep_adc_encode_response()`, the function its text has
+  always actually described; and `-027`/`-028`/`-030` (all three
+  `rcp_ep_adc_decode_response()`'s own ids) were erroneously duplicated
+  onto `rcp_ep_adc_encode_response()` as well. Both corrected.
+- `REQ-ADC-025` -> `-025`/`-043`: `rcp_ep_adc_decode_read_request()`'s
+  round-trip contract (kept as `-025`) vs. `rcp_ep_adc_encode_read_
+  request()`'s own separate "the request itself carries no payload"
+  wire-format clause (`-043`) -- a real silent-gap risk of exactly the
+  kind issue #519's own `REQ-DL-001` finding warned about: no test
+  anywhere asserted the encoded frame's payload length before this
+  split's new `test_read_request_carries_no_payload()`.
+- `REQ-ADC-026` -> `-026`/`-044`/`-045`/`-046`: four distinct
+  `rcp_ep_adc_decode_read_request()` error-path behaviours
+  (SHORT_FRAME/WRONG_BUS/WRONG_OP/BAD_EVT) bundled under one id, each
+  already independently tested. A fifth clause describing
+  dispatch-layer `UNSUPPORTED_CMD` behaviour is deliberately **not**
+  re-split into its own id: no `rcp_ep_adc_wire_error()` mapping
+  function exists in `ep_adc.c` (contrast `ep_gpio.c`'s/`ep_pwm.c`'s
+  own, issue #426) and no dispatch-layer code anywhere maps
+  `RCP_EP_ADC_ERR_BAD_EVT` to `RCP_ERROR_UNSUPPORTED_CMD` for ADC --
+  minting an id with nothing to test would violate this audit's own
+  rule; left honestly recorded as a real, pre-existing gap instead of
+  given a fabricated test.
+- `REQ-ADC-029` -> `-029`/`-047`: `rcp_ep_adc_decode_response()`'s
+  `ERR_BAD_PAYLOAD_LEN` clause (kept as `-029`) vs. its
+  `ERR_TOO_MANY_VALUES` clause (`-047`) -- only 1 "shall" occurrence in
+  the original text despite bundling two behaviours, the same
+  proxy-miss pattern Group 1's `REQ-RMAP-059`/`-061` finding warned
+  about.
+- `REQ-ADC-031` -> `-031`/`-048`/`-049`/`-050`/`-051`/`-052`:
+  `rcp_ep_adc_trigger_state_init()`'s own init contract (kept as
+  `-031`) vs. `rcp_ep_adc_trigger_evaluate()`'s five independent Table
+  53 trigger-output behaviours (BELOW_MIN/ABOVE_MIN/BELOW_MAX/
+  ABOVE_MAX/MEASUREMENT_FINISHED, `-048`..`-052`) -- the same "one
+  switch/if arm, one outcome" pattern `REQ-PWM-002..009` already
+  establishes for this codebase, previously collapsed into one changelog-
+  style narrative entry with a zero "shall" count.
+- `REQ-ADC-037` -> `-037`/`-053`: `rcp_ep_adc_cadence_case()`'s
+  3-way classification contract (kept as `-037`, reclassified
+  `tc18-gap` -> `tc18`/ASIL-B now that its own text carries no partial
+  caveat) vs. `rcp_ep_adc_cadence_response_ready()`'s separate
+  readiness-comparison contract, which retains the original entry's
+  genuine dispatch-wiring `partial` caveat (`-053`, stays `tc18-gap`).
+- `REQ-ADC-038` -> `-038`/`-054`: `rcp_ep_adc_render_registers()`'s
+  Table 54 serialization contract (kept as `-038`) vs.
+  `rcp_ep_adc_encode_reconfig_request()`'s separate protocol-encoding
+  contract (`-054`) -- two different functions bundled under one id.
+- `REQ-ADC-039` -> `-039`/`-055`: `rcp_ep_adc_apply_reconfig()`'s
+  validate/patch/atomic-adopt contract (kept as `-039`) vs.
+  `rcp_ep_adc_reconfig_strerror()`'s separate never-NULL contract
+  (`-055`).
+
+All 9 splits' `//cfusa:req`/`//cfusa:test` tags moved/duplicated to
+sit directly above the exact function/test each id describes (not
+left at a file header only), per `CONTRIBUTING.md`; the file-header
+rollup blocks in `ep_adc.h`/`tests/test_ep_adc.c` were trimmed of the
+9 split-affected ids accordingly. Every one of the 15 new ids already
+had (or was given) its own distinct test assertion: `REQ-ADC-043` got
+a brand-new test (`test_read_request_carries_no_payload()`); the other
+14 splits' tests already existed as separate, focused functions, just
+mis-tagged or file-header-only tagged. Every split mutation-tested:
+all 15 new ids' dedicated test tags were temporarily removed one at a
+time and confirmed to drop `cfusa trace --sec-tested` to 99% and list
+the id under `--gaps`, then restored (file diffed byte-for-byte
+identical to its pre-mutation state afterward); two representative
+splits (`REQ-ADC-011`/`-042`, `REQ-ADC-025`/`-043`) additionally
+verified with a real source-code defect injected and reverted --
+exactly the 2 intended tests failed (68/70 still passing) in each case,
+proving genuine behavioural independence, not just tag placement.
+
+11 flagged-but-confirmed-atomic ids were not among the 4 tracker-
+flagged ones -- rather, all 4 proxy-flagged ids (`REQ-ADC-004`,
+`-011`, `-025`, `-026`) turned out genuinely bundled and were split;
+0 flagged ids were confirmed atomic outright. 31 ADC requirements
+read and confirmed already atomic (no action): `REQ-ADC-001/002/003/
+005/006/007/008/009/010/012/013/014/015/016/017/018/019/020/021/022/
+023/024/027/028/030/032/033/034/035/036/040`.
+
+`AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s `.fusa-reqs.json`
+scope-count tables re-synced for the new 1189-requirement total (1157
+`tc18` [1050 ASIL-B / 36 ASIL-A / 71 QM] / 19 `tc18-gap` / 7 `retired`
+/ 6 `internal`), including `REQ-ADC-037`'s `tc18-gap` -> `tc18`
+reclassification and `FREEDOM_FROM_INTERFERENCE.md` §4's `tc18-gap`
+enumeration swapping `REQ-ADC-037` for `REQ-ADC-053`.
+
+Full clean rebuild + 67/67 test suites passing (70/70 `test_ep_adc`
+Unity assertions, +1 new); ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67 passing; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100` / `trace
+--sec-tested 100` (run standalone, per the #533 REQ-CFG-* batch's
+combined-flag reporting-bug finding) each 100% (1189/1189
+requirements, 512/512 functions).
+
+Part of #533. Not closing it -- other Group 2/4 prefixes and any
+remaining Group 3 batches are separate, possibly concurrent, work
+against the same tracker.
+
+### v0.444.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-SPI-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-SPI-*` prefix (`src/ep_spi.c`/`include/rcp/ep_spi.h`),
+Group 2's own lowest proxy-flag density (1/38 flagged "2+ shall") --
+all 38 requirements read in full against their actual `text` and
+traced code/tests, not just the one flagged one, per Group 1's own
+`REQ-RMAP-*` finding that real bundling can hide behind zero "shall"
+occurrences.
+
+4 ids split into 4 new ones (`REQ-SPI-041..044`):
+
+- `REQ-SPI-026` -> `-026`/`-041`: the one proxy-flagged id -- two
+  literal "shall"s about two different functions
+  (`rcp_ep_spi_encode_transfer_request()`'s read-direction `op`
+  encoding, kept as `-026`, vs. `rcp_ep_spi_decode_transfer_request()`'s
+  own round-trip field-recovery contract, `-041`).
+- `REQ-SPI-036` -> `-036`/`-044`: zero "shall" occurrences, missed by
+  the proxy -- `rcp_ep_spi_transfer_length()`'s own `max(tx_len,
+  read_size)` formula (kept as `-036`, already correctly function-
+  tagged in `src/ep_spi.c`) had a second, unrelated pair of functions
+  (`encode_transfer_request()`/`decode_transfer_request()`'s
+  `read_size` field carry-through) folded into the same id's text and
+  the same three `//cfusa:req` placements.
+- `REQ-SPI-038` -> `-038`/`-042`: the id's own title named both
+  functions it bundled (`rcp_ep_spi_render_registers()`/
+  `_encode_reconfig_request()`) -- register-block serialization (kept
+  as `-038`) split from the ACF_ABB write-request encoding (`-042`),
+  the same two-functions-one-id anti-pattern `CONTRIBUTING.md`'s own
+  `REQ-AUTH-009` example documents.
+- `REQ-SPI-039` -> `-039`/`-043`: likewise title-bundled
+  (`rcp_ep_spi_apply_reconfig()`/`_reconfig_strerror()`) -- the
+  configuration-write apply/validate contract (kept as `-039`) split
+  from the strerror NULL-safety contract (`-043`), two functions with
+  no relationship beyond sharing a source region. A stray `-038` tag
+  also sitting above `apply_reconfig()` (never matching that id's own
+  text) was removed as part of the same fix.
+
+All four splits' `//cfusa:req`/`//cfusa:test` tags moved to sit
+directly above the exact function/test each id now describes, not a
+file header only; the four ids removed from the header stack in both
+`src/ep_spi.c` and `tests/test_ep_spi.c` where duplicated there.
+Every split already had (or was given) its own distinct test
+assertion -- `REQ-SPI-041`/`-044` share `test_transfer_request_round_trip`
+but assert independently-mutable fields (channel/payload/txn vs.
+`read_size`), confirmed via mutation testing below; the other three
+splits already had separate, focused test functions, just carrying
+the pre-split id or no tag at all.
+
+34 requirements (all but the 4 split) confirmed genuinely atomic on
+full read, including several with the same "one function's multiple
+validation-branch outcomes" shape (`REQ-SPI-027`/`-030`'s
+`ERR_SHORT_FRAME`/`ERR_BAD_MSG_TYPE`/`ERR_WRONG_BUS`/... enumerations)
+that this codebase already treats as one cohesive id everywhere else
+it appears (`REQ-GPIO-027`, `REQ-I2C-012`, `REQ-UART-020`,
+`REQ-PWM-026`, `REQ-ADC-026`, `REQ-LINEP-018`, `REQ-CANEP-017`,
+`REQ-MDIO-013`, `REQ-WAKEUP-011`, dozens more) -- not split here
+either, for consistency. `REQ-SPI-010`'s `functional_cfg_init()`
+all-fields-to-default contract likewise matches the established
+codebase-wide pattern (`REQ-GPIO-018`, `REQ-PWM-016`, `REQ-ADC-014`,
+`REQ-I2C-002`, etc.) of one id per init function regardless of field
+count. `REQ-SPI-037` (not-implemented, spec-silence-blocked) keeps
+its own prior, already-reasoned decision not to force-split a blocked
+half from an unblocked half with no independent test to give it.
+
+Mutation-tested each split against a real injected defect (reverted
+after confirming): `-026`/`-041` (decode's channel-recovery mutation
+caught only by `-041`'s test, `-026`'s own test staying green),
+`-041`/`-044` (dropping `read_size` on encode caught only by `-044`'s
+assertion, `-041`'s channel/payload assertions in the same test
+function staying green), `-038`/`-042` (flipping
+`encode_reconfig_request()`'s op caught only by `-042`'s test),
+`-039`/`-043` (`reconfig_strerror()`'s default-case `NULL` caught
+only by `-043`'s test).
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's
+exact flags, `ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67
+passing; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100`/`--sec-tested 100` (run standalone, per the
+#533 `REQ-CFG-*` batch's combined-flag reporting-bug finding) each
+100% (1178/1178 requirements, 512/512 functions).
+
+Part of #533. Not closing it -- other Group 2 prefixes
+(`REQ-ADC-*`, `REQ-CANEP-*`, `REQ-GPIO-*`, `REQ-I2C-*`,
+`REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-UART-*`,
+`REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4 remain, tracked as
+separate concurrent batches against the same tracker.
+
 
 ### v0.443.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-RMAP-*: requirement-atomicity audit, Group 1 protocol-generic)
 

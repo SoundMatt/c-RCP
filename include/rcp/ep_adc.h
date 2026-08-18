@@ -29,6 +29,13 @@
 //cfusa:req REQ-ADC-028
 //cfusa:req REQ-ADC-029
 //cfusa:req REQ-ADC-030
+//cfusa:req REQ-ADC-041
+//cfusa:req REQ-ADC-042
+//cfusa:req REQ-ADC-043
+//cfusa:req REQ-ADC-044
+//cfusa:req REQ-ADC-045
+//cfusa:req REQ-ADC-046
+//cfusa:req REQ-ADC-047
 
 /* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
  * are catalogued in .fusa-reqs.json with a "tc18" citation and a
@@ -41,6 +48,11 @@
 //cfusa:req REQ-ADC-034
 //cfusa:req REQ-ADC-035
 //cfusa:req REQ-ADC-036
+//cfusa:req REQ-ADC-048
+//cfusa:req REQ-ADC-049
+//cfusa:req REQ-ADC-050
+//cfusa:req REQ-ADC-051
+//cfusa:req REQ-ADC-052
 /*
  * ep_adc.h -- ADC endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 16, "Basic Endpoints", milestone 67).
