@@ -18,11 +18,14 @@ state machine (`lifecycle.h`), the CRC32 safe-point / safety-tagged
 request execution gate and per-stream watchdog (`e2e.h`), and the
 Normal/StandBy/Sleep/Unpowered power-mode model with its WakeUp
 handshake (`power.h`) — not carried over from the retired catalog. Two
-of the eleven hazards below (H-004, H-007) record genuinely open,
-currently-unmitigated gaps rather than implemented controls; they are
-recorded honestly as open items, matching this project's practice
-throughout the roadmap of not asserting an unverified mitigation (see
-also `tara.md`'s TS-002/TS-001/TS-003 notes on residual risk).
+of the original eleven hazards this pass produced (H-004, H-007) record
+genuinely open, currently-unmitigated gaps rather than implemented
+controls; they are recorded honestly as open items, matching this
+project's practice throughout the roadmap of not asserting an unverified
+mitigation (see also `tara.md`'s TS-002/TS-001/TS-003 notes on residual
+risk). A twelfth hazard, H-012, was added later (issue `c-RCP-22` Gap 4,
+below) covering the 9 protocol-bridge stub modules that Phase 13-21's
+core-implementation scope above did not include.
 
 ---
 
@@ -66,6 +69,7 @@ is what it is — summarized per-hazard in the Rationale Summary below.
 | H-009 | A CRC32-corrupted request frame is executed instead of rejected | OS-001, OS-005 | S2 | E3 | C2 | ASIL-A | SG-009 |
 | H-010 | Fault-injection rules persist across process/vehicle power cycles | OS-001, OS-004 | S2 | E2 | C3 | ASIL-A | SG-010 |
 | H-011 | RC Server reaches `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state | OS-002, OS-008 | S2 | E2 | C2 | QM | SG-011 |
+| H-012 | A protocol-bridge stub module regresses from its fail-closed contract and reports apparent success for a translation that never occurred | OS-001, OS-002 | S2 | E2 | C2 | QM | SG-012 |
 
 ---
 
@@ -91,6 +95,7 @@ argument.
 | H-009 | S2: corrupted-frame execution is severe but evaluated per-frame, not across a whole maneuver window | E3: driven by OS-005 (link degradation/EMI) on top of ordinary OS-001 traffic — real but not constant | C2: stream-fault latching gives a downstream consumer an observable signal |
 | H-010 | S2: a persisted rule masking/fabricating a fault is severe only if it coincides with a real safety-relevant event | E2: requires OS-004 (a software fault leaking dev/test tooling into a field session) — itself low-probability | C3: uniquely difficult to control — the persisted rule actively falsifies the signal a supervisor would use to detect it |
 | H-011 | S2: an unvalidated-hardware-configuration bypass is severe in principle, though a precondition violation rather than a direct unsafe actuation | E2: needs OS-002 or occurs only within OS-008's narrow bootstrap window — an edge condition, not continuous exposure | C2: `rcp_lifecycle_transition()`'s modeled transition table is the analyzed control |
+| H-012 | S2: a caller wrongly believing a bridge translation succeeded is severe but a silent-no-op failure, not a direct unsafe actuation by this library | E2: needs *both* an OS-002-class config fault (calling an unlinked bridge) *and* a code regression breaking the tested fail-closed contract — two coincident low-probability preconditions | C2: each of the 9 modules' fail-closed contract is independently test-covered and re-validated by this project's mutation-testing discipline on every change |
 
 ---
 
@@ -163,6 +168,7 @@ field and in `tara.md`'s residual-risk notes, not asserted as closed.
 | SG-009 | A CRC32-mismatched request frame shall never have its request executed. | ASIL-A | `rcp_e2e_unwrap()`, `rcp_e2e_crc_error_action()`, `rcp_e2e_stream_fault_t` |
 | SG-010 | Fault-injection rules shall not persist beyond the lifetime of the injecting process. | ASIL-A | `rcp_faultinject_*` in-process-only state |
 | SG-011 | The RC Server's lifecycle state shall never advance to `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state. | QM | `rcp_lifecycle_transition()`; formally verified (`tla/LifecycleStateMachine.tla` `NoSkipConfiguration`) |
+| SG-012 | Until a concrete backend is linked, every protocol-bridge module's `bridge_send()` function shall return `RCP_ERR_NOT_SUPPORTED` and shall leave `*out_response` untouched, never reporting apparent success for a translation that did not occur. | QM | `rcp_can_bridge_send()`/`rcp_lin_bridge_send()`/`rcp_dds_bridge_send()`/`rcp_mqtt_bridge_send()`/`rcp_grpc_bridge_send()`/`rcp_rest_bridge_send()`/`rcp_someip_bridge_send()`/`rcp_uds_bridge_send()`/`rcp_doip_bridge_send()`, each covered by its own `REQ-*-001` test |
 
 ---
 
@@ -182,7 +188,8 @@ field and in `tara.md`'s residual-risk notes, not asserted as closed.
 
 A structural review of this HARA (issue `c-RCP-22`) found it fell short of
 ISO 26262-3:2018 Clause 6 and of what `cfusa hara show` is built to check
-in several ways. This revision closes three of those:
+in five ways. All five are now closed, three in an earlier revision and
+the remaining two in this one:
 
 1. **Operational situations were prose-only** — `.fusa-hara.json` had no
    `operationalSituations[]` key at all, so no tool could verify hazard
@@ -198,21 +205,46 @@ in several ways. This revision closes three of those:
    (S/E/C Rationale Summary above; full text in
    `.fusa-hara.json`).
 
-Two gaps from that issue remain **open**, deliberately deferred rather
-than forced through in this pass:
+The remaining two gaps from that issue are now also **closed**:
 
 4. **The 9 protocol-bridge/adapter modules** (`grpcbridge.c`,
    `restbridge.c`, `someipbr.c`, `canbr.c`, `ddsbr.c`, `mqttbr.c`,
-   `linbr.c`, `udsbr.c`, `doipbr.c`) have never been through a hazard-ID
-   pass — none appear in this HARA. This is a real, separate
-   hazard-identification exercise (reading each bridge's actual behavior
-   and either recording a genuine new hazard or an explicit "analyzed,
-   no hazard, QM" conclusion), not a mechanical field-fill, and is sized
-   for its own dedicated pass.
-5. **`ftti_ms` is asserted, not cross-checked** — nothing in this repo
-   verifies a hazard's recorded FTTI against its implementing mechanism's
-   actual measured reaction time (e.g. H-001's watchdog). Needs at least
-   one sampled timing test or a documented manual-verification record.
+   `linbr.c`, `udsbr.c`, `doipbr.c`) had never been through a hazard-ID
+   pass — none appeared in this HARA. **Closed** — each of the 9 was read
+   and analyzed individually; all 9 are, as of this analysis, byte-for-byte
+   identical fail-closed stubs (`(void)`-cast every parameter,
+   unconditionally `return RCP_ERR_NOT_SUPPORTED`) with no backend-specific
+   logic yet to differentiate risk between them. Rather than fabricate 9
+   cosmetically-distinct ASIL ratings from identical code, the honest
+   finding is recorded as a single consolidated hazard, **H-012** (QM):
+   a code regression away from that documented fail-closed contract could
+   let a caller believe a translation succeeded when it did not. This
+   conclusion is explicitly scoped to the *current stub* implementation —
+   `H-012`'s own `safe_state` field records that the first concrete backend
+   linked into any one of the 9 modules moves that module out of this
+   consolidated entry and requires its own dedicated hazard-identification
+   pass (a new `H-0NN`) before that backend ships, since a real bus/network
+   translation is not the same hazard as a stub proven to do nothing.
+5. **`ftti_ms` was asserted, not cross-checked** — nothing in this repo
+   verified a hazard's recorded FTTI against its implementing mechanism's
+   actual measured reaction time. **Closed** — added
+   `tests/test_watchdog.c`'s `test_overflow_detected_within_recorded_ftti()`,
+   which configures `rcp_e2e_wd_evaluate()`'s watchdog with H-001's own
+   recorded `ftti_ms` (100 ms), measures the actual wall-clock time from
+   stream start to detected overflow under real timing, and asserts it
+   lands within `[ftti_ms, ftti_ms + 300ms]` — a bounded window bracketing
+   the recorded FTTI plus tolerance for poll-granularity and CI scheduling
+   jitter, not the "eventually, within 5000ms" bound the pre-existing
+   `poll_for_overflow()` helper alone enforced (which never actually tied
+   detection latency to the recorded FTTI at all). H-003 shares the same
+   100 ms FTTI and the same underlying mechanism (`rx_wd_safestate_enable`
+   gating on the same watchdog evaluation), so this one sampled test
+   cross-checks both. H-008's 200 ms FTTI (`rcp_pwrmode_*` WakeUp handshake)
+   is a distinct mechanism gated on external step calls rather than a
+   single elapsed-time bound and is not covered by this test; issue
+   `c-RCP-22`'s own wording asked for "at least one" sampled cross-check,
+   which this satisfies for the mechanism it explicitly named as its
+   example (H-001's watchdog).
 
 `cfusa hara show`'s own `Hazards (0)` / partial `Safety Goals` count in
 this repo is **not** a symptom of either open gap above — it's a
