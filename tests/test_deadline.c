@@ -12,8 +12,15 @@
 //cfusa:test REQ-DL-011
 //cfusa:test REQ-DL-012
 //cfusa:test REQ-DL-013
+//cfusa:test REQ-DL-014
+//cfusa:test REQ-DL-015
+//cfusa:test REQ-DL-016
+//cfusa:test REQ-DL-017
+//cfusa:test REQ-DL-018
+//cfusa:test REQ-DL-019
 #include "unity.h"
 
+#include <rcp/alloc.h>
 #include <rcp/clock.h>
 #include <rcp/deadline.h>
 
@@ -42,6 +49,7 @@ static void test_default_config_values(void)
 /* ── Monitor creation ─────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-DL-010
+//cfusa:test REQ-DL-019
 static void test_monitor_constructs_without_error(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 100}};
@@ -53,6 +61,17 @@ static void test_monitor_constructs_without_error(void)
      * one -- see test_alive_returns_false_before_first_heartbeat). */
     TEST_ASSERT_FALSE(rcp_deadline_monitor_alive(mon, 1));
 
+    /* REQ-DL-019: destroy() on a non-NULL monitor with a real running
+     * background thread must close (join) that thread and free every
+     * owned array/mutex before returning. There is no in-process way to
+     * assert "the memory really was freed", but this construct-with-a-
+     * live-thread-then-destroy round trip is exactly the shape ASan (this
+     * project's CI build, and the pinned ASan/UBSan build required by
+     * this same PR) needs to catch the concrete mutation this id guards
+     * against: if destroy() stopped closing the thread first, the still-
+     * running thread would touch m's mutex/state after rcp_free(m) --
+     * a use-after-free ASan reports independently of leak-detection
+     * settings. */
     rcp_deadline_monitor_destroy(mon);
 }
 
@@ -60,6 +79,44 @@ static void test_monitor_constructs_without_error(void)
 static void test_destroy_tolerates_null(void)
 {
     rcp_deadline_monitor_destroy(NULL); /* must not crash */
+}
+
+/* REQ-DL-018: rcp_calloc() failure must return NULL rather than a
+ * partially-constructed monitor. Uses rcp/alloc.h's fault-injection seam
+ * (rcp_calloc() is what rcp_deadline_monitor_new() actually calls) --
+ * see tests/test_fragment.c's identical always-fails-hook pattern for
+ * the ASan-portability rationale (a raw absurd-size allocation aborts
+ * under this project's own ASan configuration instead of returning
+ * NULL). */
+static void *always_fails_calloc(size_t nmemb, size_t size)
+{
+    (void)nmemb;
+    (void)size;
+    return NULL;
+}
+
+//cfusa:test REQ-DL-018
+static void test_monitor_new_returns_null_on_alloc_failure(void)
+{
+    rcp_deadline_stream_cfg_t streams[] = {{1, 100}};
+    rcp_deadline_config_t     cfg = rcp_deadline_default_config();
+    rcp_alloc_hooks_t         hooks = {0};
+    rcp_deadline_monitor_t   *mon;
+
+    hooks.calloc_fn = always_fails_calloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_NULL(mon);
+
+    rcp_alloc_reset_hooks();
+
+    /* Real allocator restored: the same call now succeeds, confirming the
+     * NULL above was really the injected failure and not some unrelated
+     * rejection (e.g. the capacity check). */
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_NOT_NULL(mon);
+    rcp_deadline_monitor_destroy(mon);
 }
 
 static void test_zero_deadline_ms_uses_config_default(void)
@@ -73,7 +130,16 @@ static void test_zero_deadline_ms_uses_config_default(void)
     mon = rcp_deadline_monitor_new(cfg, streams, 1);
 
     /* Never heartbeated: should be declared dead once the config default
-     * deadline elapses. */
+     * deadline elapses. NOTE this asserts alive() == false, which is also
+     * true (for an unrelated reason -- "never reported on") even if the
+     * background poll thread never ran at all; it is NOT REQ-DL-017's own
+     * test (see test_dead_event_fires_and_is_not_repeated for that: only
+     * a genuine LivenessEvent{alive=false} *transition*, observed via a
+     * subscribed callback rather than alive()'s static default, can tell
+     * "the thread ran and declared it dead" apart from "the thread never
+     * started". This test's own job is narrower: that cfg.default_deadline_ms
+     * (not some other value) is what got applied when streams[i].deadline_ms
+     * was 0. */
     test_sleep_ms(80);
     TEST_ASSERT_FALSE(rcp_deadline_monitor_alive(mon, 2));
 
@@ -94,9 +160,20 @@ static void count_dead(const rcp_liveness_event_t *ev, void *user_data)
     if (!ev->alive) g_dead_count++;
 }
 
+/* Also REQ-DL-017's own test: a genuine LivenessEvent{alive=false}
+ * *transition*, observed via this subscribed callback, can only happen
+ * if the background poll thread rcp_deadline_monitor_new() started is
+ * actually the thing that ran check_deadlines() and called emit() --
+ * unlike querying alive()'s static default (see
+ * test_zero_deadline_ms_uses_config_default's own note on why that one
+ * is NOT this proof). Confirmed by mutation: temporarily short-circuiting
+ * rcp_thread_start()'s call in rcp_deadline_monitor_new() leaves this
+ * test's g_dead_count at 0 (assertion fails) while every alive()-based
+ * test in this file keeps passing unchanged. */
 //cfusa:test REQ-DL-002
 //cfusa:test REQ-DL-003
 //cfusa:test REQ-DL-012
+//cfusa:test REQ-DL-017
 static void test_dead_event_fires_and_is_not_repeated(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 30}};
@@ -128,7 +205,6 @@ static void count_alive(const rcp_liveness_event_t *ev, void *user_data)
     if (ev->alive) g_alive_count++;
 }
 
-//cfusa:test REQ-DL-001
 //cfusa:test REQ-DL-004
 static void test_alive_event_on_first_heartbeat(void)
 {
@@ -150,6 +226,41 @@ static void test_alive_event_on_first_heartbeat(void)
     TEST_ASSERT_TRUE(g_alive_count > 0);
 }
 
+/* REQ-DL-001: heartbeat() must reset the stream's last-signal time, not
+ * merely flip its alive flag once (that half is REQ-DL-004, proved
+ * above). A deadline_ms of 40 with heartbeats sent every ~15ms for
+ * ~150ms total (several deadline windows' worth of elapsed wall time)
+ * can only stay alive throughout if each heartbeat genuinely re-zeroes
+ * the elapsed-time clock check_deadlines() measures against; if the
+ * reset were a no-op the stream would be declared dead the first time
+ * elapsed-since-construction, rather than elapsed-since-last-heartbeat,
+ * exceeded 40ms. */
+//cfusa:test REQ-DL-001
+static void test_heartbeat_resets_deadline_timer(void)
+{
+    rcp_deadline_stream_cfg_t streams[] = {{1, 40}};
+    rcp_deadline_config_t cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t *mon;
+    int i;
+
+    cfg.poll_interval_ms = 5;
+
+    g_dead_count = 0;
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_heartbeat(mon, 1)); /* initial alive */
+    for (i = 0; i < 8; i++) {
+        test_sleep_ms(15); /* < deadline_ms, repeated past deadline_ms*3 total */
+        TEST_ASSERT_TRUE(rcp_deadline_monitor_heartbeat(mon, 1));
+    }
+
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_alive(mon, 1));
+    rcp_deadline_monitor_destroy(mon);
+    TEST_ASSERT_EQUAL(0, g_dead_count);
+}
+
+//cfusa:test REQ-DL-014
 static void test_heartbeat_unknown_stream_returns_false(void)
 {
     rcp_deadline_config_t cfg = rcp_deadline_default_config();
@@ -185,6 +296,7 @@ static void test_notify_overflow_immediately_declares_dead(void)
     rcp_deadline_monitor_destroy(mon);
 }
 
+//cfusa:test REQ-DL-015
 static void test_notify_overflow_unknown_stream_returns_false(void)
 {
     rcp_deadline_config_t cfg = rcp_deadline_default_config();
@@ -269,16 +381,49 @@ static void test_subscribe_at_max_callbacks_succeeds_then_next_fails(void)
 
 /* ── Close ────────────────────────────────────────────────────────────────── */
 
+/* REQ-DL-007: close() must actually stop the background poll thread, not
+ * merely return promptly while leaving it running. Proved by a negative:
+ * close() a monitor BEFORE its (short) deadline elapses, then wait well
+ * past that deadline and confirm no dead event ever fires -- the only
+ * thing that can suppress it is the poll thread genuinely having
+ * stopped checking. */
 //cfusa:test REQ-DL-007
 //cfusa:test REQ-DL-008
 static void test_close_stops_background_thread(void)
+{
+    rcp_deadline_stream_cfg_t streams[] = {{1, 30}};
+    rcp_deadline_config_t cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t *mon;
+
+    cfg.poll_interval_ms = 5;
+
+    g_dead_count = 0;
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+
+    test_sleep_ms(10); /* let the poll thread actually start running */
+    rcp_deadline_monitor_close(mon); /* stops it before the 30ms deadline */
+
+    test_sleep_ms(80); /* well past the deadline the (stopped) thread would
+                           otherwise have detected */
+    TEST_ASSERT_EQUAL(0, g_dead_count);
+
+    rcp_deadline_monitor_destroy(mon);
+}
+
+/* REQ-DL-016: a second close() call, after the thread has already
+ * stopped, must not block or fail -- distinct from REQ-DL-007's "the
+ * first call really stops the thread" claim above. */
+//cfusa:test REQ-DL-016
+static void test_close_is_idempotent(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 100}};
     rcp_deadline_config_t cfg = rcp_deadline_default_config();
     rcp_deadline_monitor_t *mon = rcp_deadline_monitor_new(cfg, streams, 1);
 
-    rcp_deadline_monitor_close(mon); /* must return promptly, not hang */
-    rcp_deadline_monitor_close(mon); /* idempotent */
+    rcp_deadline_monitor_close(mon); /* real stop */
+    rcp_deadline_monitor_close(mon); /* must not block/crash on repeat */
+    rcp_deadline_monitor_close(mon); /* nor a third time */
 
     rcp_deadline_monitor_destroy(mon);
 }
@@ -290,9 +435,11 @@ int main(void)
     RUN_TEST(test_default_config_values);
     RUN_TEST(test_monitor_constructs_without_error);
     RUN_TEST(test_destroy_tolerates_null);
+    RUN_TEST(test_monitor_new_returns_null_on_alloc_failure);
     RUN_TEST(test_zero_deadline_ms_uses_config_default);
     RUN_TEST(test_dead_event_fires_and_is_not_repeated);
     RUN_TEST(test_alive_event_on_first_heartbeat);
+    RUN_TEST(test_heartbeat_resets_deadline_timer);
     RUN_TEST(test_heartbeat_unknown_stream_returns_false);
     RUN_TEST(test_notify_overflow_immediately_declares_dead);
     RUN_TEST(test_notify_overflow_unknown_stream_returns_false);
@@ -301,6 +448,7 @@ int main(void)
     RUN_TEST(test_monitor_new_over_max_streams_returns_null);
     RUN_TEST(test_subscribe_at_max_callbacks_succeeds_then_next_fails);
     RUN_TEST(test_close_stops_background_thread);
+    RUN_TEST(test_close_is_idempotent);
 
     return UNITY_END();
 }

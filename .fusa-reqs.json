@@ -3,7 +3,7 @@
     {
       "id": "REQ-DL-001",
       "title": "heartbeat() resets a stream's deadline timer",
-      "text": "rcp_deadline_monitor_heartbeat() shall reset the named stream's last-signal time to the current time, and shall return false without changing any state if the stream was not registered.",
+      "text": "rcp_deadline_monitor_heartbeat() shall reset the named stream's last-signal time to the current time.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -59,7 +59,7 @@
     {
       "id": "REQ-DL-006",
       "title": "notify_overflow() immediately declares a stream dead",
-      "text": "rcp_deadline_monitor_notify_overflow() shall emit LivenessEvent{alive=false} for the named stream immediately, without waiting for its deadline timer to elapse, and shall return false without changing any state if the stream was not registered.",
+      "text": "rcp_deadline_monitor_notify_overflow() shall emit LivenessEvent{alive=false} for the named stream immediately, without waiting for its deadline timer to elapse.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -71,7 +71,7 @@
     {
       "id": "REQ-DL-007",
       "title": "Close terminates the background thread",
-      "text": "Monitor::close() shall signal the background deadline-check thread to stop and shall be idempotent.",
+      "text": "Monitor::close() shall signal the background deadline-check thread to stop.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -100,8 +100,8 @@
     },
     {
       "id": "REQ-DL-010",
-      "title": "rcp_deadline_monitor_new() initializes per-stream watch state and starts the poll thread",
-      "text": "rcp_deadline_monitor_new(cfg, streams, n_streams) shall allocate a monitor tracking exactly n_streams streams, each initialized not-alive with its own deadline (streams[i].deadline_ms if nonzero, otherwise cfg.default_deadline_ms) and last_signal_ms set to the current monotonic time, and shall start the background poll thread; it shall return NULL on allocation failure.",
+      "title": "rcp_deadline_monitor_new() initializes per-stream watch state",
+      "text": "rcp_deadline_monitor_new(cfg, streams, n_streams) shall allocate a monitor tracking exactly n_streams streams, each initialized not-alive with its own deadline (streams[i].deadline_ms if nonzero, otherwise cfg.default_deadline_ms) and last_signal_ms set to the current monotonic time.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -130,8 +130,72 @@
     },
     {
       "id": "REQ-DL-013",
+      "title": "rcp_deadline_monitor_destroy() tolerates NULL",
+      "text": "rcp_deadline_monitor_destroy(m) shall be a safe no-op when m is NULL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-DL-014",
+      "title": "heartbeat() rejects an unregistered stream",
+      "text": "rcp_deadline_monitor_heartbeat() shall return false without changing any state if the stream was not registered.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§12.7.9 (\"An AVTPDU shall be generated in this case even when the queue is empty to generate a heartbeat, so that the RC Client sees that the RC Server is alive.\"), TC18.txt L3416-3417",
+      "tc18_master_id": "TC18-12.7.9-006"
+    },
+    {
+      "id": "REQ-DL-015",
+      "title": "notify_overflow() rejects an unregistered stream",
+      "text": "rcp_deadline_monitor_notify_overflow() shall return false without changing any state if the stream was not registered.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§12.7.7 (\"0b: no watchdog for this stream / 1b: stream is blocked upon WD overflow and Safe state will be entered\"), TC18.txt L3249-3251; \"If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken...\", TC18.txt L3303",
+      "tc18_master_id": "TC18-12.7.7-001"
+    },
+    {
+      "id": "REQ-DL-016",
+      "title": "Close is idempotent",
+      "text": "Monitor::close() shall be idempotent (a second call after the thread has already stopped shall not block or fail).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-DL-017",
+      "title": "rcp_deadline_monitor_new() starts the poll thread",
+      "text": "rcp_deadline_monitor_new() shall start the background poll thread.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-DL-018",
+      "title": "rcp_deadline_monitor_new() returns NULL on allocation failure",
+      "text": "rcp_deadline_monitor_new() shall return NULL on allocation failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-DL-019",
       "title": "rcp_deadline_monitor_destroy() closes the poll thread and releases every owned resource",
-      "text": "rcp_deadline_monitor_destroy(m) shall be a safe no-op when m is NULL; otherwise it shall close m (joining the background poll thread if one was started) and then free its states, callbacks, and callback_ctx arrays and destroy its mutex before freeing m itself.",
+      "text": "When m is not NULL, rcp_deadline_monitor_destroy(m) shall close m (joining the background poll thread if one was started) and then free its states, callbacks, and callback_ctx arrays and destroy its mutex before freeing m itself.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

@@ -19106,6 +19106,80 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.437.0 -- 2026-08-18 (issue #533 batch REQ-DL-*: requirement-atomicity
+audit, Group 3 server/dispatch)
+
+`[c-RCP-18-tracker]` (#533) first batch, prefix `REQ-DL-*`: read all 13
+`REQ-DL-*` `.fusa-reqs.json` entries against `deadline.c`/`deadline.h`
+and CONTRIBUTING.md's "Writing a requirement" convention (#519/PR
+#525), not just the 5 the tracker's own "2+ shall" proxy flagged.
+
+All 5 proxy-flagged ids were genuinely bundled and split (13 -> 19
+entries, `REQ-DL-014`..`REQ-DL-019` newly minted):
+
+- `REQ-DL-001` (the tracker's own confirmed example): split
+  `rcp_deadline_monitor_heartbeat()`'s "resets the stream's last-signal
+  time" (kept as `REQ-DL-001`, now proved by a new dedicated test,
+  `test_heartbeat_resets_deadline_timer`, rather than the shallow
+  proof-by-side-effect the pre-split id relied on) from "returns false
+  for an unregistered stream, no state changed" (`REQ-DL-014`, now
+  tagged onto the already-existing but previously-untagged
+  `test_heartbeat_unknown_stream_returns_false` -- exactly the silent
+  gap #519 flagged this whole audit to close).
+- `REQ-DL-006`: same shape, `rcp_deadline_monitor_notify_overflow()`
+  split into "emits dead immediately" (kept) / "rejects an
+  unregistered stream" (`REQ-DL-015`, tagging the already-existing
+  `test_notify_overflow_unknown_stream_returns_false`).
+- `REQ-DL-007`: `Monitor::close()`'s "signals the thread to stop" (kept,
+  rewritten to a real negative-proof test rather than an unasserted
+  "must not hang" comment) split from "is idempotent" (`REQ-DL-016`,
+  new dedicated `test_close_is_idempotent`).
+- `REQ-DL-010`: `rcp_deadline_monitor_new()`'s three independently-
+  testable behaviours split apart -- per-stream init state (kept),
+  "starts the poll thread" (`REQ-DL-017`), "returns NULL on allocation
+  failure" (`REQ-DL-018`, new test using `rcp/alloc.h`'s fault-injection
+  seam, same pattern as `test_fragment.c`'s existing alloc-failure
+  test).
+- `REQ-DL-013`: `rcp_deadline_monitor_destroy()`'s NULL-tolerance (kept)
+  split from its real close-and-free sequence (`REQ-DL-019`), matching
+  the `REQ-AUTH-010`/`-011` NULL-tolerance-gets-its-own-id precedent
+  CONTRIBUTING.md itself cites.
+
+The other 8 `REQ-DL-*` ids (`002`-`005`, `008`, `009`, `011`, `012`)
+were read in full too and confirmed genuinely atomic despite some
+containing a compound object joined by "and" (e.g. `REQ-DL-005`'s
+"returns the most recent alive value, and false for any stream not yet
+reported on" -- one function's one return-value contract across its
+default case, the same shape as the already-atomic `REQ-DL-011`, not a
+second function's behaviour bundled in).
+
+Every one of the 6 new ids' `//cfusa:test` tag was verified load-
+bearing by two independent mutation checks: (1) temporarily removing
+just that id's tag (header + per-function) drops `cfusa trace
+--sec-tested 100` to 99% every time, proving no split id silently
+inherited a sibling's tag; (2) a real code-level mutation for the
+higher-risk splits (`REQ-DL-001`, `-014`, `-017`, `-018`) -- reverting
+the timer reset, flipping the unregistered-stream return value,
+short-circuiting `rcp_thread_start()`, and dropping the `rcp_calloc()`
+NULL-check respectively -- each caused exactly that split's own test
+to fail (the alloc-failure one crashes outright, SIGSEGV, an even
+stronger signal) while every other test kept passing. The
+`REQ-DL-017` check caught a real near-miss during this batch: the
+first draft tagged it onto `test_zero_deadline_ms_uses_config_default`,
+which stayed green even with the poll thread completely disabled
+(alive() defaults to false either way) -- moved onto
+`test_dead_event_fires_and_is_not_repeated` instead, which mutation-
+proved actually requires the thread to run.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` locally on macOS) clean throughout,
+including every mutation round, both before and after rebasing onto
+the concurrently-landed `REQ-OBS-*`, `REQ-REC-*`, and `REQ-AUTH-*`
+batches immediately below (all disjoint prefixes, clean auto-merges in
+`.fusa-reqs.json`). `cfusa check` (pinned v0.5.54): 0 errors. `cfusa
+trace --req-coverage 100 --sec-tested 100`, re-run post-rebase against
+the combined catalog: 100%/100%, restored after every mutation check.
+
 ### v0.436.0 -- 2026-08-21 ([c-RCP-18] issue #533 batch REQ-ADMIN-*:
 requirement-atomicity audit, Group 3 server/dispatch)
 
