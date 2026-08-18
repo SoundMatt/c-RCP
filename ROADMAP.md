@@ -19106,6 +19106,67 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.442.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-AVTP-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-AVTP-*` prefix (`src/avtp.c`, `include/rcp/avtp.h`,
+plus `rcp_lifecycle_should_accept()`/`rcp_mock_server_dispatch_tscf()`
+in `src/lifecycle.c`/`src/mock.c`) -- all 23 requirements triaged, not
+just the tracker's own 2+-"shall" proxy's 8 flagged ids.
+
+Split 8 bundled requirements into 19 (new ids `REQ-AVTP-024` through
+`-034`): `-009`/`-024` (NTSCF/TSCF declared-length rejection -- found
+by manual read, not the proxy, since it's an "X and Y" compound
+subject rather than a compound object); `-010`/`-025` (stream_id u64
+round-trip vs. `rcp_stream_id_make()`'s own contract); `-013`/`-026`
+(`peek_subtype()`'s success path vs. its zero-length error path);
+`-016`/`-027` (transport retain vs. release, the same pattern
+`CONTRIBUTING.md` cites `REQ-AUTH-010`/`-011` for); `-019`/`-028`
+(loopback `send()` vs. `recv()` after `close()` -- tag also moved off
+`loopback_close()`, which implements neither clause); `-021`/`-029`/
+`-030` (`rcp_avtp_should_drop_tscf()`'s IGNORE branch /
+`rcp_lifecycle_should_accept()`'s own contract / `dispatch_plain_
+inner()`'s presentation-time suppression); `-022`/`-031`/`-032`/`-033`
+(`decode_tscf()`'s reserved-field population / `tscf_reserved_all_
+zero()`'s own predicate / `dispatch_tscf()`'s DROP branch /
+`dispatch_tscf()`'s IGNORE-to-NTSCF-substitution branch); `-023`/`-034`
+(`decode_tscf()`'s tu-decode fidelity vs. `dispatch_tscf()`'s
+tu=0/tu=1 outcome equivalence). `REQ-AVTP-014` confirmed
+atomic-despite-flag (one function's one "iff" predicate; its extra
+"shall"s restate logically-entailed negations, same shape as the
+already-unflagged `REQ-AVTP-011`/`-012`).
+
+Every split id's `//cfusa:req`/`//cfusa:test` tag now sits directly
+above the specific function/test it describes. Fixed two real test
+gaps found while splitting: `rcp_avtp_transport_retain()`'s "returns
+the same pointer" clause had no dedicated assertion (added
+`test_loopback_transport_retain_returns_same_pointer()`); the combined
+send+recv-after-close test was split into two dedicated tests.
+Mutation-tested 6 of the 8 splits by reverting each split-off clause's
+implementation and confirming only that split id's own test failed
+(ASan use-after-free, UBSan null-deref, and plain assertion failures,
+depending on the mutation) while every sibling split id's test kept
+passing.
+
+This batch's own REQ-AVTP-* delta is 1137 -> 1148 requirements (11 new
+ids); merged on top of v0.441.0's concurrently-landed REQ-ACF-* batch
+(1137 -> 1157) below, `.fusa-reqs.json` now carries 1168 requirements
+total (1136 `scope: "tc18"`: 1031 ASIL-B / 35 ASIL-A / 70 QM).
+`AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md` scope-count tables
+re-synced to the merged total.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100` / `trace --sec-tested 100`
+(standalone, per the #533 REQ-CFG-* batch's combined-flag reporting-bug
+finding) each 100% (1168/1168 requirements, 512/512 functions) --
+re-verified after merging v0.441.0's REQ-ACF-* batch.
+
+**Next**: `REQ-RMAP-*`, closing out #533 Group 1 (protocol-generic) --
+`REQ-ACF-*` landed concurrently as v0.441.0 below.
+
 ### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-ACF-*: requirement-atomicity audit, Group 1 protocol-generic)
 
@@ -19144,9 +19205,8 @@ ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54: `check`
 standalone, the known combined-flag reporting bug) each 100%
 (1157/1157 requirements, 512/512 functions).
 
-**Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, Group 1's remaining prefixes
-(other agents working these concurrently per #533's own suggested
-order).
+**Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, Group 1's remaining prefixes --
+`REQ-AVTP-*` landed concurrently as v0.442.0 above.
 
 ### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552:
 REQ-ISELED-028 scope corrected to retired)

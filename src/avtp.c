@@ -63,7 +63,7 @@ static rcp_stream_id_t get_stream_id(const uint8_t *p)
 
 /* ── stream_id / byte_bus_id addressing ───────────────────────────────────── */
 
-//cfusa:req REQ-AVTP-010
+//cfusa:req REQ-AVTP-025
 rcp_stream_id_t rcp_stream_id_make(const uint8_t mac[6], uint16_t unique_id)
 {
     rcp_stream_id_t id;
@@ -210,7 +210,9 @@ rcp_bytes_t rcp_avtp_encode_tscf(const rcp_avtp_tscf_header_t *hdr,
 //cfusa:req REQ-AVTP-004
 //cfusa:req REQ-AVTP-006
 //cfusa:req REQ-AVTP-008
-//cfusa:req REQ-AVTP-009
+//cfusa:req REQ-AVTP-022
+//cfusa:req REQ-AVTP-023
+//cfusa:req REQ-AVTP-024
 rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
                                      rcp_avtp_tscf_header_t *out_hdr,
                                      const uint8_t **out_payload, size_t *out_payload_len)
@@ -265,6 +267,7 @@ uint64_t rcp_avtp_extend_timestamp(uint32_t wire_ts, uint64_t reference_now)
 /* ── Subtype dispatch & the TSCF-without-time-sync drop rule ──────────────── */
 
 //cfusa:req REQ-AVTP-013
+//cfusa:req REQ-AVTP-026
 rcp_avtp_errc_t rcp_avtp_peek_subtype(const uint8_t *b, size_t len, uint8_t *out_subtype)
 {
     if (len < 1) return RCP_AVTP_ERR_SHORT_FRAME;
@@ -284,7 +287,7 @@ bool rcp_avtp_should_drop_tscf(bool server_time_sync_supported, uint8_t subtype,
     return false;
 }
 
-//cfusa:req REQ-AVTP-022
+//cfusa:req REQ-AVTP-031
 bool rcp_avtp_tscf_reserved_all_zero(const rcp_avtp_tscf_header_t *hdr)
 {
     return hdr->reserved0 == 0u && hdr->reserved1 == 0u;
@@ -299,7 +302,7 @@ rcp_avtp_transport_t *rcp_avtp_transport_retain(rcp_avtp_transport_t *t)
     return t;
 }
 
-//cfusa:req REQ-AVTP-016
+//cfusa:req REQ-AVTP-027
 void rcp_avtp_transport_release(rcp_avtp_transport_t *t)
 {
     if (!t) return;
@@ -323,6 +326,7 @@ typedef struct rcp_avtp_loopback_transport {
     size_t        cap;
 } rcp_avtp_loopback_transport_t;
 
+//cfusa:req REQ-AVTP-019
 //cfusa:req REQ-AVTP-020
 static int loopback_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_t frame_len)
 {
@@ -352,6 +356,7 @@ static int loopback_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_
 
 //cfusa:req REQ-AVTP-017
 //cfusa:req REQ-AVTP-018
+//cfusa:req REQ-AVTP-028
 static int loopback_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                           uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
@@ -392,7 +397,6 @@ static int loopback_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
     return RCP_OK;
 }
 
-//cfusa:req REQ-AVTP-019
 static int loopback_close(rcp_avtp_transport_t *self)
 {
     rcp_avtp_loopback_transport_t *lb = (rcp_avtp_loopback_transport_t *)self;

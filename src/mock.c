@@ -1107,8 +1107,6 @@ bool rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(rcp_mock_server_t *sr
     return true;
 }
 
-//cfusa:req REQ-AVTP-021
-//cfusa:req REQ-AVTP-022
 void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t       *srv,
                                                              rcp_avtp_tscf_fallback_t policy)
 {
@@ -1426,7 +1424,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
 
 //cfusa:req REQ-MOCK-021
 //cfusa:req REQ-MOCK-030
-//cfusa:req REQ-AVTP-021
+//cfusa:req REQ-AVTP-030
 /* The actual body of rcp_mock_server_dispatch(), factored out so
  * rcp_mock_server_dispatch_e2e() can reach it directly (dispatch_plain())
  * without going back through the public rcp_mock_server_dispatch() --
@@ -1456,14 +1454,16 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
      * new out_ack -- see finish_admission()'s own doc comment for how this
      * is transferred to *out_response. */
     rcp_bytes_t                ack = {0};
-    /* REQ-AVTP-021, TC18 §13.3 rule 1: "In case the RC Server does not
-     * support time synchronization, the presentation time shall be
-     * ignored, and the request(s) executed as if no presentation time
-     * were included or dropped depending on the configuration of the RC
-     * Server." Under RCP_AVTP_TSCF_FALLBACK_IGNORE, rcp_lifecycle_should_
-     * accept() below no longer drops this frame (see its own
-     * unsupported_time_sync_policy parameter), so this is the second
-     * half of that rule this function itself must apply: the request is
+    /* REQ-AVTP-030 (formerly bundled into REQ-AVTP-021, split by the
+     * requirement-atomicity audit, issue #533), TC18 §13.3 rule 1: "In
+     * case the RC Server does not support time synchronization, the
+     * presentation time shall be ignored, and the request(s) executed as
+     * if no presentation time were included or dropped depending on the
+     * configuration of the RC Server." Under RCP_AVTP_TSCF_FALLBACK_
+     * IGNORE, rcp_lifecycle_should_accept() below no longer drops this
+     * frame (REQ-AVTP-029, see its own unsupported_time_sync_policy
+     * parameter), so this is the second half of that rule this function
+     * itself must apply: the request is
      * admitted with tv forced false, exactly the "as if no presentation
      * time were included" wording -- NOT the fuller "as if the header
      * was in NTSCF format" substitution rule 2's own IGNORE side makes
@@ -1778,7 +1778,9 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
 
 //cfusa:req REQ-TIMED-012
 //cfusa:req REQ-TIMED-013
-//cfusa:req REQ-AVTP-022
+//cfusa:req REQ-AVTP-032
+//cfusa:req REQ-AVTP-033
+//cfusa:req REQ-AVTP-034
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
                                                           rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -1793,10 +1795,11 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
      * rcp_mock_server_dispatch()'s own identical kick. */
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
-    /* REQ-AVTP-022, TC18 §13.3 rule 2: "If the reserved bytes in the
-     * header are all zero, then the request shall be queued as if the
-     * header was in NTSCF format or dropped, depending on
-     * configuration." tscf_reserved_all_zero is the caller's own
+    /* REQ-AVTP-032/033 (formerly bundled into REQ-AVTP-022, split by the
+     * requirement-atomicity audit, issue #533), TC18 §13.3 rule 2: "If
+     * the reserved bytes in the header are all zero, then the request
+     * shall be queued as if the header was in NTSCF format or dropped,
+     * depending on configuration." tscf_reserved_all_zero is the caller's own
      * rcp_avtp_tscf_reserved_all_zero() result from decoding the real
      * TSCF header one layer up (avtp.h) -- this function itself still
      * never touches the outer AVTP/TSCF framing directly, matching every

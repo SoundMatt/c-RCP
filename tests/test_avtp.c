@@ -22,6 +22,12 @@
 //cfusa:test REQ-AVTP-021
 //cfusa:test REQ-AVTP-022
 //cfusa:test REQ-AVTP-023
+//cfusa:test REQ-AVTP-024
+//cfusa:test REQ-AVTP-025
+//cfusa:test REQ-AVTP-026
+//cfusa:test REQ-AVTP-027
+//cfusa:test REQ-AVTP-028
+//cfusa:test REQ-AVTP-031
 //cfusa:test REQ-TIMED-012
 #include "unity.h"
 
@@ -47,6 +53,7 @@ static void test_subtype_constants(void)
 
 /* ── stream_id ─────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-AVTP-025
 static void test_stream_id_make_preserves_mac_and_unique_id(void)
 {
     rcp_stream_id_t id = rcp_stream_id_make(kMacA, 0xBEEF);
@@ -55,6 +62,7 @@ static void test_stream_id_make_preserves_mac_and_unique_id(void)
     TEST_ASSERT_EQUAL_UINT16(0xBEEF, id.unique_id);
 }
 
+//cfusa:test REQ-AVTP-010
 static void test_stream_id_u64_roundtrip(void)
 {
     rcp_stream_id_t id = rcp_stream_id_make(kMacA, 0x1234);
@@ -195,6 +203,7 @@ static void test_ntscf_decode_rejects_wrong_subtype(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-AVTP-009
 static void test_ntscf_decode_rejects_declared_length_past_buffer(void)
 {
     rcp_avtp_ntscf_header_t hdr = {0};
@@ -328,6 +337,7 @@ static void test_tscf_decode_rejects_wrong_subtype(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-AVTP-024
 static void test_tscf_decode_rejects_declared_length_past_buffer(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -444,6 +454,7 @@ static void test_extend_timestamp_result_feeds_rcp_timed_due_correctly(void)
 
 /* ── Subtype dispatch & TSCF drop rule ─────────────────────────────────────── */
 
+//cfusa:test REQ-AVTP-013
 static void test_peek_subtype_reads_first_byte(void)
 {
     rcp_avtp_ntscf_header_t hdr = {0};
@@ -459,6 +470,7 @@ static void test_peek_subtype_reads_first_byte(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-AVTP-026
 static void test_peek_subtype_rejects_empty_buffer(void)
 {
     uint8_t subtype = 0;
@@ -502,6 +514,7 @@ static void test_should_not_drop_ntscf_regardless_of_time_sync(void)
  * under the default RCP_AVTP_TSCF_FALLBACK_DROP policy -- the same
  * inputs, only the new policy parameter differs, isolating this fix's
  * own behavior change from every pre-existing case above. */
+//cfusa:test REQ-AVTP-021
 static void test_should_not_drop_tscf_without_time_sync_when_policy_is_ignore(void)
 {
     TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_TSCF,
@@ -520,6 +533,7 @@ static void test_ignore_policy_irrelevant_when_time_sync_supported(void)
 
 /* ── §13.3 reserved-bytes-all-zero rule (REQ-AVTP-022) ─────────────────────── */
 
+//cfusa:test REQ-AVTP-031
 static void test_tscf_reserved_all_zero_true_for_freshly_decoded_conformant_header(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -544,6 +558,7 @@ static void test_tscf_reserved_all_zero_true_for_freshly_decoded_conformant_head
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-AVTP-031
 static void test_tscf_reserved_all_zero_false_when_reserved0_nonzero(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -553,6 +568,7 @@ static void test_tscf_reserved_all_zero_false_when_reserved0_nonzero(void)
     TEST_ASSERT_FALSE(rcp_avtp_tscf_reserved_all_zero(&hdr));
 }
 
+//cfusa:test REQ-AVTP-031
 static void test_tscf_reserved_all_zero_false_when_reserved1_nonzero(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -569,6 +585,7 @@ static void test_tscf_reserved_all_zero_false_when_reserved1_nonzero(void)
  * decode tests elsewhere in this file for the established convention of
  * hand-building raw frame bytes to exercise decode independent of
  * encode. */
+//cfusa:test REQ-AVTP-022
 static void test_decode_tscf_reads_nonzero_reserved_bytes_off_the_wire(void)
 {
     uint8_t                 b[RCP_AVTP_TSCF_HEADER_LEN] = {0};
@@ -599,6 +616,7 @@ static void test_decode_tscf_reads_nonzero_reserved_bytes_off_the_wire(void)
  * dispatch layer instead (test_mock.c's own REQ-AVTP-023 test), since
  * this library's decode/dispatch split means no single function decides
  * both. */
+//cfusa:test REQ-AVTP-023
 static void test_decode_tscf_reports_tu_one_and_tu_zero_faithfully(void)
 {
     uint8_t                 b[RCP_AVTP_TSCF_HEADER_LEN] = {0};
@@ -680,26 +698,43 @@ static void test_loopback_transport_recv_times_out_when_empty(void)
     rcp_avtp_transport_release(t);
 }
 
-static void test_loopback_transport_rejects_after_close(void)
+//cfusa:test REQ-AVTP-019
+static void test_loopback_transport_send_rejects_after_close(void)
+{
+    rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 2);
+    uint8_t frame[] = {9};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_close(t));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(t, frame, sizeof(frame)));
+
+    rcp_avtp_transport_release(t);
+}
+
+/* REQ-AVTP-028: recv() on an already-closed, already-empty transport
+ * returns RCP_ERR_CLOSED -- test_loopback_transport_close_drains_queued_
+ * frame_first() below proves the companion "drains queued frames first"
+ * nuance for a transport that had something queued at close() time; this
+ * is the simpler immediate-empty-queue case. */
+//cfusa:test REQ-AVTP-028
+static void test_loopback_transport_recv_rejects_after_close_when_empty(void)
 {
     rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 2);
     rcp_context_t ctx = rcp_context_with_timeout_ms(20);
-    uint8_t frame[] = {9};
     uint8_t buf[8];
     size_t out_len = 0;
 
     TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_close(t));
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(t, frame, sizeof(frame)));
     TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_recv(t, &ctx, buf, sizeof(buf), &out_len));
 
     rcp_avtp_transport_release(t);
 }
 
-/* REQ-AVTP-019's own "once any already-queued frames are exhausted"
+/* REQ-AVTP-028's own "once any already-queued frames are exhausted"
  * clause: close() must not discard frames already queued before it was
  * called -- recv() drains them first and only then starts returning
- * RCP_ERR_CLOSED. test_loopback_transport_rejects_after_close() above
- * only proves the empty-queue case. */
+ * RCP_ERR_CLOSED. test_loopback_transport_recv_rejects_after_close_when_
+ * empty() above only proves the immediate-empty-queue case. */
+//cfusa:test REQ-AVTP-028
 static void test_loopback_transport_close_drains_queued_frame_first(void)
 {
     rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 4);
@@ -734,7 +769,33 @@ static void test_loopback_transport_send_rejects_when_full(void)
     rcp_avtp_transport_release(t);
 }
 
-static void test_loopback_transport_refcount_defers_destroy(void)
+/* REQ-AVTP-016: retain() itself increments the refcount and returns the
+ * same pointer -- the pointer-identity half is asserted directly here,
+ * not merely relied upon implicitly by a later call, so a retain() that
+ * returned a different (or NULL) pointer would fail this assertion on
+ * its own. */
+//cfusa:test REQ-AVTP-016
+static void test_loopback_transport_retain_returns_same_pointer(void)
+{
+    rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 1);
+    rcp_avtp_transport_t *retained = rcp_avtp_transport_retain(t);
+
+    TEST_ASSERT_EQUAL_PTR(t, retained);
+
+    rcp_avtp_transport_release(t); /* undo the retain above */
+    rcp_avtp_transport_release(t); /* drops to 0: frees */
+}
+
+/* REQ-AVTP-027: release() invokes destroy() only once refcount reaches
+ * zero, never before -- retain()+release() nets back to the original
+ * refcount (1), and the transport is still genuinely usable (not
+ * use-after-freed) afterwards; only the SECOND release() below actually
+ * drops to zero and frees. Under this project's own ASan CI job, a
+ * release() that destroyed prematurely would turn the send() below into
+ * a detectable use-after-free, and one that never destroyed at refcount
+ * zero would show up as a detected leak. */
+//cfusa:test REQ-AVTP-027
+static void test_loopback_transport_release_defers_destroy_until_zero(void)
 {
     rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 1);
     uint8_t frame[] = {1};
@@ -801,10 +862,12 @@ int main(void)
 
     RUN_TEST(test_loopback_transport_send_recv_fifo_order);
     RUN_TEST(test_loopback_transport_recv_times_out_when_empty);
-    RUN_TEST(test_loopback_transport_rejects_after_close);
+    RUN_TEST(test_loopback_transport_send_rejects_after_close);
+    RUN_TEST(test_loopback_transport_recv_rejects_after_close_when_empty);
     RUN_TEST(test_loopback_transport_close_drains_queued_frame_first);
     RUN_TEST(test_loopback_transport_send_rejects_when_full);
-    RUN_TEST(test_loopback_transport_refcount_defers_destroy);
+    RUN_TEST(test_loopback_transport_retain_returns_same_pointer);
+    RUN_TEST(test_loopback_transport_release_defers_destroy_until_zero);
 
     return UNITY_END();
 }

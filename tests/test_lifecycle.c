@@ -23,7 +23,7 @@
 //cfusa:test REQ-LIFECYCLE-039
 //cfusa:test REQ-WIREERR-004
 //cfusa:test REQ-RMAP-025
-//cfusa:test REQ-AVTP-021
+//cfusa:test REQ-AVTP-029
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -560,7 +560,7 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)42u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
-/* REQ-AVTP-021, TC18 §13.3's own configurable alternative to the
+/* REQ-AVTP-029, TC18 §13.3's own configurable alternative to the
  * general drop rule test_hw_configured_applies_ordinary_tscf_drop_rule()
  * above already pins for RCP_AVTP_TSCF_FALLBACK_DROP: the SAME inputs
  * (RCP_CONFIGURED, time_sync_supported=false, TSCF) under
@@ -572,6 +572,7 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
  * governs the general time-sync check, never those states' own separate,
  * always-unconditional rules), so ACCEPT is this rule's own directly
  * observable effect. */
+//cfusa:test REQ-AVTP-029
 static void test_rcp_configured_accepts_tscf_without_time_sync_when_policy_is_ignore(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(

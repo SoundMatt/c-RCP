@@ -260,7 +260,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 //cfusa:req REQ-LIFECYCLE-029
 //cfusa:req REQ-LIFECYCLE-032
 //cfusa:req REQ-LIFECYCLE-033
-//cfusa:req REQ-AVTP-021
+//cfusa:req REQ-AVTP-029
 rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                                     bool time_sync_supported,
                                                     uint8_t avtp_subtype,

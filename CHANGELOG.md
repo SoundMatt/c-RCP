@@ -34,6 +34,91 @@ the rationale.
 
 ## Releases
 
+### v0.442.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-AVTP-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-AVTP-*` prefix (`src/avtp.c`, `include/rcp/avtp.h`,
+plus the `rcp_lifecycle_should_accept()`/`rcp_mock_server_dispatch_
+tscf()` cross-references in `src/lifecycle.c`/`src/mock.c`) --
+23 requirements total, all triaged (not just the tracker's own
+2+-"shall" proxy's 8 flagged ids).
+
+Split 8 bundled requirements into 19 (11 new ids, `REQ-AVTP-024`
+through `REQ-AVTP-034`):
+
+- `REQ-AVTP-009` -> `-009` (NTSCF) + `-024` (TSCF): decoders' declared-
+  length-past-buffer rejection was one id for two different functions
+  -- not proxy-flagged (one "shall" spanning an "X and Y" compound
+  subject, not a compound object), found on manual read by noticing
+  this file already splits the identical NTSCF/TSCF distinction
+  everywhere else (`-001`/`-002`, `-005`/`-006`, `-007`/`-008`).
+- `REQ-AVTP-010` -> `-010` (`from_u64(to_u64())` round-trip) + `-025`
+  (`rcp_stream_id_make()`'s own separate construction contract).
+- `REQ-AVTP-013` -> `-013` (`peek_subtype()`'s >=1-byte success path)
+  + `-026` (its separate zero-length-buffer error path).
+- `REQ-AVTP-016` -> `-016` (`transport_retain()`) + `-027`
+  (`transport_release()`'s destroy-at-zero contract) -- the exact
+  retain/release pattern `CONTRIBUTING.md` already cites
+  `REQ-AUTH-010`/`-011` for.
+- `REQ-AVTP-019` -> `-019` (`send()` after `close()`) + `-028`
+  (`recv()` after `close()`, once queued frames are exhausted) -- the
+  tag also moved off `loopback_close()` (which implements neither
+  clause) onto `loopback_send()`/`loopback_recv()` themselves.
+- `REQ-AVTP-021` -> `-021` (`rcp_avtp_should_drop_tscf()`'s own IGNORE-
+  policy branch) + `-029` (`rcp_lifecycle_should_accept()`'s own
+  parameter-honoring contract) + `-030` (`dispatch_plain_inner()`'s
+  presentation-time-gate suppression).
+- `REQ-AVTP-022` -> `-022` (`rcp_avtp_decode_tscf()` populating
+  reserved0/reserved1) + `-031` (`rcp_avtp_tscf_reserved_all_zero()`'s
+  own predicate) + `-032` (`dispatch_tscf()`'s DROP-policy branch) +
+  `-033` (`dispatch_tscf()`'s IGNORE-policy NTSCF-substitution branch).
+- `REQ-AVTP-023` -> `-023` (`rcp_avtp_decode_tscf()`'s own tu-decode
+  fidelity) + `-034` (`dispatch_tscf()`'s tu=0/tu=1 dispatch-outcome
+  equivalence).
+
+Every `//cfusa:req`/`//cfusa:test` tag for a split id now sits
+directly above the specific function/test it describes (not only a
+file header), per `CONTRIBUTING.md`. Two real test gaps fixed as part
+of the split (not just re-tagging): `rcp_avtp_transport_retain()`'s
+own "returns the same pointer" clause had no dedicated assertion
+(the return value was discarded by the one test exercising it) --
+added `test_loopback_transport_retain_returns_same_pointer()`; the
+combined send+recv-after-close test was split into two dedicated
+tests so send()'s and recv()'s own postconditions can regress
+independently.
+
+Confirmed atomic-despite-flag: `REQ-AVTP-014` (a single function's one
+"iff" predicate, its extra "shall"-count coming from restating
+logically-entailed negations for TC18-traceability clarity, not a
+second independent behaviour -- same shape as the already-unflagged
+`REQ-AVTP-011`/`-012`).
+
+Mutation-tested 6 of the 8 splits (016/027, 019/028, 009/024,
+021/029/030, 022/031/032/033, 013/026): reverted each split-off
+clause's own implementation, confirmed only that split id's own test
+failed (ASan use-after-free for 016/027's premature-destroy mutation,
+UBSan null-deref for 013/026's skipped-bounds-check mutation, plain
+Unity assertion failures for the rest) while every sibling split id's
+test kept passing, then restored.
+
+This batch's own REQ-AVTP-* delta is 1137 -> 1148 requirements (11 new
+ids); merged on top of v0.441.0's concurrently-landed REQ-ACF-* batch
+(1137 -> 1157), `.fusa-reqs.json` now carries 1168 requirements total
+(1136 `scope: "tc18"`: 1031 ASIL-B / 35 ASIL-A / 70 QM).
+`AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s scope-count tables
+re-synced to the merged total.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100` / `trace --sec-tested
+100` (standalone, per the #533 REQ-CFG-* batch's combined-flag
+reporting-bug finding) each 100% (1168/1168 requirements, 512/512
+functions) -- re-verified after merging v0.441.0's REQ-ACF-* batch.
+
+**Next**: `REQ-RMAP-*`, closing out #533 Group 1 (protocol-generic) --
+`REQ-ACF-*` landed concurrently as v0.441.0 below.
+
 ### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ACF-*: requirement-atomicity audit, Group 1 protocol-generic)
 
 Triaged all 32 `REQ-ACF-*` requirements (`src/acf.c`/`include/rcp/acf.h`)
@@ -143,8 +228,7 @@ REQ-CFG-* batch found is still present in this tool version) each
 100% (1157/1157 requirements, 512/512 functions).
 
 **Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, the remaining two prefixes in
-Group 1 -- other agents are working these concurrently per issue
-#533's own suggested execution order.
+Group 1 -- `REQ-AVTP-*` landed concurrently as v0.442.0 above.
 
 ### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552: REQ-ISELED-028 scope corrected to retired)
 
