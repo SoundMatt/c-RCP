@@ -80,6 +80,7 @@ the citation after each item is that fact's source-of-record.
 | AoU-5 | `rcp_e2e_endpoint_in_safe_state()` fails closed (returns "not safe") on a misconfigured `safestate_sequencer` index or an unrecognized `rx_safety_measure` value, by explicit design choice rather than a spec mandate. An integrator must confirm this fail-closed posture is what their own safe-state definition actually requires before relying on it, rather than assuming a spec-mandated behavior. | `HARA.md` Residual Risks table |
 | AoU-6 | c-RCP's safety mechanisms are analyzed and tested at c-RCP's own implementation-correctness level; no separate ASIL decomposition argument (ISO 26262-9:2018 Clause 5) has been constructed for H-001 (the sole element-level hazard exceeding the ASIL-B baseline, at ASIL-C). An integrator whose item-level HARA assigns an ASIL to the corresponding vehicle-level hazard must construct their own decomposition or undecomposed-rigor argument at that ASIL — c-RCP's own ASIL-C rating does not do this for them. | `HARA.md` ASIL Determination Note |
 | AoU-7 | c-RCP's own tool confidence evidence for `cfusa` (its static-analysis/lint/traceability toolchain) is a **self-run, non-independent qualification** (`qualify-report.json`, `qualificationMethod: "self"`) — see §3. An integrator targeting an ASIL where ISO 26262-8:2018 Clause 11 would require a higher tool confidence level than self-qualification provides must independently qualify `cfusa` (or substitute their own toolchain) to that level; c-RCP's CI evidence does not satisfy that requirement on its own. | §3 below; `qualify-report.json` |
+| AoU-8 | `rcp_alloc_set_hooks()` (`alloc.c`) is public API with no ASIL/scope gate: it overwrites one process-wide, unsynchronized global hook table that every allocation in the library — QM and ASIL-B/A alike, across 46 of c-RCP's `src/*.c` files — routes through via `rcp_malloc()`/`rcp_calloc()`/`rcp_realloc()`/`rcp_free()`. An integrator must treat any call to `rcp_alloc_set_hooks()` anywhere in their own application, QM-rated call sites included, as safety-relevant with respect to every ASIL-rated code path in c-RCP — c-RCP itself does not restrict, gate, or synchronize who may call it. See §4 below. | §4 below; `alloc.c` |
 
 ## 3. Tool confidence level (TCL) — `cfusa`
 
@@ -124,7 +125,78 @@ role (if any) in a build's toolchain — c-RCP's actual build/test
 toolchain (the C compiler, `ctest`, ASan/UBSan) is a separate TCL
 question this document does not address.
 
-## 4. Safety-relevant interface contract (pointer)
+## 4. Freedom from interference (ISO 26262-6:2018 Clause 7 / -9:2018 Clause 6)
+
+c-RCP is a pure-C99 library built as one statically-linked archive
+(`add_library(rcp STATIC ...)`, `CMakeLists.txt`) — every consumer
+links a single binary containing every requirement scope tier
+together. c-RCP provides **no OS-level partition of its own** (no
+process boundary, no memory-protection domain, no separate
+compilation unit per ASIL tier): if freedom from interference between
+QM and ASIL-rated code is required, the integrator's own architecture
+(a partitioned OS, MPU/MMU regions, or separate processes) must supply
+it — this is itself an Assumption of Use this section makes explicit
+where the previous AoU-1 (hardware/platform safety) left it implicit.
+
+**Current requirement-scope partition** (`.fusa-reqs.json`, verified
+against current HEAD — see that file's `catalogNote` for the full
+audit history): 1095 requirements across four `scope` values —
+`tc18` (947: 859 ASIL-B, 30 ASIL-A, 58 QM — the shipped, TC18-spec-derived
+behavior), `tc18-gap` (136: 10 ASIL-B, 126 QM — TC18 normative clauses
+c-RCP does *not* implement, pinned by a test rather than omitted
+silently), `retired` (6 — superseded/citation-corrected requirement
+entries kept for traceability, not shipped functionality of their
+own), and `internal` (6, all QM — the pluggable allocator-hook
+indirection in `alloc.c`, an implementation-detail API with no direct
+TC18-spec basis). Note for readers of issue #518 itself: the issue's
+own framing (`scope: "tc18"` vs. a QM `scope: "legacy-compat"` retired
+Zone/Command surface "still linked into the same binary per
+`src/rcp.c`/`tests/legacy_mock.*`") is now stale and the specific
+concern it raised is moot — verified against current HEAD, that
+pre-TC18 object model (`rcp_zone_t`/`rcp_command_t`/`rcp_response_t`/
+etc.) was fully removed at v0.91.0 (see `CHANGELOG.md`'s Deprecation &
+Removal Log); `src/rcp.c` is now 65 lines of generic error-string and
+byte-buffer helpers with no Zone/Command types in it, and
+`tests/legacy_mock.*` no longer exists anywhere in this tree. The
+`legacy-compat` scope value itself no longer appears in
+`.fusa-reqs.json` at all.
+
+**The QM/ASIL-rated boundary is function-level, not file-level.**
+`scope: "tc18"`'s 58 QM entries are not confined to otherwise-QM
+files — `src/lifecycle.c` alone carries ASIL-A, ASIL-B, *and* QM
+`//cfusa:req` tags in the same translation unit (confirmed by direct
+grep of its `//cfusa:req` tags against `.fusa-reqs.json`'s `level`
+field). c-RCP provides no compiler-enforced or file-boundary
+separation between a QM-rated helper function and an ASIL-B-rated one
+sitting beside it in the same `.c` file; an integrator reasoning about
+freedom from interference at the source level must do so
+function-by-function against `.fusa-reqs.json`'s `id`/`level`
+pairing, not file-by-file.
+
+**The one concrete, cross-cutting interference vector this analysis
+found:** `alloc.c`'s allocator-hook indirection (`REQ-ALLOC-001..006`,
+`scope: "internal"`, all QM). `rcp_malloc()`/`rcp_calloc()`/
+`rcp_realloc()`/`rcp_free()` are used across 46 of c-RCP's `src/*.c`
+files — effectively the entire ASIL-rated surface — and every one of
+them dereferences a single process-wide, unsynchronized static struct
+of function pointers (`g_hooks`). `rcp_alloc_set_hooks()`, the
+function that overwrites that struct, is unrestricted public API: it
+carries no ASIL/scope gate, no access check, and no synchronization
+against a concurrent `rcp_malloc()`/etc. call already in flight. A
+QM-rated call site anywhere in an integrator's own application —
+c-RCP itself never calls `rcp_alloc_set_hooks()` internally, per a
+repo-wide search — can silently redirect every subsequent allocation
+across the entire library, ASIL-B TC18 code paths included, to a
+custom allocator of unknown provenance and unknown correctness. This
+is now recorded as AoU-8 (§2): an integrator must treat any call to
+`rcp_alloc_set_hooks()` in their own codebase as safety-relevant with
+respect to every ASIL-rated path in c-RCP, regardless of which
+ASIL/QM tier the calling code itself carries. c-RCP does not close
+this gap on the integrator's behalf — no gate, wrapper, or
+access-control mechanism restricting `rcp_alloc_set_hooks()` exists in
+this codebase today, and none is claimed.
+
+## 5. Safety-relevant interface contract (pointer)
 
 c-RCP's public interface surface is `include/rcp/*.h`; its
 lexicon/file-path mapping against the shared x-RCP architecture is
@@ -142,7 +214,7 @@ each function exhibits on malformed input) is deferred to a future
 revision of this document — see the c-RCP-16 (issue #518) tracking
 comment for the current status of that remaining work.
 
-## 5. What this document does not do
+## 6. What this document does not do
 
 Consistent with issue #518's own scoping: this document does not
 assign ASIL-D to c-RCP (a category error for an SEOOC — ASIL attaches

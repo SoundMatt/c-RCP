@@ -51,12 +51,17 @@ case as part of a larger item's own safety argument.
 - Function-annotation density (every `.c` file traces to at least one
   requirement) is a hard 100% CI gate from v0.1.0
 - Requirement traceability (`cfusa trace --req-coverage 100`) has been a
-  hard 100% gate since v0.53.0. `.fusa-reqs.json`'s `catalogNote` records
-  this project's own `scope: "tc18"` (779 requirements — this project's
-  actual ISO 26262 safety-case basis) vs. `scope: "legacy-compat"` (75
-  requirements, retired pre-TC18 surface, `level`/`asil` demoted to
-  `QM`) split as of the Phase 22 re-certification pass (`ROADMAP.md`
-  milestone 85)
+  hard 100% gate since v0.53.0. `.fusa-reqs.json` currently carries 1095
+  requirements across four `scope` values — `tc18` (947: this project's
+  actual ISO 26262 safety-case basis), `tc18-gap` (136: TC18 normative
+  clauses not implemented, pinned rather than omitted), `retired` (6:
+  superseded/citation-corrected entries), and `internal` (6, QM: the
+  allocator-hook indirection) — see `SEOOC_BOUNDARY.md` §4 for the
+  freedom-from-interference argument over this partition and
+  `AUDIT_PACK.md` §1 for the full breakdown. (The pre-TC18 `scope:
+  "legacy-compat"` surface this line previously described was fully
+  removed at v0.91.0 and no longer exists in either the code or the
+  catalog.)
 - Two safety mechanisms are formally verified via TLC model checking
   (`tla/`, see `FORMAL_VERIFICATION.md`), wired into CI's
   `formal-verification` job

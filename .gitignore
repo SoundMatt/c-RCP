@@ -19,3 +19,6 @@ _deps/
 
 # TLC model-checker scratch state (tla2tools.jar working directory)
 tla/states/
+
+__pycache__/
+*.pyc

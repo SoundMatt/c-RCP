@@ -22,7 +22,7 @@ TC18 protocol and its own measured evidence.
 | Cybersecurity Architecture | `CYBERSECURITY.md` | Complete — re-derived, Phase 22 |
 | Formal Verification | `FORMAL_VERIFICATION.md` + `tla/*.tla` | Complete — re-derived, Phase 22 |
 | Portability Audit | `PORTABILITY.md` | Complete (unaffected by the protocol replacement — KEEP AS-IS per `ROADMAP.md`'s Satellite Package Disposition table) |
-| Safety Requirements | `.fusa-reqs.json` | 854 requirements; 779 `scope: "tc18"` (this project's ISO 26262 safety-case basis), 75 `scope: "legacy-compat"` (retired pre-TC18 surface, `level`/`asil` demoted to `QM`) — see the file's own `catalogNote` |
+| Safety Requirements | `.fusa-reqs.json` | 1095 requirements across four `scope` values — `tc18` (947: 859 ASIL-B/30 ASIL-A/58 QM, this project's ISO 26262 safety-case basis), `tc18-gap` (136: TC18 normative clauses not implemented, pinned rather than omitted), `retired` (6: superseded/citation-corrected entries), `internal` (6, QM: the allocator-hook indirection) — see `SEOOC_BOUNDARY.md` §4 for the freedom-from-interference argument over this partition, and the file's own `catalogNote` for the audit history |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
@@ -31,6 +31,29 @@ TC18 protocol and its own measured evidence.
 ---
 
 ## 2. ASIL-C Gap Analysis (ISO 26262 §7)
+
+**Audience and framing (c-RCP-16, issue #518, item 5):** this section
+is this project's own internal derogation table against its own
+ASIL-B/C baseline — it records why each ASIL-D-tier practice below
+either was or wasn't pursued, for this repository's own contributors
+and safety-case reviewers. It is evidence an integrator's own
+item-level ASIL-D HARA (ISO 26262-3:2018 Clause 6) can *draw on*, not
+a claim that c-RCP itself is ASIL-D-rated or ASIL-D-obligated — ASIL
+attaches to a vehicle-level hazard reached through that item-level
+HARA, never to a software element in isolation (`SEOOC_BOUNDARY.md`
+§1). Concretely: an integrator whose own HARA assigns ASIL-D to a
+hazard c-RCP participates in can read the "Current Coverage" column
+below as *supporting* their own decomposition or undecomposed-rigor
+argument at that ASIL, but the table does not do that argument's work
+for them, and the "Not implemented" rows are exactly that — genuinely
+absent controls, not conservatively-labeled present ones. See
+`SEOOC_BOUNDARY.md` (added alongside §2a below) for the fuller
+integrator-facing AoU/Safety-Manual-equivalent document this table is
+one input to, and its §4 for this project's freedom-from-interference
+argument over the ASIL/QM requirement-scope partition `.fusa-reqs.json`
+records (§1 above; the numbers in that table's earlier "854
+requirements / 75 legacy-compat" framing described a since-superseded
+milestone snapshot and are corrected there).
 
 c-RCP targets **ASIL-B** as its baseline. Under ISO 26262-3:2018 Table
 4, only **one** hazard — H-001 (see `HARA.md`) — computes above that
@@ -130,8 +153,10 @@ If c-RCP is used in an airborne system under DO-178C DAL-B:
 
 - Source code traceability to LLR: via `//cfusa:req` annotations —
   `.fusa-reqs.json`'s `scope: "tc18"` subset is this project's actual
-  LLR basis; `scope: "legacy-compat"` entries are informational only
-  (see §1)
+  LLR basis; `scope: "tc18-gap"`/`"retired"`/`"internal"` entries are
+  informational only (see §1; the pre-TC18 `scope: "legacy-compat"`
+  surface this bullet previously referenced was fully removed at
+  v0.91.0 and no longer exists in either the code or the catalog)
 - Tool qualification: `cfusa` is a Tool Qualification Level analysis
   tool — see `qualify-report.json`
 - Decision coverage: MC/DC required at DAL-B — see the open item in §3
@@ -171,15 +196,17 @@ All of the following gates run on every tagged release
 ## 6. Traceability Matrix
 
 Requirements → implementation tracing is maintained in `.fusa-reqs.json`
-(854 requirements: 779 `scope: "tc18"` covering the register-map,
+(1095 requirements: 947 `scope: "tc18"` covering the register-map,
 lifecycle FSM, E2E safe points, every endpoint type's request/response
 shape, discovery, power-mode transitions, and every ADAPT-class
-satellite shipped through v0.84.0; 75 `scope: "legacy-compat"`
-describing the retired pre-TC18 Zone/Command surface, kept — not
-deleted — because `src/rcp.c`/`include/rcp/rcp.h` and
-`tests/legacy_mock.*` still carry `//cfusa:req` tags naming them, per
-`ROADMAP.md`'s v0.84.0 milestone confirming that surface as the last
-consumer of those retired types anywhere in `src/`). `cfusa trace
+satellite; 136 `scope: "tc18-gap"` recording TC18 normative clauses
+not implemented, pinned by a test rather than omitted; 6
+`scope: "retired"` superseded/citation-corrected entries; 6
+`scope: "internal"` covering the allocator-hook indirection —
+see §1 and `SEOOC_BOUNDARY.md` §4. The pre-TC18 `scope: "legacy-compat"`
+Zone/Command surface this paragraph previously described was removed
+from both `src/` and this catalog at v0.91.0; `tests/legacy_mock.*`
+no longer exists). `cfusa trace
 --req-coverage 100` validates both metrics at 100% in CI: Metric 2
 (function-annotation density) has been a hard gate since v0.1.0; Metric
 1 (per-requirement traceability) became a hard gate at v0.53.0 once
@@ -199,9 +226,12 @@ For any change to a safety-relevant source file:
 2. Review all impacted requirements in the SCI report (`sci.json`)
 3. Re-run regression tests for all affected modules (`ctest`)
 4. Update `.fusa-reqs.json` if the change introduces new requirements —
-   set `scope: "tc18"` for anything describing shipped TC18 behavior;
-   `scope: "legacy-compat"` is reserved for the retired pre-TC18
-   surface and should not gain new entries
+   set `scope: "tc18"` for anything describing shipped TC18 behavior,
+   `scope: "tc18-gap"` for a normative clause deliberately not
+   implemented, or `scope: "internal"` for an implementation-detail
+   API with no direct TC18-spec basis (see §1); `scope: "retired"` is
+   reserved for superseded/citation-corrected entries and should not
+   gain new entries describing shipped functionality
 5. Re-generate the audit pack with `cfusa audit-pack`
 6. Obtain safety team review approval before merging
 

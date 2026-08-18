@@ -342,6 +342,102 @@ jobs:
           name: coverage-info
           path: coverage.info
 
+  # ── c-FuSa: real (non-branch-proxy) MC/DC evidence, informational ────────────
+  # c-RCP-16 (issue #518) item 3: `cfusa coverage --mcdc-file` can gate on
+  # genuine per-condition MC/DC data instead of the 100%-branch proxy the
+  # `cfusa-report` job's "Structural coverage report" step falls back to
+  # (see that step's own comment below). This job builds a second,
+  # separately-instrumented (clang `-fcoverage-mcdc`) copy of the test
+  # suite, exports real LLVM MC/DC data via `llvm-cov export`, and feeds it
+  # to cfusa. Landed as informational only (`|| true`), per this issue's
+  # own suggested sequencing ("land it first as a reported, non-gating CI
+  # metric... before considering any hard threshold") -- not yet a hard
+  # gate, since the real number (see mcdc-report.json) is well under 100%.
+  #
+  # NOTE on scripts/mcdc_translate.py: cfusa v0.5.54's --mcdc-file parser
+  # expects an object-keyed JSON shape
+  # (`{"covered_true_count":N,"covered_false_count":M}` per condition) that
+  # does not match real `llvm-cov export --format=text` output (a
+  # positional-array schema -- verified directly, reproduction and fix
+  # filed upstream as SoundMatt/c-FuSa#129). scripts/mcdc_translate.py is a
+  # narrow, tested format adapter that runs here so this repo isn't fully
+  # blocked on that upstream fix landing -- it re-encodes the real
+  # per-condition "independence pair covered" boolean llvm-cov already
+  # computed; it does not invent coverage data (see that script's own
+  # docstring for the full reproduction and rationale).
+  cfusa-mcdc:
+    name: cfusa coverage --mcdc-file (real MC/DC, informational)
+    runs-on: ubuntu-22.04
+    needs: cfusa-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Translator self-test (fixtures, no clang/build needed)
+        run: python3 scripts/test_mcdc_translate.py
+
+      - name: Install tools + clang 18 (first LLVM release with -fcoverage-mcdc)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build wget
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          sudo apt-get install -y clang-18 llvm-18
+
+      - name: Configure (MC/DC-instrumented build)
+        env:
+          CC: clang-18
+        run: |
+          cmake -B build-mcdc \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc -O0" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate -fcoverage-mapping" \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build-mcdc --parallel
+
+      - name: Run tests (instrumented, one profraw per test process)
+        run: |
+          mkdir -p build-mcdc/mcdc-profiles
+          LLVM_PROFILE_FILE="$PWD/build-mcdc/mcdc-profiles/%p.profraw" \
+            ctest --test-dir build-mcdc --output-on-failure -j1
+
+      - name: Merge profile data
+        run: llvm-profdata-18 merge -sparse build-mcdc/mcdc-profiles/*.profraw -o mcdc.profdata
+
+      - name: Export real LLVM MC/DC JSON
+        run: |
+          objects=()
+          for bin in build-mcdc/tests/test_*; do
+            [ -x "$bin" ] && [ -f "$bin" ] && objects+=("-object=$bin")
+          done
+          first="${objects[0]#-object=}"
+          llvm-cov-18 export "$first" "${objects[@]:1}" \
+            -instr-profile=mcdc.profdata -format=text > mcdc-llvm-export.json
+
+      - name: Translate to cfusa's expected schema
+        run: python3 scripts/mcdc_translate.py mcdc-llvm-export.json mcdc-translated.json
+
+      - name: Real MC/DC report (informational, not yet a hard gate)
+        run: |
+          /tmp/cfusa/build/cfusa coverage --mcdc-file mcdc-translated.json \
+            --format json --output mcdc-report.json || true
+          cat mcdc-report.json
+
+      - name: Upload MC/DC report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcdc-report
+          path: mcdc-report.json
+
   # ── Build c-FuSa binary (shared by all cfusa-* jobs) ─────────────────────────
   cfusa-build:
     name: Build c-FuSa
@@ -599,6 +695,7 @@ jobs:
     needs:
       - build-and-test
       - coverage
+      - cfusa-mcdc
       - cfusa-analyze
       - cfusa-cyber
       - cfusa-trace
@@ -617,6 +714,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-info
+          path: .
+
+      - name: Download real MC/DC report
+        uses: actions/download-artifact@v4
+        with:
+          name: mcdc-report
           path: .
 
       # Best-effort by design, not masking a real gate: DAL-B requires 100%
@@ -658,3 +761,4 @@ jobs:
             report.json
             results.sarif
             coverage-report.json
+            mcdc-report.json
