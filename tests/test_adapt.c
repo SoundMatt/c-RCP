@@ -30,12 +30,16 @@
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/discovery.h>
+#include <rcp/ep_adc.h>
 #include <rcp/ep_can.h>
 #include <rcp/ep_gpio.h>
 #include <rcp/ep_i2c.h>
 #include <rcp/ep_iseled.h>
+#include <rcp/ep_lin.h>
 #include <rcp/ep_mdio.h>
+#include <rcp/ep_pwm.h>
 #include <rcp/ep_spi.h>
+#include <rcp/ep_uart.h>
 #include <rcp/ep_wakeup.h>
 #include <rcp/power.h>
 #include <rcp/rcp.h>
@@ -248,6 +252,11 @@ static void test_op_string_round_trips_every_op(void)
         TEST_ASSERT_TRUE(rcp_adapt_op_from_string(name, &parsed));
         TEST_ASSERT_EQUAL(ALL_OPS[i], parsed);
     }
+}
+
+static void test_op_string_rejects_out_of_range_op(void)
+{
+    TEST_ASSERT_EQUAL_STRING("unknown", rcp_adapt_op_string((rcp_adapt_op_t)999));
 }
 
 static void test_op_from_string_rejects_unknown_and_null(void)
@@ -470,6 +479,29 @@ static void test_uart_read_request_requires_read_size_meta(void)
     relay_message_free(&msg);
 }
 
+static void test_uart_read_request_round_trips_with_read_size_meta(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    uint16_t out_read_size = 0;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.uart.read_size", "8");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_UART_READ, 1, make_stream(1), &msg, 3, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
+        rcp_ep_uart_decode_read_request(req.data, req.len, 1, &out_read_size, &out_txn));
+    TEST_ASSERT_EQUAL_UINT16(8, out_read_size);
+    TEST_ASSERT_EQUAL_UINT8(3, out_txn);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
 /* issue #471: RCP_ADAPT_OP_ISELED_COMMAND now selects the read direction
  * the same way RCP_ADAPT_OP_I2C_TRANSFER does -- meta rcp.iseled.read_size
  * absent/0 stays the (unchanged) write direction; non-zero switches to
@@ -680,6 +712,790 @@ static void test_discovery_response_maps_fields_and_server_stream_id(void)
     rcp_bytes_free(&frame);
 }
 
+/* issue #520 category 1 remainder: rcp_message_to_request()'s and
+ * response_to_message_impl()'s per-op switches (src/adapt.c) were only
+ * directly exercised for a handful of ops each (GPIO/SPI/I2C/UART_READ/
+ * ISELED/CAN/MDIO_WRITE/WAKEUP_SLEEPCMD request side; GPIO/WAKEUP_SLEEPCMD/
+ * DISCOVERY response side) even though every op has its own dedicated case
+ * arm. The tests below hit every remaining arm on both switches directly,
+ * plus the default (out-of-range op) arm on each -- mechanical, table-driven
+ * dispatch coverage, the same pattern PR #526 used for the smaller
+ * op-kind/strerror/protocol-string tables. */
+
+static void test_discovery_request_round_trips_default_read_size(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    rcp_discovery_request_t out_req;
+
+    relay_message_init(&msg); /* no rcp.discovery.read_size set */
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_DISCOVERY, 0, make_stream(9), &msg, 4, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_OK, rcp_discovery_decode_request(req.data, req.len, &out_req));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN, out_req.read_size);
+    TEST_ASSERT_EQUAL_UINT8(4, out_req.transaction_num);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_uart_write_request_round_trips(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t tx[] = {0xAA, 0xBB};
+    const uint8_t *out_tx = NULL;
+    size_t out_tx_len = 0;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(tx, sizeof(tx));
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_UART_WRITE, 3, make_stream(1), &msg, 9, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
+        rcp_ep_uart_decode_write_request(req.data, req.len, 3, &out_tx, &out_tx_len, &out_txn));
+    TEST_ASSERT_EQUAL_UINT(sizeof(tx), out_tx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_adc_read_request_uses_default_read_size_when_meta_absent(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+
+    relay_message_init(&msg); /* no rcp.adc.read_size set */
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_ADC_READ, 2, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_pwm_out_read_request_round_trips(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+
+    relay_message_init(&msg);
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_PWM_OUT_READ, 4, make_stream(1), &msg, 2, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_pwm_out_write_request_maps_payload_and_evt_meta(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t payload[RCP_EP_PWM_PAYLOAD_LEN] = {0x00, 0x64, 0x00, 0x32}; /* period=100, active=50 */
+    rcp_ep_pwm_value_t out_value;
+    uint8_t out_evt = 0xFF;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(payload, sizeof(payload));
+    relay_message_set_meta(&msg, "rcp.pwm.evt", "1"); /* RCP_EP_PWM_OUT_WRITE_OR */
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_PWM_OUT_WRITE, 4, make_stream(1), &msg, 3, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_OK,
+        rcp_ep_pwm_out_decode_write_request(req.data, req.len, 4, &out_value, &out_evt, &out_txn));
+    TEST_ASSERT_EQUAL_UINT16(100, out_value.period);
+    TEST_ASSERT_EQUAL_UINT16(50, out_value.active_duration);
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_WRITE_OR, out_evt);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_pwm_out_write_request_rejects_wrong_payload_length(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+    uint8_t payload[1] = {0};
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(payload, sizeof(payload));
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_PWM_OUT_WRITE, 4, make_stream(1), &msg, 3, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+static void test_pwm_in_read_request_round_trips(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+
+    relay_message_init(&msg);
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_PWM_IN_READ, 5, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_lin_command_request_round_trips(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t tx[] = {0x01, 0x02, 0x03};
+    const uint8_t *out_tx = NULL;
+    size_t out_tx_len = 0;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(tx, sizeof(tx));
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_LIN_COMMAND, 6, make_stream(1), &msg, 8, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_OK,
+        rcp_ep_lin_decode_command_request(req.data, req.len, 6, &out_tx, &out_tx_len, &out_txn));
+    TEST_ASSERT_EQUAL_UINT(sizeof(tx), out_tx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_mdio_read_request_maps_addr_and_word_count_meta(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    rcp_ep_mdio_addr_t out_addr;
+    size_t out_word_count = 0;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.mdio.clause", "1"); /* RCP_EP_MDIO_CLAUSE_45 */
+    relay_message_set_meta(&msg, "rcp.mdio.prtad", "2");
+    relay_message_set_meta(&msg, "rcp.mdio.devad", "3");
+    relay_message_set_meta(&msg, "rcp.mdio.regad", "256"); /* decimal -- meta_get_u32 is base 10 */
+    relay_message_set_meta(&msg, "rcp.mdio.word_count", "5");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_MDIO_READ, 7, make_stream(1), &msg, 2, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK,
+        rcp_ep_mdio_decode_read_request(req.data, req.len, 7, &out_addr, &out_word_count,
+                                         &out_txn));
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_CLAUSE_45, out_addr.clause);
+    TEST_ASSERT_EQUAL_UINT8(2, out_addr.prtad);
+    TEST_ASSERT_EQUAL_UINT8(3, out_addr.devad);
+    TEST_ASSERT_EQUAL_UINT16(256, out_addr.regad);
+    TEST_ASSERT_EQUAL_UINT(5, out_word_count);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_wakeup_wakeup_request_round_trips(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t out_txn = 0;
+
+    relay_message_init(&msg);
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_WAKEUP_WAKEUP, 0, make_stream(1), &msg, 12, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+        rcp_ep_wakeup_decode_wakeup_message(req.data, req.len, 0, &out_txn));
+    TEST_ASSERT_EQUAL_UINT8(12, out_txn);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_message_to_request_rejects_out_of_range_op(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    relay_message_init(&msg);
+
+    req = rcp_message_to_request((rcp_adapt_op_t)999, 0, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+/* out_err is documented as an optional out-parameter on both
+ * rcp_message_to_request() and rcp_response_to_message() -- every `if
+ * (out_err) ...` null-check in src/adapt.c (fail_encode()/fail_decode()/
+ * the two entry points themselves) was previously only ever called with a
+ * non-NULL out_err across the whole suite, leaving that guard's NULL arm
+ * completely unexercised on both the success and failure paths. */
+static void test_message_to_request_tolerates_null_out_err(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+
+    relay_message_init(&msg);
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_GPIO_READ, 1, make_stream(1), &msg, 1, NULL);
+    TEST_ASSERT_NOT_NULL(req.data);
+    rcp_bytes_free(&req);
+
+    req = rcp_message_to_request((rcp_adapt_op_t)999, 0, make_stream(1), &msg, 1, NULL);
+    TEST_ASSERT_NULL(req.data);
+
+    relay_message_free(&msg);
+}
+
+static void test_response_to_message_tolerates_null_out_err(void)
+{
+    rcp_bytes_t frame = rcp_ep_gpio_encode_response(7, 1, 1, false, 0);
+    relay_message_t msg;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_GPIO_READ, 7, frame.data, frame.len, NULL);
+    TEST_ASSERT_NOT_NULL(msg.payload.data);
+    relay_message_free(&msg);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_GPIO_READ, 8 /* wrong bus */, frame.data,
+                                   frame.len, NULL);
+    TEST_ASSERT_NULL(msg.payload.data);
+
+    rcp_bytes_free(&frame);
+}
+
+/* meta_get_u32()'s own `!v || !*v` short-circuit (src/adapt.c): the `!v`
+ * (key entirely absent) arm was already exercised via e.g.
+ * test_uart_read_request_requires_read_size_meta, but the `!*v` arm (key
+ * present with an explicit empty-string value) was not. */
+static void test_uart_read_request_rejects_empty_read_size_meta(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.uart.read_size", "");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_UART_READ, 1, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+static void test_spi_transfer_response_maps_channel_and_payload(void)
+{
+    uint8_t rx[] = {0x10, 0x20, 0x30};
+    rcp_bytes_t frame = rcp_ep_spi_encode_response(2, 5, rx, sizeof(rx), 11, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_SPI_TRANSFER, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, msg.payload.data, sizeof(rx));
+    TEST_ASSERT_EQUAL_STRING("5", relay_message_get_meta(&msg, "rcp.spi.channel"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_i2c_transfer_response_reports_read_size_for_read_direction(void)
+{
+    uint8_t rx[] = {0x01, 0x02};
+    rcp_bytes_t frame =
+        rcp_ep_i2c_encode_response(2, RCP_EP_I2C_DIR_READ, rx, sizeof(rx), 4, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_I2C_TRANSFER, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_STRING("2", relay_message_get_meta(&msg, "rcp.i2c.read_size"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_i2c_transfer_response_reports_zero_read_size_for_write_direction(void)
+{
+    rcp_bytes_t frame = rcp_ep_i2c_encode_response(2, RCP_EP_I2C_DIR_WRITE, NULL, 0, 4, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_I2C_TRANSFER, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_STRING("0", relay_message_get_meta(&msg, "rcp.i2c.read_size"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_uart_write_response_maps_accepted_payload(void)
+{
+    uint8_t accepted[] = {0x55, 0x66};
+    rcp_bytes_t frame =
+        rcp_ep_uart_encode_write_response(3, accepted, sizeof(accepted), 4, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_UART_WRITE, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(accepted), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(accepted, msg.payload.data, sizeof(accepted));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_uart_read_response_maps_rx_payload(void)
+{
+    uint8_t rx[] = {0x01, 0x02, 0x03};
+    rcp_bytes_t frame = rcp_ep_uart_encode_read_response(2, rx, sizeof(rx), 11, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_UART_READ, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, msg.payload.data, sizeof(rx));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_adc_read_response_maps_values_big_endian_and_count_meta(void)
+{
+    uint16_t values[] = {0x0102, 0x0304, 0x0506};
+    rcp_bytes_t frame = rcp_ep_adc_encode_response(2, values, 3, 7, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_ADC_READ, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(6, msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8(0x01, msg.payload.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x02, msg.payload.data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x05, msg.payload.data[4]);
+    TEST_ASSERT_EQUAL_UINT8(0x06, msg.payload.data[5]);
+    TEST_ASSERT_EQUAL_STRING("3", relay_message_get_meta(&msg, "rcp.adc.value_count"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_pwm_out_response_maps_value_payload_for_read_and_write_ops(void)
+{
+    rcp_ep_pwm_value_t value;
+    rcp_bytes_t frame;
+    relay_message_t msg;
+    rcp_adapt_errc_t err;
+
+    value.period          = 100;
+    value.active_duration = 25;
+    frame = rcp_ep_pwm_out_encode_response(9, value, 11, false, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    err = RCP_ADAPT_ERR_DECODE;
+    msg = rcp_response_to_message(RCP_ADAPT_OP_PWM_OUT_READ, 9, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(RCP_EP_PWM_PAYLOAD_LEN, msg.payload.len);
+    relay_message_free(&msg);
+
+    /* Same underlying frame/case block, entered via the WRITE label this
+     * time -- both case labels fall into the identical body. */
+    err = RCP_ADAPT_ERR_DECODE;
+    msg = rcp_response_to_message(RCP_ADAPT_OP_PWM_OUT_WRITE, 9, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(RCP_EP_PWM_PAYLOAD_LEN, msg.payload.len);
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_pwm_in_read_response_maps_value_payload(void)
+{
+    rcp_ep_pwm_value_t value;
+    rcp_bytes_t frame;
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    value.period          = 40;
+    value.active_duration = 10;
+    frame = rcp_ep_pwm_in_encode_response(1, value, 3, false, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_PWM_IN_READ, 1, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(RCP_EP_PWM_PAYLOAD_LEN, msg.payload.len);
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_lin_command_response_maps_rx_payload(void)
+{
+    uint8_t rx[] = {0xAA, 0xBB};
+    rcp_bytes_t frame = rcp_ep_lin_encode_response(2, rx, sizeof(rx), 11, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_LIN_COMMAND, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, msg.payload.data, sizeof(rx));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_can_frame_response_maps_frame_fields_and_payload(void)
+{
+    uint8_t rx[] = {0xDE, 0xAD};
+    rcp_bytes_t frame = rcp_ep_can_encode_frame_response(2, RCP_EP_CAN_FRAME_FBFF, 0x55, NULL, rx,
+                                                          sizeof(rx), 11, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_CAN_FRAME, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, msg.payload.data, sizeof(rx));
+    {
+        char expected_format[8];
+        snprintf(expected_format, sizeof(expected_format), "%u",
+                 (unsigned)RCP_EP_CAN_FRAME_FBFF);
+        TEST_ASSERT_EQUAL_STRING(expected_format,
+                                  relay_message_get_meta(&msg, "rcp.can.frame_format"));
+    }
+    TEST_ASSERT_EQUAL_STRING("85", relay_message_get_meta(&msg, "rcp.can.arbitration_id"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_iseled_command_response_maps_rx_payload(void)
+{
+    uint8_t rx[] = {0x01, 0x02, 0x03};
+    rcp_bytes_t frame = rcp_ep_iseled_encode_response(2, rx, sizeof(rx), 11, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_ISELED_COMMAND, 2, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, msg.payload.data, sizeof(rx));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_mdio_read_response_maps_words_payload(void)
+{
+    uint16_t words[2] = {0x1234, 0x5678};
+    rcp_bytes_t frame;
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    frame = rcp_ep_mdio_encode_read_response(3, words, 2, 5, false, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_MDIO_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(4, msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, rcp_ep_mdio_unpack_word_at(msg.payload.data, 0));
+    TEST_ASSERT_EQUAL_UINT16(0x5678, rcp_ep_mdio_unpack_word_at(msg.payload.data, 1));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_mdio_write_response_maps_words_payload(void)
+{
+    uint16_t accepted[1] = {0xBEEF};
+    rcp_bytes_t frame;
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    frame = rcp_ep_mdio_encode_write_response(3, accepted, 1, 6, false, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_MDIO_WRITE, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_UINT(2, msg.payload.len);
+    TEST_ASSERT_EQUAL_UINT16(0xBEEF, rcp_ep_mdio_unpack_word_at(msg.payload.data, 0));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_wakeup_wakeup_response_round_trips(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message(0, 12);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_ERR_DECODE;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_WAKEUP_WAKEUP, 0, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL_STRING("12", relay_message_get_meta(&msg, "rcp.transaction_num"));
+
+    relay_message_free(&msg);
+    rcp_bytes_free(&frame);
+}
+
+static void test_response_to_message_rejects_out_of_range_op(void)
+{
+    uint8_t junk[4] = {0};
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message((rcp_adapt_op_t)999, 0, junk, sizeof(junk), &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+    TEST_ASSERT_NULL(msg.id);
+    TEST_ASSERT_NULL(msg.payload.data);
+}
+
+/* Every remaining response_to_message_impl() `return fail_decode(out_err);`
+ * call site (issue #520 category 1 remainder): each op's own decode
+ * failure was previously only exercised for GPIO. A response frame built
+ * for byte_bus_id 2 decoded against a mismatched requested bus (3) fails
+ * that op's own rcp_ep_*_decode_*() call the same way
+ * test_response_to_message_rejects_wrong_bus does for GPIO, hitting this
+ * op's own fail_decode() line rather than GPIO's already-covered one. */
+
+static void test_spi_transfer_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_spi_encode_response(2, 0, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_SPI_TRANSFER, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+    TEST_ASSERT_NULL(msg.payload.data);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_i2c_transfer_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_i2c_encode_response(2, RCP_EP_I2C_DIR_WRITE, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_I2C_TRANSFER, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_uart_write_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_uart_encode_write_response(2, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_UART_WRITE, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_uart_read_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_uart_encode_read_response(2, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_UART_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_adc_read_response_decode_failure_is_reported(void)
+{
+    uint16_t values[1] = {1};
+    rcp_bytes_t frame = rcp_ep_adc_encode_response(2, values, 1, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_ADC_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_pwm_out_response_decode_failure_is_reported(void)
+{
+    rcp_ep_pwm_value_t value = {0, 0};
+    rcp_bytes_t frame = rcp_ep_pwm_out_encode_response(2, value, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_PWM_OUT_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_pwm_in_response_decode_failure_is_reported(void)
+{
+    rcp_ep_pwm_value_t value = {0, 0};
+    rcp_bytes_t frame = rcp_ep_pwm_in_encode_response(2, value, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_PWM_IN_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_lin_command_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_lin_encode_response(2, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_LIN_COMMAND, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_can_frame_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_can_encode_frame_response(2, RCP_EP_CAN_FRAME_CBFF, 0, NULL, NULL,
+                                                          0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_CAN_FRAME, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_iseled_command_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_iseled_encode_response(2, NULL, 0, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_ISELED_COMMAND, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_mdio_read_response_decode_failure_is_reported(void)
+{
+    uint16_t words[1] = {0x1234};
+    rcp_bytes_t frame = rcp_ep_mdio_encode_read_response(2, words, 1, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_MDIO_READ, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_mdio_write_response_decode_failure_is_reported(void)
+{
+    uint16_t words[1] = {0x1234};
+    rcp_bytes_t frame = rcp_ep_mdio_encode_write_response(2, words, 1, 0, false, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_MDIO_WRITE, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_wakeup_sleepcmd_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_sleepcmd_response(2, RCP_PWRMODE_ENTRY_OK, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_WAKEUP_SLEEPCMD, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_wakeup_wakeup_response_decode_failure_is_reported(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message(2, 0);
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_WAKEUP_WAKEUP, 3, frame.data, frame.len, &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_discovery_response_decode_failure_is_reported(void)
+{
+    uint8_t junk[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+    relay_message_t msg;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    msg = rcp_response_to_message(RCP_ADAPT_OP_DISCOVERY, 0, junk, sizeof(junk), &err);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, err);
+    TEST_ASSERT_NULL(msg.id);
+}
+
 /* ── §10.3: rcp_adapt() wraps an rcp_avtp_transport_t as a relay Caller ─────── */
 
 static void test_adapt_returns_non_null(void)
@@ -771,6 +1587,41 @@ static void test_adapt_send_transmits_a_valid_gpio_write_request(void)
     rcp_avtp_transport_release(server_t);
 }
 
+/* adapter_send()'s own final transport-error fallthrough (ec not OK/
+ * CLOSED): shmem_side_send() (src/shmem.c) reports RCP_ERR_BUSY once the
+ * client->server queue is at its configured capacity -- a real, reachable
+ * transport condition distinct from the CLOSED case
+ * test_send_closed_error_is_relay_equivalent() already covers. */
+static void test_adapt_send_returns_transport_error_when_queue_is_full(void)
+{
+    rcp_avtp_transport_t *client_t = NULL;
+    rcp_avtp_transport_t *server_t = NULL;
+    rcp_relay_caller_t *caller;
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t msg;
+    uint8_t payload[RCP_EP_GPIO_PAYLOAD_LEN] = {0, 0, 0, 0x2A};
+    int ec;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 1, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 9, RCP_ADAPT_EP_GPIO);
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.adapt.op", "gpio_write");
+    msg.payload = relay_bytes_dup(payload, sizeof(payload));
+
+    /* Queue capacity is 1 and nothing ever drains it (server_t never
+     * recv()s) -- the first send() fills the queue, the second overflows
+     * it. */
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, rcp_relay_caller_send(caller, &ctx, &msg));
+    ec = rcp_relay_caller_send(caller, &ctx, &msg);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_TRANSPORT, ec);
+
+    relay_message_free(&msg);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
 static void test_adapt_call_gpio_read_returns_mapped_response(void)
 {
     rcp_avtp_transport_t *client_t = NULL;
@@ -812,6 +1663,110 @@ static void test_adapt_call_gpio_read_returns_mapped_response(void)
 
     relay_message_free(&req);
     relay_message_free(&resp);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
+/* adapter_call()'s RCP_ADAPT_OP_DISCOVERY branch (src/adapt.c): unlike
+ * every other op, a discovery reply is read straight off the wire with no
+ * NTSCF unwrap -- rcp_discovery_encode_response() already returns a
+ * complete standalone frame, mirroring the request side's own
+ * already-NTSCF-framed discovery request (build_frame()'s own doc
+ * comment). Previously only exercised via the GPIO op, which always takes
+ * the NTSCF-unwrap branch instead. */
+static void test_adapt_call_discovery_returns_mapped_response(void)
+{
+    rcp_avtp_transport_t *client_t = NULL;
+    rcp_avtp_transport_t *server_t = NULL;
+    rcp_relay_caller_t *caller;
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t req, resp = {0};
+    rcp_regmap_general_t map;
+    rcp_bytes_t resp_frame;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 4, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 0, RCP_ADAPT_EP_DISCOVERY);
+
+    rcp_regmap_general_init(&map);
+    map.vendor_id = 0xAAAA;
+    resp_frame = rcp_discovery_encode_response(&map, (uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN, 1,
+                                                make_stream(2));
+    TEST_ASSERT_NOT_NULL(resp_frame.data);
+    TEST_ASSERT_EQUAL(RCP_OK,
+                       rcp_avtp_transport_send(server_t, resp_frame.data, resp_frame.len));
+    rcp_bytes_free(&resp_frame);
+
+    relay_message_init(&req);
+    relay_message_set_meta(&req, "rcp.adapt.op", "discovery");
+
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, rcp_relay_caller_call(caller, &ctx, &req, &resp));
+    TEST_ASSERT_EQUAL_STRING("43690", relay_message_get_meta(&resp, "rcp.discovery.vendor_id"));
+
+    relay_message_free(&req);
+    relay_message_free(&resp);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
+/* adapter_call()'s rcp_avtp_decode_ntscf() failure branch: a non-discovery
+ * op whose reply frame doesn't parse as NTSCF at all (not merely a
+ * downstream ep_*.h decode failure, which the response_to_message_impl()
+ * tests above already cover). */
+static void test_adapt_call_returns_decode_error_on_malformed_ntscf_reply(void)
+{
+    rcp_avtp_transport_t *client_t = NULL;
+    rcp_avtp_transport_t *server_t = NULL;
+    rcp_relay_caller_t *caller;
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t req, resp = {0};
+    uint8_t junk[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    int ec;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 4, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 9, RCP_ADAPT_EP_GPIO);
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(server_t, junk, sizeof(junk)));
+
+    relay_message_init(&req);
+    relay_message_set_meta(&req, "rcp.adapt.op", "gpio_read");
+
+    ec = rcp_relay_caller_call(caller, &ctx, &req, &resp);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, ec);
+
+    relay_message_free(&req);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
+/* adapter_call()'s final transport-error fallthrough (ec not OK/TIMEOUT/
+ * CLOSED): shmem_side_recv() (src/shmem.c) reports RCP_ERR_BUSY when a
+ * queued frame exceeds the caller's receive buffer -- ADAPT_RECV_BUF_LEN
+ * (src/adapt.c) -- which is exactly such a non-OK/TIMEOUT/CLOSED code. */
+static void test_adapt_call_returns_transport_error_on_oversized_reply(void)
+{
+    rcp_avtp_transport_t *client_t = NULL;
+    rcp_avtp_transport_t *server_t = NULL;
+    rcp_relay_caller_t *caller;
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t req, resp = {0};
+    static uint8_t oversized[2200]; /* > ADAPT_RECV_BUF_LEN (2047 + 64) */
+    int ec;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 4, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 9, RCP_ADAPT_EP_GPIO);
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(server_t, oversized, sizeof(oversized)));
+
+    relay_message_init(&req);
+    relay_message_set_meta(&req, "rcp.adapt.op", "gpio_read");
+
+    ec = rcp_relay_caller_call(caller, &ctx, &req, &resp);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_TRANSPORT, ec);
+
+    relay_message_free(&req);
     rcp_relay_caller_release(caller);
     rcp_avtp_transport_release(client_t);
     rcp_avtp_transport_release(server_t);
@@ -949,6 +1904,7 @@ int main(void)
     RUN_TEST(test_op_kind_covers_every_op);
     RUN_TEST(test_op_kind_rejects_out_of_range_op);
     RUN_TEST(test_op_string_round_trips_every_op);
+    RUN_TEST(test_op_string_rejects_out_of_range_op);
     RUN_TEST(test_op_from_string_rejects_unknown_and_null);
     RUN_TEST(test_adapt_strerror_never_null);
     RUN_TEST(test_adapt_strerror_covers_every_code);
@@ -962,6 +1918,8 @@ int main(void)
     RUN_TEST(test_spi_transfer_request_maps_channel_meta_and_payload);
     RUN_TEST(test_i2c_transfer_request_has_no_channel_selector);
     RUN_TEST(test_uart_read_request_requires_read_size_meta);
+    RUN_TEST(test_uart_read_request_round_trips_with_read_size_meta);
+    RUN_TEST(test_uart_read_request_rejects_empty_read_size_meta);
     RUN_TEST(test_iseled_command_default_is_write_direction);
     RUN_TEST(test_iseled_command_read_size_meta_selects_read_direction);
     RUN_TEST(test_iseled_command_read_size_above_max_rejected);
@@ -971,11 +1929,59 @@ int main(void)
     RUN_TEST(test_wakeup_sleepcmd_round_trips_without_timed_meta);
     RUN_TEST(test_discovery_response_maps_fields_and_server_stream_id);
 
+    RUN_TEST(test_discovery_request_round_trips_default_read_size);
+    RUN_TEST(test_uart_write_request_round_trips);
+    RUN_TEST(test_adc_read_request_uses_default_read_size_when_meta_absent);
+    RUN_TEST(test_pwm_out_read_request_round_trips);
+    RUN_TEST(test_pwm_out_write_request_maps_payload_and_evt_meta);
+    RUN_TEST(test_pwm_out_write_request_rejects_wrong_payload_length);
+    RUN_TEST(test_pwm_in_read_request_round_trips);
+    RUN_TEST(test_lin_command_request_round_trips);
+    RUN_TEST(test_mdio_read_request_maps_addr_and_word_count_meta);
+    RUN_TEST(test_wakeup_wakeup_request_round_trips);
+    RUN_TEST(test_message_to_request_rejects_out_of_range_op);
+    RUN_TEST(test_message_to_request_tolerates_null_out_err);
+    RUN_TEST(test_response_to_message_tolerates_null_out_err);
+    RUN_TEST(test_spi_transfer_response_maps_channel_and_payload);
+    RUN_TEST(test_i2c_transfer_response_reports_read_size_for_read_direction);
+    RUN_TEST(test_i2c_transfer_response_reports_zero_read_size_for_write_direction);
+    RUN_TEST(test_uart_write_response_maps_accepted_payload);
+    RUN_TEST(test_uart_read_response_maps_rx_payload);
+    RUN_TEST(test_adc_read_response_maps_values_big_endian_and_count_meta);
+    RUN_TEST(test_pwm_out_response_maps_value_payload_for_read_and_write_ops);
+    RUN_TEST(test_pwm_in_read_response_maps_value_payload);
+    RUN_TEST(test_lin_command_response_maps_rx_payload);
+    RUN_TEST(test_can_frame_response_maps_frame_fields_and_payload);
+    RUN_TEST(test_iseled_command_response_maps_rx_payload);
+    RUN_TEST(test_mdio_read_response_maps_words_payload);
+    RUN_TEST(test_mdio_write_response_maps_words_payload);
+    RUN_TEST(test_wakeup_wakeup_response_round_trips);
+    RUN_TEST(test_response_to_message_rejects_out_of_range_op);
+    RUN_TEST(test_spi_transfer_response_decode_failure_is_reported);
+    RUN_TEST(test_i2c_transfer_response_decode_failure_is_reported);
+    RUN_TEST(test_uart_write_response_decode_failure_is_reported);
+    RUN_TEST(test_uart_read_response_decode_failure_is_reported);
+    RUN_TEST(test_adc_read_response_decode_failure_is_reported);
+    RUN_TEST(test_pwm_out_response_decode_failure_is_reported);
+    RUN_TEST(test_pwm_in_response_decode_failure_is_reported);
+    RUN_TEST(test_lin_command_response_decode_failure_is_reported);
+    RUN_TEST(test_can_frame_response_decode_failure_is_reported);
+    RUN_TEST(test_iseled_command_response_decode_failure_is_reported);
+    RUN_TEST(test_mdio_read_response_decode_failure_is_reported);
+    RUN_TEST(test_mdio_write_response_decode_failure_is_reported);
+    RUN_TEST(test_wakeup_sleepcmd_response_decode_failure_is_reported);
+    RUN_TEST(test_wakeup_wakeup_response_decode_failure_is_reported);
+    RUN_TEST(test_discovery_response_decode_failure_is_reported);
+
     RUN_TEST(test_adapt_returns_non_null);
     RUN_TEST(test_adapt_protocol_returns_rcp);
     RUN_TEST(test_adapt_rejects_op_outside_bound_kind);
     RUN_TEST(test_adapt_send_transmits_a_valid_gpio_write_request);
+    RUN_TEST(test_adapt_send_returns_transport_error_when_queue_is_full);
     RUN_TEST(test_adapt_call_gpio_read_returns_mapped_response);
+    RUN_TEST(test_adapt_call_discovery_returns_mapped_response);
+    RUN_TEST(test_adapt_call_returns_decode_error_on_malformed_ntscf_reply);
+    RUN_TEST(test_adapt_call_returns_transport_error_on_oversized_reply);
     RUN_TEST(test_adapt_subscribe_is_not_supported);
     RUN_TEST(test_adapt_close_is_idempotent);
     RUN_TEST(test_caller_retain_returns_same_pointer_and_keeps_it_alive);

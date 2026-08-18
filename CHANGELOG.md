@@ -34,6 +34,65 @@ the rationale.
 
 ## Releases
 
+### v0.423.0 -- 2026-08-18 (c-RCP-19: adapt.c dispatch-table branch/line coverage closed to its structural ceiling)
+
+Continues issue #520's category 1 backlog (the smaller op-kind/strerror/
+protocol-string dispatch tables were closed in v0.410.0/PR #526): the
+two large per-op switches in `src/adapt.c` --
+`rcp_message_to_request()`'s 18-arm encode dispatch and
+`response_to_message_impl()`'s 17-arm decode dispatch, plus the
+`rcp_adapter_t` wrapper's `send()`/`call()` transport-error and
+NTSCF-unwrap branches -- were previously exercised for only a handful
+of ops each (GPIO/SPI/I2C/UART_READ/ISELED/CAN/MDIO_WRITE/
+WAKEUP_SLEEPCMD on the request side; GPIO/WAKEUP_SLEEPCMD/DISCOVERY on
+the response side), leaving most op-specific case arms and both
+switches' `default` (out-of-range op) arms completely unhit.
+
+Added 41 new `tests/test_adapt.c` cases, mechanical and table-driven
+like PR #526's: one request-encode round-trip (or documented rejection)
+per previously-untested op, one response-decode success mapping per op,
+one response-decode *failure* (`fail_decode()`) per op via a
+wrong-bus-id mismatch, three new `rcp_adapt()`-wrapper `call()` tests
+(the `RCP_ADAPT_OP_DISCOVERY` branch that skips NTSCF unwrap, a
+malformed-NTSCF-reply decode failure, and an oversized-reply transport
+error via `shmem_side_recv()`'s real `RCP_ERR_BUSY` path), one new
+`send()` transport-error test (queue-capacity overflow via
+`shmem_side_send()`'s real `RCP_ERR_BUSY` path), both switches'
+out-of-range-op `default` arms, both public entry points' documented
+`out_err == NULL` tolerance, and `meta_get_u32()`'s empty-string-value
+short-circuit. No source change. Mutation-tested a sample (temporarily
+broke `RCP_ADAPT_OP_CAN_FRAME`'s response arm and the `adapter_call()`
+DISCOVERY branch; both new tests failed as expected, both reverted).
+
+**Measured impact** (local coverage build matching `ci.yml`'s
+`coverage` job's exact `lcov --capture`/`--remove` invocation, run
+through the CI-pinned `cfusa` v0.5.54 `coverage` command):
+- `src/adapt.c`: line 63.3% -> 99.8%, branch 53.1% -> 85.1%, function
+  87.1% -> 100%
+- project-wide: line 92.2% -> 93.7%, branch 79.6% -> 80.9%
+
+`src/adapt.c`'s remaining ~15-point branch gap is one confirmed
+structurally-unreachable defensive check --
+`meta_get_u32()`'s `if (!end || *end != '\0')`, where `!end` can never
+be true because C99's `strtoul()` contract guarantees `endptr` is
+always written, success or failure -- plus a residual of
+partial-condition combinations in the same function's multi-clause
+guards that a next batch can still close; not treated as this file's
+final ceiling.
+
+Full 67-test suite (`test_adapt` now 96 cases, was 46) + ASan/UBSan
+clean; fresh CI-pinned `cfusa` (v0.5.54) `check`: 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (unchanged --
+requirement traceability, not code coverage, per issue #520's own
+scope note).
+
+Issue #520 stays open: category 2 (`mock.c`'s CRC/fault-injection
+paths, `ep_can.c`/`shmem.c`/`tsn.c`/`loan.c`), category 3
+(documenting the `_WIN32`-conditional carve-out in
+`platform.c`/`clock.c`/`udp.c`), and the CI threshold-gate/
+branch-floor sequencing from the issue's own phased plan are all still
+open -- see the issue's own status comment for the current backlog.
+
 ### v0.422.0 -- 2026-08-18 (c-RCP-19: category 1 remainder + ep_can.c fully closed (incl. its CAN-XL fragmented subsystem) + loan.c/tsn.c/shmem.c category 2 + category 3 (`_WIN32` carve-out documented) + CI line-coverage floor raised 88 -> 90)
 
 Third increment against issue #520 (c-RCP-19), continuing the two
