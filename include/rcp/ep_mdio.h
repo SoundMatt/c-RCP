@@ -1,34 +1,20 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:req REQ-MDIO-001
-//cfusa:req REQ-MDIO-002
-//cfusa:req REQ-MDIO-003
-//cfusa:req REQ-MDIO-004
-//cfusa:req REQ-MDIO-005
-//cfusa:req REQ-MDIO-006
-//cfusa:req REQ-MDIO-007
-//cfusa:req REQ-MDIO-008
-//cfusa:req REQ-MDIO-009
-//cfusa:req REQ-MDIO-010
-//cfusa:req REQ-MDIO-011
-//cfusa:req REQ-MDIO-012
-//cfusa:req REQ-MDIO-013
-//cfusa:req REQ-MDIO-014
-//cfusa:req REQ-MDIO-015
-//cfusa:req REQ-MDIO-016
-//cfusa:req REQ-MDIO-017
-//cfusa:req REQ-MDIO-018
-//cfusa:req REQ-MDIO-019
-
-/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+/* c-RCP-18-tracker (issue #533): the per-id requirement-trace tags that
+ * used to be stacked here at the file header (one block per id,
+ * satisfying cfusa's file-level --func-coverage metric without saying
+ * which declaration each id actually describes) have been moved to sit
+ * directly above the specific declaration/#define each one describes,
+ * per CONTRIBUTING.md's "Writing a requirement" convention. See each
+ * declaration below for its own tag(s). (Deliberately not spelling out
+ * the literal tag syntax in this paragraph -- cfusa's own scanner reads
+ * that exact character sequence anywhere in a line, comment or not, as
+ * a real tag with whatever word follows it as the id.)
+ *
+ * TC18 requirements-corpus completeness pass (v0.105.0): the ids below
  * are catalogued in .fusa-reqs.json with a "tc18" citation and a
  * "status" of "implemented", "partial" or "not-implemented". The
  * not-implemented and partial ones describe normative TC18 behaviour
  * this module does NOT provide; their tests pin the deviation. */
-//cfusa:req REQ-MDIO-020
-//cfusa:req REQ-MDIO-021
-//cfusa:req REQ-MDIO-022
-//cfusa:req REQ-MDIO-023
-//cfusa:req REQ-MDIO-024
 /*
  * ep_mdio.h -- MDIO management endpoint for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint Types",
@@ -364,6 +350,7 @@ typedef enum {
  * already made before this fix, now also reflected in the wire-encoded
  * mdio_mode octet. Meaningless for word_count == 0, which every encoder
  * below already rejects before this would be consulted. */
+//cfusa:req REQ-MDIO-021
 rcp_ep_mdio_mode_t rcp_ep_mdio_mode_for_word_count(size_t word_count);
 
 /* True iff mode is RCP_EP_MDIO_MODE_MMS_SINGLE or _MMS_MULTI -- the two
@@ -375,6 +362,7 @@ rcp_ep_mdio_mode_t rcp_ep_mdio_mode_for_word_count(size_t word_count);
  * MMD-family functions above can encode or interpret -- a caller
  * decoding an incoming frame of unknown mode should still check this
  * first and route to the *_mms_* family instead, exactly as before. */
+//cfusa:req REQ-MDIO-021
 bool rcp_ep_mdio_mode_is_unsupported_mms(rcp_ep_mdio_mode_t mode);
 
 /* ── MMS addressing: REQ-MDIO-022/024, FIXED 2026-08-13 ──────────────────────
@@ -448,6 +436,7 @@ typedef struct {
 /* True iff addr.mms <= RCP_EP_MDIO_MMS_MAX. addr.addr's full 16-bit range
  * is always valid (no MMS-specific narrower range is known -- see the
  * file header's own honesty note above). */
+//cfusa:req REQ-MDIO-024
 bool rcp_ep_mdio_mms_addr_valid(rcp_ep_mdio_mms_addr_t addr);
 
 /* True iff mms is 0 or 1 -- REQ-MDIO-022's own TC18-literal rule (Table
@@ -455,6 +444,7 @@ bool rcp_ep_mdio_mms_addr_valid(rcp_ep_mdio_mms_addr_t addr);
  * uses 16-bit data fields. Meaningless (but well-defined: false) for
  * mms > RCP_EP_MDIO_MMS_MAX -- callers should have already validated
  * mms via rcp_ep_mdio_mms_addr_valid() first. */
+//cfusa:req REQ-MDIO-022
 bool rcp_ep_mdio_mms_uses_32bit_words(uint8_t mms);
 
 /* The next register address one step into an MMS burst starting at addr
@@ -462,11 +452,13 @@ bool rcp_ep_mdio_mms_uses_32bit_words(uint8_t mms);
  * provides for the MMD family, at MMS addressing's own full 16-bit
  * width (wraps at 0xFFFF). This module's own design choice, like its
  * MMD counterpart -- not itself derived from either spec. */
+//cfusa:req REQ-MDIO-024
 uint16_t rcp_ep_mdio_mms_burst_next_addr(uint16_t addr);
 
 /* True iff word_count selects RCP_EP_MDIO_MODE_MMS_MULTI (word_count > 1)
  * rather than RCP_EP_MDIO_MODE_MMS_SINGLE (word_count == 1) -- the MMS
  * family's own counterpart to rcp_ep_mdio_mode_for_word_count() above. */
+//cfusa:req REQ-MDIO-022
 rcp_ep_mdio_mode_t rcp_ep_mdio_mms_mode_for_word_count(size_t word_count);
 
 /* ── MMS register-word packing: 16- or 32-bit per rcp_ep_mdio_mms_uses_32bit_words() ──
@@ -478,13 +470,16 @@ rcp_ep_mdio_mode_t rcp_ep_mdio_mms_mode_for_word_count(size_t word_count);
  * not a second independent parameter a caller could get wrong. */
 
 /* Encodes word into out[0..4) big-endian (out[0] = highest byte). */
+//cfusa:req REQ-MDIO-022
 void rcp_ep_mdio_word32_encode(uint32_t word, uint8_t out[4]);
 
 /* Decodes a big-endian 32-bit word from in[0..4) (in[0] = highest byte). */
+//cfusa:req REQ-MDIO-022
 uint32_t rcp_ep_mdio_word32_decode(const uint8_t in[4]);
 
 /* Number of octets rcp_ep_mdio_mms_pack_words() produces for word_count
  * words at mms's own width: word_count * (4 or 2). */
+//cfusa:req REQ-MDIO-022
 size_t rcp_ep_mdio_mms_pack_len(uint8_t mms, size_t word_count);
 
 /* Packs words[0..word_count) into a newly allocated big-endian byte
@@ -494,17 +489,20 @@ size_t rcp_ep_mdio_mms_pack_len(uint8_t mms, size_t word_count);
  * otherwise). words may be NULL iff word_count == 0. Returns a zeroed
  * rcp_bytes_t (data=NULL) if word_count == 0 or on allocation failure.
  * Caller frees the result with rcp_bytes_free(). */
+//cfusa:req REQ-MDIO-022
 rcp_bytes_t rcp_ep_mdio_mms_pack_words(uint8_t mms, const uint32_t *words, size_t word_count);
 
 /* True (with *out_word_count set) iff byte_len is an exact multiple of
  * mms's own word width (4 or 2 octets) -- the MMS family's own
  * counterpart to rcp_ep_mdio_word_count_of(). */
+//cfusa:req REQ-MDIO-022
 bool rcp_ep_mdio_mms_word_count_of(uint8_t mms, size_t byte_len, size_t *out_word_count);
 
 /* Reads the word_index'th packed word out of data at mms's own width,
  * zero-extended to uint32_t for a 16-bit mms. No bounds check of its
  * own -- the MMS family's own counterpart to
  * rcp_ep_mdio_unpack_word_at(). */
+//cfusa:req REQ-MDIO-022
 uint32_t rcp_ep_mdio_mms_unpack_word_at(uint8_t mms, const uint8_t *data, size_t word_index);
 
 /* ── Addressing: Clause-22 MMD / Clause-45 MMS ───────────────────────────── */
@@ -535,6 +533,7 @@ typedef struct {
  * `clause` value, any prtad/devad above its own 5-bit range, a nonzero
  * devad under RCP_EP_MDIO_CLAUSE_22, or a regad above
  * RCP_EP_MDIO_CLAUSE22_REGAD_MAX under RCP_EP_MDIO_CLAUSE_22. */
+//cfusa:req REQ-MDIO-001
 bool rcp_ep_mdio_addr_valid(rcp_ep_mdio_addr_t addr);
 
 /* The next register address one step into a burst starting at regad, for
@@ -542,6 +541,7 @@ bool rcp_ep_mdio_addr_valid(rcp_ep_mdio_addr_t addr);
  * discussion. Wraps to 0 after RCP_EP_MDIO_CLAUSE22_REGAD_MAX
  * (RCP_EP_MDIO_CLAUSE_22) or after 0xFFFF (RCP_EP_MDIO_CLAUSE_45). Returns
  * regad unchanged for any other clause value. */
+//cfusa:req REQ-MDIO-002
 uint16_t rcp_ep_mdio_burst_next_regad(rcp_ep_mdio_clause_t clause, uint16_t regad);
 
 /* Largest word_count this module's encoders/decoders accept in a single
@@ -551,13 +551,16 @@ uint16_t rcp_ep_mdio_burst_next_regad(rcp_ep_mdio_clause_t clause, uint16_t rega
 /* ── Register-word packing: this module's own big-endian word layout ────────── */
 
 /* Encodes word into out[0..2) big-endian (out[0] = high byte). */
+//cfusa:req REQ-MDIO-003
 void rcp_ep_mdio_word_encode(uint16_t word, uint8_t out[2]);
 
 /* Decodes a big-endian 16-bit word from in[0..2) (in[0] = high byte). */
+//cfusa:req REQ-MDIO-004
 uint16_t rcp_ep_mdio_word_decode(const uint8_t in[2]);
 
 /* Number of octets rcp_ep_mdio_pack_words() produces for word_count words:
  * word_count * 2. */
+//cfusa:req REQ-MDIO-005
 size_t rcp_ep_mdio_pack_len(size_t word_count);
 
 /* Packs words[0..word_count) into a newly allocated big-endian byte buffer
@@ -565,12 +568,14 @@ size_t rcp_ep_mdio_pack_len(size_t word_count);
  * applied word by word). words may be NULL iff word_count == 0. Returns a
  * zeroed rcp_bytes_t (data=NULL) if word_count == 0 or on allocation
  * failure. Caller frees the result with rcp_bytes_free(). */
+//cfusa:req REQ-MDIO-006
 rcp_bytes_t rcp_ep_mdio_pack_words(const uint16_t *words, size_t word_count);
 
 /* True (with *out_word_count set to byte_len / 2) iff byte_len is even --
  * every packed word occupies exactly 2 octets, so an odd byte_len can
  * never hold a whole number of words. False (leaving *out_word_count
  * untouched) otherwise. */
+//cfusa:req REQ-MDIO-007
 bool rcp_ep_mdio_word_count_of(size_t byte_len, size_t *out_word_count);
 
 /* Reads the word_index'th packed word out of data via
@@ -579,6 +584,7 @@ bool rcp_ep_mdio_word_count_of(size_t byte_len, size_t *out_word_count);
  * rcp_ep_mdio_word_count_of(), that word_index selects a whole word
  * actually present in data -- this function performs no bounds check of
  * its own. */
+//cfusa:req REQ-MDIO-008
 uint16_t rcp_ep_mdio_unpack_word_at(const uint8_t *data, size_t word_index);
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
@@ -599,6 +605,7 @@ typedef struct {
 } rcp_ep_mdio_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; ep_status 0). */
+//cfusa:req REQ-MDIO-009
 void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -606,6 +613,7 @@ void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg);
  * (lifecycle.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file
  * header. Reuses, and never duplicates, that function's authorization
  * logic. */
+//cfusa:req REQ-MDIO-010
 bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
                                           rcp_lifecycle_writer_ctx_t writer);
 
@@ -616,6 +624,7 @@ bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
  * corrected for the address-collision editorial defect -- see the file
  * header. Note there is no base_clk row here, unlike every other endpoint
  * type's own common prefix -- Table 59 genuinely defines none. */
+//cfusa:req REQ-MDIO-020
 #define RCP_EP_MDIO_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
 #define RCP_EP_MDIO_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
 #define RCP_EP_MDIO_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
@@ -647,11 +656,13 @@ typedef enum {
 
 /* Human-readable message for an rcp_ep_mdio_reconfig_errc_t value. Never
  * returns NULL. */
+//cfusa:req REQ-MDIO-023
 const char *rcp_ep_mdio_reconfig_strerror(rcp_ep_mdio_reconfig_errc_t e);
 
 /* Serializes cfg's EP_func registers into out[0..RCP_EP_MDIO_EP_FUNC_LEN)
  * exactly as a configuration *read* of the whole block would report them
  * -- the inverse of rcp_ep_mdio_apply_reconfig()'s own parse step. */
+//cfusa:req REQ-MDIO-023
 void rcp_ep_mdio_render_registers(const rcp_ep_mdio_functional_cfg_t *cfg,
                                    uint8_t out[RCP_EP_MDIO_EP_FUNC_LEN]);
 
@@ -666,6 +677,7 @@ void rcp_ep_mdio_render_registers(const rcp_ep_mdio_functional_cfg_t *cfg,
  * A caller routing a decoded request here is responsible for having
  * checked that evt[2:0] really was 111b, e.g. via
  * !rcp_acf_evt_row2_is_plain(). */
+//cfusa:req REQ-MDIO-023
 rcp_ep_mdio_reconfig_errc_t
 rcp_ep_mdio_apply_reconfig(rcp_ep_mdio_functional_cfg_t *cfg,
                             const uint8_t *payload, size_t payload_len);
@@ -675,6 +687,7 @@ rcp_ep_mdio_apply_reconfig(rcp_ep_mdio_functional_cfg_t *cfg,
  * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
  * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
  * allocation failure. Caller frees the result with rcp_bytes_free(). */
+//cfusa:req REQ-MDIO-023
 rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                  uint16_t start_address,
                                                  const uint8_t *data, size_t data_len,
@@ -716,6 +729,7 @@ typedef enum {
 } rcp_ep_mdio_errc_t;
 
 /* Human-readable message for an rcp_ep_mdio_errc_t value. Never returns NULL. */
+//cfusa:req REQ-MDIO-011
 const char *rcp_ep_mdio_strerror(rcp_ep_mdio_errc_t e);
 
 /* ── Read request/response ─────────────────────────────────────────────────── */
@@ -729,6 +743,8 @@ const char *rcp_ep_mdio_strerror(rcp_ep_mdio_errc_t e);
  * wire-layout discussion. Returns a zeroed rcp_bytes_t (data=NULL) if
  * !rcp_ep_mdio_addr_valid(addr), if word_count is 0 or exceeds
  * RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure. */
+//cfusa:req REQ-MDIO-012
+//cfusa:req REQ-MDIO-021
 rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
                                              rcp_ep_mdio_addr_t addr, size_t word_count,
                                              uint8_t transaction_num);
@@ -750,6 +766,8 @@ rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
  * respond with error code UNSUPPORTED_CMD). On
  * RCP_EP_MDIO_OK, *out_addr, *out_word_count, and *out_transaction_num
  * are populated. */
+//cfusa:req REQ-MDIO-013
+//cfusa:req REQ-MDIO-021
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
                                                     rcp_byte_bus_id_t expected_bus_id,
                                                     rcp_ep_mdio_addr_t *out_addr,
@@ -765,6 +783,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
  * burst read) or 0 (words may be NULL in that case). Returns a zeroed
  * rcp_bytes_t (data=NULL) if word_count exceeds
  * RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure. */
+//cfusa:req REQ-MDIO-014
+//cfusa:req REQ-MDIO-025
 rcp_bytes_t rcp_ep_mdio_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
                                               const uint16_t *words, size_t word_count,
                                               uint8_t transaction_num, bool timed,
@@ -785,6 +805,8 @@ rcp_bytes_t rcp_ep_mdio_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
  * words out of it; *out_timed and *out_timestamp report whether the
  * message was ACF_GBB with a valid (rcp_acf_gbb_is_timed()) timestamp,
  * and that timestamp's value (0 when !*out_timed). */
+//cfusa:req REQ-MDIO-015
+//cfusa:req REQ-MDIO-026
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_response(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      const uint8_t **out_words_data,
@@ -804,6 +826,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_response(const uint8_t *b, size_t len
  * discussion. Returns a zeroed rcp_bytes_t (data=NULL) if
  * !rcp_ep_mdio_addr_valid(addr), if word_count is 0 or exceeds
  * RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure. */
+//cfusa:req REQ-MDIO-016
+//cfusa:req REQ-MDIO-021
 rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
                                               rcp_ep_mdio_addr_t addr, const uint16_t *words,
                                               size_t word_count, uint8_t transaction_num);
@@ -827,6 +851,8 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
  * *out_transaction_num are populated, and *out_words_data /
  * *out_word_count are set to a *borrowed* view into b (not copied) of the
  * packed word bytes following the address prefix. */
+//cfusa:req REQ-MDIO-017
+//cfusa:req REQ-MDIO-021
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      rcp_ep_mdio_addr_t *out_addr,
@@ -844,6 +870,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len
  * is true. Returns a zeroed rcp_bytes_t (data=NULL) if
  * accepted_word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on
  * allocation failure. */
+//cfusa:req REQ-MDIO-018
+//cfusa:req REQ-MDIO-027
 rcp_bytes_t rcp_ep_mdio_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
                                                const uint16_t *accepted_words,
                                                size_t accepted_word_count,
@@ -861,6 +889,8 @@ rcp_bytes_t rcp_ep_mdio_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
  * accepted packed word bytes; *out_timed and *out_timestamp report
  * whether the message was ACF_GBB with a valid (rcp_acf_gbb_is_timed())
  * timestamp, and that timestamp's value (0 when !*out_timed). */
+//cfusa:req REQ-MDIO-019
+//cfusa:req REQ-MDIO-028
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_response(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       const uint8_t **out_words_data,
@@ -883,6 +913,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_response(const uint8_t *b, size_t le
 /* Returns a zeroed rcp_bytes_t (data=NULL) if !rcp_ep_mdio_mms_addr_valid(addr),
  * if word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on
  * allocation failure. */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_bytes_t rcp_ep_mdio_encode_mms_read_request(rcp_byte_bus_id_t byte_bus_id,
                                                  rcp_ep_mdio_mms_addr_t addr, size_t word_count,
                                                  uint8_t transaction_num);
@@ -896,6 +928,8 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_read_request(rcp_byte_bus_id_t byte_bus_id,
  * decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS. On
  * RCP_EP_MDIO_OK, *out_addr, *out_word_count, and *out_transaction_num
  * are populated. */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_request(const uint8_t *b, size_t len,
                                                         rcp_byte_bus_id_t expected_bus_id,
                                                         rcp_ep_mdio_mms_addr_t *out_addr,
@@ -909,6 +943,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_request(const uint8_t *b, size_t 
  * works for the MMD family). Otherwise identical to
  * rcp_ep_mdio_encode_read_response() (timed/untimed ACF_GBB/ACF_ABB
  * choice, partial-burst word_count, RCP_EP_MDIO_MAX_BURST_WORDS bound). */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_bytes_t rcp_ep_mdio_encode_mms_read_response(rcp_byte_bus_id_t byte_bus_id, uint8_t mms,
                                                   const uint32_t *words, size_t word_count,
                                                   uint8_t transaction_num, bool timed,
@@ -921,6 +957,8 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_read_response(rcp_byte_bus_id_t byte_bus_id, 
  * rcp_ep_mdio_decode_read_response(). *out_words_data / *out_word_count
  * are a *borrowed* view into b; rcp_ep_mdio_mms_unpack_word_at(mms, ...)
  * reads individual words out of it. */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_response(const uint8_t *b, size_t len,
                                                          rcp_byte_bus_id_t expected_bus_id,
                                                          uint8_t mms,
@@ -940,6 +978,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_response(const uint8_t *b, size_t
 /* Returns a zeroed rcp_bytes_t (data=NULL) if !rcp_ep_mdio_mms_addr_valid(addr),
  * if word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on
  * allocation failure. */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
                                                   rcp_ep_mdio_mms_addr_t addr,
                                                   const uint32_t *words, size_t word_count,
@@ -956,6 +996,8 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
  * packed word bytes following the address prefix (not copied) --
  * rcp_ep_mdio_mms_unpack_word_at(out_addr->mms, ...) reads individual
  * words out of it. */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_write_request(const uint8_t *b, size_t len,
                                                          rcp_byte_bus_id_t expected_bus_id,
                                                          rcp_ep_mdio_mms_addr_t *out_addr,
@@ -968,6 +1010,8 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_write_request(const uint8_t *b, size_t
  * caller-supplied input, the same convention as
  * rcp_ep_mdio_encode_mms_read_response(). Otherwise identical to
  * rcp_ep_mdio_encode_write_response(). */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_bytes_t rcp_ep_mdio_encode_mms_write_response(rcp_byte_bus_id_t byte_bus_id, uint8_t mms,
                                                    const uint32_t *accepted_words,
                                                    size_t accepted_word_count,
@@ -977,6 +1021,8 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_write_response(rcp_byte_bus_id_t byte_bus_id,
 /* Decodes an MMS write response -- mms is a caller-supplied input, the
  * same convention as rcp_ep_mdio_decode_mms_read_response(). Otherwise
  * identical to rcp_ep_mdio_decode_write_response(). */
+//cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-024
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_write_response(const uint8_t *b, size_t len,
                                                           rcp_byte_bus_id_t expected_bus_id,
                                                           uint8_t mms,
