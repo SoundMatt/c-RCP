@@ -420,8 +420,8 @@
     },
     {
       "id": "REQ-AUTH-009",
-      "title": "rcp_authz_policy_new() allocates a policy with refcount 1; retain/release tolerate NULL",
-      "text": "rcp_authz_policy_new() shall return a heap-allocated rcp_authz_policy_t with refcount 1, no entries, and its own mutex initialized, or NULL on allocation failure. rcp_authz_policy_retain(NULL) shall return NULL without dereferencing it; rcp_authz_policy_release(NULL) shall be a safe no-op.",
+      "title": "rcp_authz_policy_new() allocates a policy with refcount 1, no entries, mutex initialized",
+      "text": "rcp_authz_policy_new() shall return a heap-allocated rcp_authz_policy_t with refcount 1, no entries, and its own mutex initialized, or NULL on allocation failure.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -442,6 +442,26 @@
       "id": "REQ-AUTH-011",
       "title": "rcp_authz_policy_release() frees only once the refcount reaches zero",
       "text": "rcp_authz_policy_release(p) shall decrement p's refcount and free p (its mutex, every entry's owned addrs/request_types arrays, and its own entries array) only once the refcount reaches zero; a policy retained more than once shall remain fully usable after any release that leaves its refcount above zero.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-AUTH-012",
+      "title": "rcp_authz_policy_retain(NULL) tolerates NULL",
+      "text": "rcp_authz_policy_retain(NULL) shall return NULL without dereferencing it.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-AUTH-013",
+      "title": "rcp_authz_policy_release(NULL) is a safe no-op",
+      "text": "rcp_authz_policy_release(NULL) shall be a safe no-op.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

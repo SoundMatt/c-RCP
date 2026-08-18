@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.435.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-AUTH-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+`.fusa-reqs.json` requirement-atomicity audit, `REQ-AUTH-*` prefix
+(`src/authz.c`/`tests/test_authz.c`), one of the disjoint-prefix
+batches tracked by issue #533 (mirrors #256's own batch pattern),
+executing the atomicity convention #519/PR #525 added to
+`CONTRIBUTING.md`. 11 requirements triaged in full against their
+actual tagged code/tests, not just the 2+-"shall" proxy count.
+
+`REQ-AUTH-009` -- #519's own confirmed bundled example -- asserted
+three different functions' contracts under one id:
+`rcp_authz_policy_new()`'s alloc contract, plus
+`rcp_authz_policy_retain(NULL)`'s and `rcp_authz_policy_release(NULL)`'s
+NULL-tolerance, overlapping `REQ-AUTH-010`/`-011`'s separate non-NULL
+contracts. Split three ways: `REQ-AUTH-009` narrowed to just the alloc
+contract; new `REQ-AUTH-012` (retain-NULL) and `REQ-AUTH-013`
+(release-NULL) each got a `//cfusa:req` tag directly above their
+function and a dedicated test (`test_retain_null_returns_null`,
+`test_release_null_is_safe_noop`, split out of the combined
+`test_retain_and_release_tolerate_null`) with its own `//cfusa:test`
+tag. Verified by mutation test: temporarily deleted each new test's
+function+tag, confirmed `cfusa trace --gaps` flagged exactly that one
+id and `--sec-tested 100` regressed to 99% (1100/1101), then restored
+and re-confirmed clean.
+
+Two proxy-flagged ids reviewed and confirmed already atomic, not
+bundled: `REQ-AUTH-008` ("copy the addrs and request_types arrays...
+mutating shall not affect...") is one function's one copy-by-value
+contract restated for its consequence, an "and"-joined compound object
+per CONTRIBUTING's own distinction, not two behaviours; `REQ-AUTH-011`
+is in fact CONTRIBUTING.md's own canonical atomic example (paired with
+`REQ-AUTH-010`) -- its second "shall" clause is the direct converse of
+the first, same single refcount-release behaviour. The other 8 ids
+(`REQ-AUTH-001`-`007`, `-010`) weren't proxy-flagged and read as
+correctly atomic on inspection -- no changes.
+
+Scope discipline: only `.fusa-reqs.json`, `src/authz.c`,
+`tests/test_authz.c` touched -- no other prefix's requirements edited,
+per issue #533's disjoint-prefix batching (rebased onto the
+concurrently-merged REQ-OBS and REQ-REC batches below;
+`.fusa-reqs.json` merged cleanly, disjoint prefixes). Full 67-test
+suite + ASan/UBSan (CI's exact flags, `ASAN_OPTIONS=detect_leaks=0` on
+macOS) clean; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100%.
+
+**Next**: remaining `REQ-SRV-*`/`REQ-DL-*`/`REQ-ADMIN-*`/`REQ-CFG-*`
+batches of issue #533's Group 3, in flight concurrently by other
+agents.
+
 ### v0.434.0 -- 2026-08-20 ([c-RCP-18-tracker] issue #533 batch
 REQ-REC-*: requirement-atomicity audit, Group 3 server/dispatch)
 
@@ -19166,9 +19216,9 @@ suite + ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54:
 baseline.
 
 **Next**: continuing issue #533's Group 3 batches --
-`REQ-SRV-*`/`REQ-DL-*`/`REQ-AUTH-*`/`REQ-ADMIN-*`/`REQ-CFG-*` are
-tracked as separate concurrent batches by other sessions against the
-same tracker.
+`REQ-SRV-*`/`REQ-DL-*`/`REQ-ADMIN-*`/`REQ-CFG-*` are tracked as
+separate concurrent batches by other sessions against the same
+tracker.
 
 ### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS:
 requirement-atomicity audit, Group 3 server/dispatch)

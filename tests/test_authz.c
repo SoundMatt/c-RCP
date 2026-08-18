@@ -97,10 +97,15 @@ static void test_retain_keeps_policy_alive_across_one_release(void)
     rcp_authz_policy_release(retained);
 }
 
-//cfusa:test REQ-AUTH-009
-static void test_retain_and_release_tolerate_null(void)
+//cfusa:test REQ-AUTH-012
+static void test_retain_null_returns_null(void)
 {
     TEST_ASSERT_NULL(rcp_authz_policy_retain(NULL));
+}
+
+//cfusa:test REQ-AUTH-013
+static void test_release_null_is_safe_noop(void)
+{
     rcp_authz_policy_release(NULL); /* must not crash */
 }
 
@@ -251,7 +256,8 @@ int main(void)
 
     RUN_TEST(test_permitted_identity_succeeds);
     RUN_TEST(test_retain_keeps_policy_alive_across_one_release);
-    RUN_TEST(test_retain_and_release_tolerate_null);
+    RUN_TEST(test_retain_null_returns_null);
+    RUN_TEST(test_release_null_is_safe_noop);
     RUN_TEST(test_denied_identity_is_not_permitted);
     RUN_TEST(test_empty_addrs_and_types_means_all_allowed);
     RUN_TEST(test_wrong_address_is_forbidden);
