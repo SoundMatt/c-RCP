@@ -9,6 +9,8 @@
 //cfusa:test REQ-SCHED-008
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/request_cancel.h>
 #include <rcp/request_chained.h>
@@ -139,8 +141,8 @@ static void test_split_frame_members_multiple(void)
     TEST_ASSERT_NOT_NULL(m2.data);
     TEST_ASSERT_TRUE(m1.len + m2.len <= sizeof(frame));
 
-    memcpy(&frame[0], m1.data, m1.len);
-    memcpy(&frame[m1.len], m2.data, m2.len);
+    rcp_memcpy_bounded(&frame[0], sizeof(frame), m1.data, m1.len);
+    rcp_memcpy_bounded(&frame[m1.len], sizeof(frame) - m1.len, m2.data, m2.len);
 
     n = rcp_sched_split_frame_members(frame, m1.len + m2.len, offsets, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
@@ -161,8 +163,8 @@ static void test_split_frame_members_out_cap_still_counts(void)
 
     m1 = rcp_cancel_encode_clear_all(0, 0);
     m2 = rcp_cancel_encode_clear_all(1, 0);
-    memcpy(&frame[0], m1.data, m1.len);
-    memcpy(&frame[m1.len], m2.data, m2.len);
+    rcp_memcpy_bounded(&frame[0], sizeof(frame), m1.data, m1.len);
+    rcp_memcpy_bounded(&frame[m1.len], sizeof(frame) - m1.len, m2.data, m2.len);
 
     n = rcp_sched_split_frame_members(frame, m1.len + m2.len, offsets, 1);
     TEST_ASSERT_EQUAL_size_t(2, n);

@@ -44,6 +44,8 @@
  */
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
@@ -320,14 +322,14 @@ static void test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4(void)
     be_ref[2] = TEST_TU ? 0x01u : 0x00u;
     for (i = 0; i < 8; i++) be_ref[3 + i] = (uint8_t)(TEST_SID >> (56u - 8u * i));
     for (i = 0; i < 4; i++) be_ref[11 + i] = (uint8_t)(TEST_TS >> (24u - 8u * i));
-    memcpy(be_ref + 15, body, sizeof(body));
+    rcp_memcpy_bounded(be_ref + 15, sizeof(be_ref) - 15, body, sizeof(body));
 
-    memcpy(le_ts, be_ref, sizeof(le_ts));
+    rcp_memcpy_bounded(le_ts, sizeof(le_ts), be_ref, sizeof(le_ts));
     for (i = 0; i < 4; i++) le_ts[11 + i] = (uint8_t)(TEST_TS >> (8u * i));
 
-    memcpy(ts8, be_ref, 11);
+    rcp_memcpy_bounded(ts8, sizeof(ts8), be_ref, 11);
     for (i = 0; i < 8; i++) ts8[11 + i] = (uint8_t)((uint64_t)TEST_TS >> (56u - 8u * i));
-    memcpy(ts8 + 19, body, sizeof(body));
+    rcp_memcpy_bounded(ts8 + 19, sizeof(ts8) - 19, body, sizeof(body));
 
     actual = rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, body, sizeof(body));
 
@@ -477,8 +479,8 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
 
     TEST_ASSERT_EQUAL_UINT(16u, w1.len);
     TEST_ASSERT_EQUAL_UINT(16u, w2.len);
-    memcpy(joined, w1.data, w1.len);
-    memcpy(joined + w1.len, w2.data, w2.len);
+    rcp_memcpy_bounded(joined, sizeof(joined), w1.data, w1.len);
+    rcp_memcpy_bounded(joined + w1.len, sizeof(joined) - w1.len, w2.data, w2.len);
 
     TEST_ASSERT_EQUAL_UINT(2u, rcp_sched_split_frame_members(joined, sizeof(joined), offs, 4));
     TEST_ASSERT_EQUAL_UINT(0u, offs[0]);
@@ -528,8 +530,8 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
 
     TEST_ASSERT_EQUAL_UINT(16u, w1.len);
     TEST_ASSERT_EQUAL_UINT(16u, w2.len);
-    memcpy(joined, w1.data, w1.len);
-    memcpy(joined + w1.len, w2.data, w2.len);
+    rcp_memcpy_bounded(joined, sizeof(joined), w1.data, w1.len);
+    rcp_memcpy_bounded(joined + w1.len, sizeof(joined) - w1.len, w2.data, w2.len);
     joined[31] ^= 0xFFu; /* corrupt only the second member's trailer */
 
     /* RCP_CONFIGURED, not HW_CONFIGURED -- see to_rcp_configured()'s own
@@ -583,10 +585,10 @@ static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
     const uint8_t            *pl  = NULL;
     size_t                    len = 0;
 
-    memcpy(plain_payload, m.data, m.len);
-    memcpy(plain_payload + m.len, m.data, m.len);
-    memcpy(safe_payload, w.data, w.len);
-    memcpy(safe_payload + w.len, w.data, w.len);
+    rcp_memcpy_bounded(plain_payload, sizeof(plain_payload), m.data, m.len);
+    rcp_memcpy_bounded(plain_payload + m.len, sizeof(plain_payload) - m.len, m.data, m.len);
+    rcp_memcpy_bounded(safe_payload, sizeof(safe_payload), w.data, w.len);
+    rcp_memcpy_bounded(safe_payload + w.len, sizeof(safe_payload) - w.len, w.data, w.len);
 
     memset(&hdr, 0, sizeof(hdr));
     hdr.sv                = 1;
@@ -665,9 +667,9 @@ static void test_fragmented_crc_covers_only_the_last_fragment(void)
     TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, w2.data, f2.len),
                             be32(w2.data + f2.len));
 
-    memcpy(payload, p0, 4);
-    memcpy(payload + 4, p1, 4);
-    memcpy(payload + 8, p2, 4);
+    rcp_memcpy_bounded(payload, sizeof(payload), p0, 4);
+    rcp_memcpy_bounded(payload + 4, sizeof(payload) - 4, p1, 4);
+    rcp_memcpy_bounded(payload + 8, sizeof(payload) - 8, p2, 4);
     conforming = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u,
                                                  payload, sizeof(payload));
     TEST_ASSERT_TRUE(conforming != be32(w2.data + f2.len));
@@ -699,8 +701,8 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
     uint32_t      via_helper;
     uint32_t      via_manual_concat;
 
-    memcpy(concat, hdr, sizeof(hdr));
-    memcpy(concat + sizeof(hdr), payload, sizeof(payload));
+    rcp_memcpy_bounded(concat, sizeof(concat), hdr, sizeof(hdr));
+    rcp_memcpy_bounded(concat + sizeof(hdr), sizeof(concat) - sizeof(hdr), payload, sizeof(payload));
 
     via_helper = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, hdr, sizeof(hdr),
                                                  payload, sizeof(payload));
@@ -710,7 +712,7 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
     /* Sensitive to the header region... */
     {
         uint8_t bad_hdr[8];
-        memcpy(bad_hdr, hdr, sizeof(hdr));
+        rcp_memcpy_bounded(bad_hdr, sizeof(bad_hdr), hdr, sizeof(hdr));
         bad_hdr[0] ^= 0xFFu;
         TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, bad_hdr, sizeof(bad_hdr),
                                                          payload, sizeof(payload)) != via_helper);
@@ -718,7 +720,7 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
     /* ...and to the payload region, anywhere in it (not just the tail). */
     {
         uint8_t bad_payload[8];
-        memcpy(bad_payload, payload, sizeof(payload));
+        rcp_memcpy_bounded(bad_payload, sizeof(bad_payload), payload, sizeof(payload));
         bad_payload[0] ^= 0xFFu; /* segment 0's own octet, not segment 1's */
         TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, hdr, sizeof(hdr),
                                                          bad_payload, sizeof(bad_payload)) != via_helper);
@@ -1087,8 +1089,8 @@ static void test_dispatch_frame_seq_gate_evaluates_once_not_per_member(void)
 
     joined = malloc(joined_len);
     TEST_ASSERT_NOT_NULL(joined);
-    memcpy(joined, one.data, one.len);
-    memcpy(joined + one.len, one.data, one.len);
+    rcp_memcpy_bounded(joined, joined_len, one.data, one.len);
+    rcp_memcpy_bounded(joined + one.len, joined_len - one.len, one.data, one.len);
 
     n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 9u,
                                         joined, joined_len, results, 4);
@@ -1729,7 +1731,7 @@ static void capturing_handler(const uint8_t *request, size_t request_len, rcp_by
     TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
                           rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len));
     TEST_ASSERT_TRUE(payload_len <= sizeof(g_captured_payload));
-    memcpy(g_captured_payload, payload, payload_len);
+    rcp_memcpy_bounded(g_captured_payload, sizeof(g_captured_payload), payload, payload_len);
     g_captured_payload_len = payload_len;
 }
 
@@ -1808,9 +1810,9 @@ static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
     final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f2.data, f2.len);
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
-    memcpy(concatenated, p0, 4);
-    memcpy(concatenated + 4, p1, 4);
-    memcpy(concatenated + 8, p2, 4);
+    rcp_memcpy_bounded(concatenated, sizeof(concatenated), p0, 4);
+    rcp_memcpy_bounded(concatenated + 4, sizeof(concatenated) - 4, p1, 4);
+    rcp_memcpy_bounded(concatenated + 8, sizeof(concatenated) - 8, p2, 4);
     want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u, concatenated,
                                            sizeof(concatenated));
     final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
@@ -1894,8 +1896,8 @@ static void test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok(voi
     final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f1.data, f1.len);
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
-    memcpy(concatenated, p0, 4);
-    memcpy(concatenated + 4, p1, 3);
+    rcp_memcpy_bounded(concatenated, sizeof(concatenated), p0, 4);
+    rcp_memcpy_bounded(concatenated + 4, sizeof(concatenated) - 4, p1, 3);
     want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u, concatenated,
                                            sizeof(concatenated));
 
@@ -2012,8 +2014,8 @@ static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
     final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f1.data, f1.len); /* trailer slot only, see above */
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
-    memcpy(concatenated, p0, 4);
-    memcpy(concatenated + 4, p1, 4);
+    rcp_memcpy_bounded(concatenated, sizeof(concatenated), p0, 4);
+    rcp_memcpy_bounded(concatenated + 4, sizeof(concatenated) - 4, p1, 4);
     /* issue #465: mock.c's own dispatch_e2e_fragment() passes the REAL
      * avtp_subtype it was given (RCP_AVTP_SUBTYPE_NTSCF here, matching
      * the dispatch calls below), but has no per-message header_octet1/tu
@@ -2458,7 +2460,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
      * over the length-adapted 14-byte real prefix only, matching
      * rcp_e2e_compute_crc()'s documented coverage span -- NOT over all 16
      * bytes of frame.data (which would include the 2 pad octets). */
-    memcpy(adapted_prefix, frame.data, sizeof(adapted_prefix));
+    rcp_memcpy_bounded(adapted_prefix, sizeof(adapted_prefix), frame.data, sizeof(adapted_prefix));
     adapted_prefix[1] = (uint8_t)(adapted_prefix[1] + 1u); /* +1 quadlet: 4 -> 5, no MSB carry here */
     expected_crc = rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, adapted_prefix, sizeof(adapted_prefix));
     TEST_ASSERT_EQUAL_HEX32(expected_crc, be32(wrapped.data + 14));
@@ -2471,7 +2473,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
      * two wrapped CRC32 trailers are byte-identical, while the two
      * wrapped pad regions differ (proving the pad bytes are still
      * faithfully carried through, just excluded from the CRC). */
-    memcpy(perturbed, frame.data, sizeof(perturbed));
+    rcp_memcpy_bounded(perturbed, sizeof(perturbed), frame.data, sizeof(perturbed));
     perturbed[14] = 0xAAu;
     perturbed[15] = 0xBBu;
     wrapped_perturbed_pad = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, perturbed, sizeof(perturbed));

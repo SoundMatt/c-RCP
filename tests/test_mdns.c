@@ -12,6 +12,8 @@
 //cfusa:test REQ-MDNS-011
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/avtp.h>
 #include <rcp/mdns.h>
 #include <rcp/rcp.h>
@@ -90,9 +92,9 @@ static int test_announcer_announce(rcp_mdns_announcer_t *self, const rcp_mdns_se
     }
     a->entries[a->len].server_stream_id = info->server_stream_id;
     a->entries[a->len].info             = *info;
-    strncpy(a->entries[a->len].host, info->host ? info->host : "", sizeof(a->entries[a->len].host) - 1);
-    strncpy(a->entries[a->len].instance_name, info->instance_name ? info->instance_name : "",
-            sizeof(a->entries[a->len].instance_name) - 1);
+    rcp_strncpy_bounded(a->entries[a->len].host, sizeof(a->entries[a->len].host), info->host ? info->host : "");
+    rcp_strncpy_bounded(a->entries[a->len].instance_name, sizeof(a->entries[a->len].instance_name),
+            info->instance_name ? info->instance_name : "");
     a->entries[a->len].info.host          = a->entries[a->len].host;
     a->entries[a->len].info.instance_name = a->entries[a->len].instance_name;
     a->len++;

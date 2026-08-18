@@ -19,6 +19,8 @@
 //cfusa:test REQ-WAKEUP-022
 #include "unity.h"
 
+#include "../src/mem_bounded.h"
+
 #include <rcp/acf.h>
 #include <rcp/ep_wakeup.h>
 #include <rcp/lifecycle.h>
@@ -803,7 +805,7 @@ static void test_render_then_apply_reconfig_both_edges_round_trips(void)
 
     rcp_ep_wakeup_functional_cfg_init(&reparsed);
     payload[0] = 0x00; payload[1] = 0x00; /* address 0: whole block */
-    memcpy(&payload[2], image, RCP_EP_WAKEUP_EP_FUNC_LEN);
+    rcp_memcpy_bounded(&payload[2], sizeof(payload) - 2, image, RCP_EP_WAKEUP_EP_FUNC_LEN);
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
         rcp_ep_wakeup_apply_reconfig(&reparsed, payload, sizeof(payload)));
 
