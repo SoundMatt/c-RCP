@@ -11,6 +11,9 @@
 //cfusa:test REQ-CANEP-030
 //cfusa:test REQ-CANEP-031
 //cfusa:test REQ-CANEP-032
+//cfusa:test REQ-CANEP-037
+//cfusa:test REQ-CANEP-039
+//cfusa:test REQ-CANEP-040
 //cfusa:test REQ-ISELED-025
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
@@ -937,10 +940,42 @@ static void test_lin_trigger_now_honours_trailing_time_and_block_has_registers(v
 
 /* ── CAN (§13.7.11) ────────────────────────────────────────────────────────── */
 
-static void test_can_frame_format_values_match_table_54(void)
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit: this test
+ * previously also asserted rcp_ep_can_frame_format_valid()'s own 5/6/7
+ * boundary (REQ-CANEP-001's own contract, already independently proven
+ * by test_frame_format_valid_bounds, tests/test_ep_can.c) and the
+ * decoder's BAD_FRAME_FORMAT rejection (REQ-CANEP-017's own
+ * reject-taxonomy clause, already independently proven by
+ * test_frame_request_decode_rejects_bad_frame_format,
+ * tests/test_ep_can.c) -- both removed here as near-duplicates of
+ * those already-tested contracts. This test now proves only
+ * REQ-CANEP-031's own remaining claim: the enum's numeric code
+ * assignment. */
+//cfusa:test REQ-CANEP-031
+static void test_can_frame_format_enum_values_match_table_57(void)
+{
+    /* IMPLEMENTED -- TC18 §13.7.11.3 Table 57 assigns the FrameFormat
+     * selector codes 0..5 in this exact order, leaving 6 and 7 reserved. */
+    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_CAN_FRAME_CBFF);
+    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_CAN_FRAME_CEFF);
+    TEST_ASSERT_EQUAL_INT(2, (int)RCP_EP_CAN_FRAME_FBFF);
+    TEST_ASSERT_EQUAL_INT(3, (int)RCP_EP_CAN_FRAME_FEFF);
+    TEST_ASSERT_EQUAL_INT(4, (int)RCP_EP_CAN_FRAME_XL_CLASSICAL_PL);
+    TEST_ASSERT_EQUAL_INT(5, (int)RCP_EP_CAN_FRAME_XL_NEW_PL);
+}
+
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit: split out
+ * of test_can_frame_format_values_match_table_54's own prior body as
+ * REQ-CANEP-039's own dedicated test -- unlike
+ * test_frame_request_golden_leading_quadlet_bit_packing
+ * (tests/test_ep_can.c, which also proves REQ-CANEP-039 via the
+ * encoder), this one proves the wire position directly against a
+ * hand-built raw frame, independent of the encoder. */
+//cfusa:test REQ-CANEP-039
+static void test_can_frame_format_selector_wire_position_top_3_bits(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
-    /* Leading quadlet's top 3 bits = 110b (6), Table 54's first reserved
+    /* Leading quadlet's top 3 bits = 110b (6), Table 57's first reserved
      * code -- the low 29 bits (arbitration_id) are irrelevant here. */
     const uint8_t                body[4] = {0xC0u, 0, 0, 0};
     rcp_bytes_t                 f;
@@ -951,23 +986,12 @@ static void test_can_frame_format_values_match_table_54(void)
     size_t                      data_len = 0u;
     uint8_t                     tn = 0u;
 
-    /* IMPLEMENTED -- TC18 §13.7.11.3 Table 54 assigns the FrameFormat
-     * selector codes 0..5 in this exact order, leaving 6 and 7 reserved. */
-    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_CAN_FRAME_CBFF);
-    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_CAN_FRAME_CEFF);
-    TEST_ASSERT_EQUAL_INT(2, (int)RCP_EP_CAN_FRAME_FBFF);
-    TEST_ASSERT_EQUAL_INT(3, (int)RCP_EP_CAN_FRAME_FEFF);
-    TEST_ASSERT_EQUAL_INT(4, (int)RCP_EP_CAN_FRAME_XL_CLASSICAL_PL);
-    TEST_ASSERT_EQUAL_INT(5, (int)RCP_EP_CAN_FRAME_XL_NEW_PL);
-    TEST_ASSERT_TRUE(rcp_ep_can_frame_format_valid(5u));
-    TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(6u));
-    TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(7u));
-
     /* FIXED (v0.109.0) -- the selector rides the payload's own leading
      * quadlet (TC18 §13.7.11.3 Figure 39), not evt[2:0] (an earlier
      * revision's own design choice, not TC18's); evt is left at its
      * ordinary Table 30 Row-2 "plain request" value (0), and a reserved
-     * FrameFormat code in the payload is rejected by the frame decoder. */
+     * FrameFormat code found at that wire position is rejected by the
+     * frame decoder -- proving the selector really is read from there. */
     hdr.byte_bus_id     = 0x31u;
     hdr.op              = RCP_ACF_OP_WRITE;
     hdr.evt             = 0u;
@@ -980,7 +1004,26 @@ static void test_can_frame_format_values_match_table_54(void)
     rcp_bytes_free(&f);
 }
 
-static void test_can_base_identifier_is_right_aligned_and_data_only(void)
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit: split out
+ * of this test's own prior body, which also asserted REQ-CANEP-040's
+ * own separate right-alignment contract below -- two facts about two
+ * different topics that happened to share this one test function. */
+//cfusa:test REQ-CANEP-032
+static void test_can_does_not_support_remote_frames(void)
+{
+    /* IMPLEMENTED -- there is no remote-frame flag, encoder or decode
+     * outcome anywhere in this module, so every frame it produces is a
+     * data frame: a base-format identifier above 0x7FF is refused
+     * outright by rcp_ep_can_arbitration_id_valid() regardless, and
+     * rcp_ep_can_encode_frame_request()'s own signature (tested
+     * separately, REQ-CANEP-016/-033) has no remote-frame parameter to
+     * set in the first place. */
+    TEST_ASSERT_FALSE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CBFF, 0x800u));
+    TEST_ASSERT_TRUE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CEFF, 0x1FFFFFFFu));
+}
+
+//cfusa:test REQ-CANEP-040
+static void test_can_base_identifier_is_right_aligned(void)
 {
     const uint8_t               payload_in[2] = {0xDEu, 0xADu};
     rcp_bytes_t                 f;
@@ -1004,13 +1047,6 @@ static void test_can_base_identifier_is_right_aligned_and_data_only(void)
     TEST_ASSERT_EQUAL_HEX8(0x07u, payload[2]);
     TEST_ASSERT_EQUAL_HEX8(0xFFu, payload[3]);
     rcp_bytes_free(&f);
-
-    /* No bit can escape that alignment: a base-format identifier above
-     * 0x7FF is refused outright, and only data frames exist -- there is no
-     * remote-frame flag, encoder or decode outcome anywhere in this
-     * module, so every frame it produces is a data frame. */
-    TEST_ASSERT_FALSE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CBFF, 0x800u));
-    TEST_ASSERT_TRUE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CEFF, 0x1FFFFFFFu));
 }
 
 /* REQ-CANEP-028 IMPLEMENTED (issue #201, 2026-08-12): TC18 §13.7.11.2
@@ -1027,6 +1063,7 @@ static void test_can_base_identifier_is_right_aligned_and_data_only(void)
  * documented address collision in the acceptance-filter region --
  * closing this register block did not require resolving that collision,
  * since it lies entirely outside this span. */
+//cfusa:test REQ-CANEP-028
 static void test_can_register_block_round_trips_ep_status_and_status_fields(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
@@ -1119,7 +1156,10 @@ static void test_can_register_block_round_trips_ep_status_and_status_fields(void
     }
 }
 
-/* REQ-CANEP-028 wire-format regression (issue #470, 2026-08-14):
+/* REQ-CANEP-037 wire-format regression (issue #470, 2026-08-14; split out
+ * of REQ-CANEP-028's own prior text by the [c-RCP-18-tracker] issue #533
+ * atomicity audit, since it is a different register than can_ep_len/
+ * can_base_clk/the status registers REQ-CANEP-028 itself describes):
  * CAN_ENABLE_CLR_BIT_CLEAR was defined at bit 1 instead of TC18 Table 35's
  * bit 4 for ep_clear_req_storage -- self-consistent (render and parse both
  * used the same wrong bit), so the round-trip test above never caught it.
@@ -1127,6 +1167,7 @@ static void test_can_register_block_round_trips_ep_status_and_status_fields(void
  * tripping through this module's own (at the time, wrong) encode/decode
  * pair, the only way to catch this class of bug: it would have failed
  * before the fix (can_ep_enable&clr would have rendered 0x02, not 0x10). */
+//cfusa:test REQ-CANEP-037
 static void test_can_ep_enable_clr_clear_bit_is_wire_bit_4(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
@@ -1176,6 +1217,7 @@ static void test_can_ep_enable_clr_clear_bit_is_wire_bit_4(void)
     TEST_ASSERT_FALSE(roundtrip.common.ep_clear_req_storage);
 }
 
+//cfusa:test REQ-CANEP-029
 static void test_can_block_lacks_receive_filter_table(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
@@ -1207,6 +1249,7 @@ static void test_can_block_lacks_receive_filter_table(void)
     TEST_ASSERT_EQUAL_UINT32(0x123u, cfg.xl_filters[0].id);
 }
 
+//cfusa:test REQ-CANEP-030
 static void test_can_new_physical_layer_is_selected_per_frame(void)
 {
     const uint8_t          data[2] = {0x5Au, 0xA5u};
@@ -1705,8 +1748,10 @@ int main(void)
 
     RUN_TEST(test_lin_trigger_now_honours_trailing_time_and_block_has_registers);
 
-    RUN_TEST(test_can_frame_format_values_match_table_54);
-    RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);
+    RUN_TEST(test_can_frame_format_enum_values_match_table_57);
+    RUN_TEST(test_can_frame_format_selector_wire_position_top_3_bits);
+    RUN_TEST(test_can_does_not_support_remote_frames);
+    RUN_TEST(test_can_base_identifier_is_right_aligned);
     RUN_TEST(test_can_register_block_round_trips_ep_status_and_status_fields);
     RUN_TEST(test_can_ep_enable_clr_clear_bit_is_wire_bit_4);
     RUN_TEST(test_can_block_lacks_receive_filter_table);

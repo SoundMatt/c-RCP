@@ -32,6 +32,22 @@
 //cfusa:req REQ-CANEP-030
 //cfusa:req REQ-CANEP-031
 //cfusa:req REQ-CANEP-032
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit (2026-08-18):
+ * ids split out of the ones above -- see each new id's own
+ * .fusa-reqs.json text for which prior id it came from and why. Each
+ * also carries its own per-function cfusa "req" tag directly above the
+ * exact function it describes (src/ep_can.c, or this header's own enum
+ * for REQ-CANEP-031), per CONTRIBUTING.md's "Writing a requirement";
+ * this file-header block exists only so this file, taken as a whole,
+ * still satisfies cfusa's own file-level annotation gate. */
+//cfusa:req REQ-CANEP-033
+//cfusa:req REQ-CANEP-034
+//cfusa:req REQ-CANEP-035
+//cfusa:req REQ-CANEP-036
+//cfusa:req REQ-CANEP-037
+//cfusa:req REQ-CANEP-038
+//cfusa:req REQ-CANEP-039
+//cfusa:req REQ-CANEP-040
 /*
  * ep_can.h -- CAN controller endpoint (Classical/FD/XL) for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint
@@ -369,6 +385,7 @@ extern "C" {
 
 /* ── FrameFormat selection (evt[2:0]) ────────────────────────────────────── */
 
+//cfusa:req REQ-CANEP-031
 typedef enum {
     RCP_EP_CAN_FRAME_CBFF            = 0, /* Classical Base Frame Format, 11-bit id */
     RCP_EP_CAN_FRAME_CEFF            = 1, /* Classical Extended Frame Format, 29-bit id */
@@ -402,12 +419,17 @@ bool rcp_ep_can_frame_format_is_xl(rcp_ep_can_frame_format_t format);
  * filed as TC18_spec_defects_report.md item 57 -- so
  * rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned (below) is
  * deliberately an IN-MEMORY-ONLY field with no wire offset: it lets a
- * caller record and validate this choice programmatically (closing
- * this requirement's own "nothing rejects a frame whose XL variant
- * contradicts the endpoint's actual physical layer" half), but cannot
- * be read back over the register map the way every other functional-
- * config setting can, since TC18 gives no bit position to expose it
- * at. */
+ * caller record this choice programmatically (rcp_ep_can_set_xl_new_pl_provisioned(),
+ * REQ-CANEP-030's own contract), but cannot be read back over the
+ * register map the way every other functional-config setting can,
+ * since TC18 gives no bit position to expose it at.
+ *
+ * REQ-CANEP-038: this function is the endpoint-level constraint that
+ * closes REQ-CANEP-030's own prior "nothing rejects a frame whose XL
+ * variant contradicts the endpoint's actual physical layer" finding --
+ * split into its own id (c-RCP-18-tracker, issue #533) since it is a
+ * different function's contract than the setter above. */
+//cfusa:req REQ-CANEP-038
 bool rcp_ep_can_xl_frame_matches_provisioned_pl(bool xl_new_pl_provisioned,
                                                  rcp_ep_can_frame_format_t format);
 

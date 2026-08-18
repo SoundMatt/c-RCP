@@ -34,6 +34,115 @@ the rationale.
 
 ## Releases
 
+### v0.449.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-CANEP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-CANEP-*` prefix (`src/ep_can.c`/`include/rcp/ep_can.h`)
+-- Group 2's second batch, 4/32 proxy-flagged ("2+ shall"). All 32
+requirements read in full against their actual text and traced
+code/tests, not just the 4 flagged ones, per the tracker's own warning
+that the REQ-RMAP-* batch found real bundling with zero "shall"
+occurrences that the proxy missed entirely.
+
+8 ids split into 40 total (32 originals + 8 new, REQ-CANEP-033..040):
+
+- REQ-CANEP-016 -> -016/-033: `rcp_ep_can_encode_frame_request()`'s
+  precondition-rejection contract (kept as -016) vs. its
+  successful-encoding contract (-033) -- two distinct outcomes of one
+  function, the same per-outcome granularity REQ-PWM-002..009 and
+  REQ-RMAP-014/-082 already establish; the request decoder's own
+  sibling split (REQ-CANEP-017/-018) already drew this exact line, the
+  encoder just hadn't caught up.
+- REQ-CANEP-023 -> -023/-034: `rcp_ep_can_frame_response_fragment_count()`'s
+  precondition-failure contract (kept as -023) vs. its successful
+  delegation to `fragment.h`'s `rcp_fragment_plan_count()` (-034).
+- REQ-CANEP-024 -> -024/-035: `rcp_ep_can_encode_frame_response_fragmented()`'s
+  general multi-fragment plan-correctness contract (kept as -024) vs.
+  its degenerate single-fragment-identical-to-the-unfragmented-encoder
+  special case (-035) -- mutation-tested by corrupting the *plain*
+  single-frame encoder, proving -035 depends on a cross-function
+  byte-identity guarantee -024's own tests never check.
+- REQ-CANEP-027 -> -027/-036: `rcp_ep_can_decode_reassembled_frame_response()`'s
+  reject-taxonomy contract (kept as -027) vs. its successful-populate
+  contract (-036) -- the same reject/success split already established
+  for every sibling decode function in this module (REQ-CANEP-017/-018,
+  -020/-022, -025/-026), just never applied to this one. Closed two
+  real gaps in the same split: `RCP_EP_CAN_ERR_BAD_FRAME_FORMAT` had no
+  dedicated test for this function (`test_reassembled_decode_rejects_bad_frame_format`
+  is new), and the successful-populate outcome had only ever been
+  proven incidentally via REQ-CANEP-024's own fragmentation round-trip
+  tests (`test_reassembled_decode_round_trip_recovers_fields` is a new,
+  focused test independent of fragmentation).
+- REQ-CANEP-028 -> -028/-037: the `can_ep_len`/`can_base_clk`/status
+  register-block contract (kept as -028) vs. the unrelated
+  `can_ep_enable&clr` wire-bit defect fix (-037, issue #470) that had
+  been appended to -028's own text -- a different register, from a
+  different issue, dated two days later, sharing only the same two
+  implementing functions.
+- REQ-CANEP-030 -> -030/-038: `rcp_ep_can_set_xl_new_pl_provisioned()`'s
+  setter/storage contract (kept as -030) vs.
+  `rcp_ep_can_xl_frame_matches_provisioned_pl()`'s validator contract
+  (-038) -- two different functions bundled under one id, self-described
+  in the prior text as "closing this requirement's own ... half".
+- REQ-CANEP-031 -> -031/-039: the `rcp_ep_can_frame_format_t` enum's own
+  numeric code assignment (kept as -031, trimmed) vs. the FrameFormat
+  selector's wire position (-039) -- also removed two near-duplicate
+  clauses from -031's own text that restated REQ-CANEP-001's and
+  REQ-CANEP-017/-020/-027's own already-tested contracts verbatim, the
+  REQ-RMAP-059/061 near-duplicate pattern the tracker warned about,
+  found here with a nonzero "shall" count instead of zero.
+- REQ-CANEP-032 -> -032/-040: "the CAN endpoint does not support remote
+  frames" (kept as -032) vs. "an 11-bit CAN identifier is
+  right-aligned" (-040) -- two unrelated facts about two different
+  topics joined only by both being true of this module, previously
+  proven by one shared test function split into two.
+
+4 flagged ids confirmed atomic despite the "2+ shall" proxy (the same
+established "gate + apply, one function's one total contract" pattern
+REQ-CANEP-009..014 already use un-flagged): none of Group 2's
+CANEP-specific reject/success bundles at the "iff...otherwise"
+phrasing level needed splitting -- only the ids listed above, which
+either literally repeated "shall" or (for -028/-030/-031/-032) bundled
+two functions/topics under prose with 0-2 "shall" occurrences. `REQ-CANEP-029`
+(0 "shall", a NOT-IMPLEMENTED finding) and `REQ-CANEP-019` (encode_frame_response's
+own "apply the same preconditions ... and encode timed/untimed"
+contract) were both read closely and confirmed as single, atomic
+findings/contracts, not bundles.
+
+All 8 splits' `//cfusa:req`/`//cfusa:test` tags moved/duplicated to sit
+directly above the exact function/test each id describes (not left at
+a file header only), per `CONTRIBUTING.md` -- including two ids
+(REQ-CANEP-031/-039) that previously had no per-function `//cfusa:req`
+tag anywhere in `src/ep_can.c` at all, only the file-header stack.
+Every split mutation-tested against a real injected defect (reverted
+after confirming): the newly-independent clause's own test failed
+cleanly while the retained id's own test(s) stayed green in every one
+of the 8 cases.
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's exact
+flags, `ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67 passing;
+pinned cfusa v0.5.54: `check` 0 errors; `trace --req-coverage 100` /
+`trace --sec-tested 100` (run standalone, per the #533 REQ-CFG-* batch's
+combined-flag reporting-bug finding) each 100% (1182/1182 requirements,
+512/512 functions).
+
+Re-synced `AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s
+`.fusa-reqs.json` scope-count tables for the 8 new entries: 1182 total
+(1149 tc18 [1042 ASIL-B / 36 ASIL-A / 71 QM] / 20 tc18-gap / 7 retired
+/ 6 internal).
+
+Version 0.443.0 -> 0.444.0 (`CMakeLists.txt`/`version.h`/`.fusa.json`
+kept in sync); dated `CHANGELOG.md`/`ROADMAP.md` entries above the
+current highest version header in each.
+
+Part of #533. Not closing it -- other Group 2 (`REQ-ADC-*`,
+`REQ-GPIO-*`, `REQ-I2C-*`, `REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`,
+`REQ-SPI-*`, `REQ-UART-*`, `REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4
+prefixes remain, tracked as separate concurrent batches against the
+same tracker.
+
 ### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ISELED-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
