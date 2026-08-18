@@ -296,6 +296,7 @@ static void test_acf_read_size_or_segment_num_kind_follows_op(void)
 /* REQ-ACF-021: cs_has_meaning=true is the compound-wait/chained exemption --
  * an otherwise-conforming header (hs=rsp=err=0) with cs=1 is valid only
  * when the caller asserts cs carries a meaning of its own. */
+//cfusa:test REQ-ACF-021
 static void test_acf_request_header_constraints_cs_exemption(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};

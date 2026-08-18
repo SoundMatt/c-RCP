@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-ACF-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Triaged all 32 `REQ-ACF-*` requirements (the densest Group 1
+sub-batch, 17/32 proxy-flagged). 15 bundled ids split into 35 total
+(20 new: `REQ-ACF-034`-`053`) -- `rcp_acf_classify_response()` 5-way
+by outcome (matching this file's own `REQ-PWM-*`/compound-wait
+per-case precedent); seven ABB/GBB compound-subject bundles split
+per this file's own `REQ-ACF-007`/`-008` precedent (three of the
+seven, 006/009/015, were missed by the 2+-"shall" proxy entirely --
+found only by reading the code); `rcp_acf_pack_header()`/
+`_unpack_header()`/`rcp_acf_pad_len()` 3-way split (three functions
+under one id); `RCP_ACF_MSG_TYPE_ABB`/`_GBB` constants split; op-bit
+encode/decode split; request-constraints-validator/admission-check
+split; compound-wait's shared-guard/reserved-fallback split;
+compound-wait's GE/LE mode pairs split one-mode-per-id. 5
+flagged-but-confirmed-atomic (012/013/024/032/033 -- boolean
+predicates' complete true/false spec, and one-function
+success+error-path patterns, are not bundling). 12 unflagged
+confirmed atomic; 2 more (020/022) carry zero "shall" text at all
+and were left as prose, tags preserved by relocating to the struct
+they describe. Full tag re-placement per-declaration in both
+`src/acf.c` and `include/rcp/acf.h` (both files' stacked header
+blocks retired). 6 new focused tests for splits whose old shared
+test didn't independently prove the new clause. Mutation-tested: a
+representative sample of split test-trace tags each drop `cfusa
+trace --sec-tested 100` by exactly one requirement when reverted
+(verified live, then restored); the new `REQ-ACF-006` test also
+catches a real code mutation (encode trusting the caller's
+`acf_msg_length`) with a concrete wrong value, not just a
+trace-coverage drop.
+
+`.fusa-reqs.json`: 1137 -> 1157 requirements. Full 67-test suite +
+ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100` / `trace --sec-tested 100` (run
+standalone, the known combined-flag reporting bug) each 100%
+(1157/1157 requirements, 512/512 functions).
+
+**Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, Group 1's remaining prefixes
+(other agents working these concurrently per #533's own suggested
+order).
+
 ### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552:
 REQ-ISELED-028 scope corrected to retired)
 

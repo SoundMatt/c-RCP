@@ -44,6 +44,7 @@ static uint64_t get_u64(const uint8_t *p)
 /* ── byte_message_info bit packing (TC18 v0.5.1_RC Figure 7 / Table 4) ────── */
 
 //cfusa:req REQ-ACF-016
+//cfusa:req REQ-ACF-019
 void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_length,
                           const rcp_acf_byte_message_info_t *hdr)
 {
@@ -78,7 +79,8 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
     out[7] = (uint8_t)(hdr->read_size_or_segment_num & 0xFFu);
 }
 
-//cfusa:req REQ-ACF-016
+//cfusa:req REQ-ACF-046
+//cfusa:req REQ-ACF-049
 rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_info_t *out_hdr)
 {
     uint16_t busid_full;
@@ -130,7 +132,7 @@ bool rcp_acf_peek_gbb_request_type(const uint8_t *frame, size_t frame_len,
     return true;
 }
 
-//cfusa:req REQ-ACF-016
+//cfusa:req REQ-ACF-047
 uint8_t rcp_acf_pad_len(size_t unpadded_len)
 {
     return (uint8_t)((4u - (unpadded_len % 4u)) % 4u);
@@ -158,6 +160,10 @@ size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad)
 /* ── Response semantics ───────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ACF-002
+//cfusa:req REQ-ACF-034
+//cfusa:req REQ-ACF-035
+//cfusa:req REQ-ACF-036
+//cfusa:req REQ-ACF-037
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr)
 {
     /* TC18 §11.3.1: evt[3:0] = 0xF identifies an Acknowledge regardless of
@@ -194,7 +200,7 @@ bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t 
     return true;
 }
 
-//cfusa:req REQ-ACF-021
+//cfusa:req REQ-ACF-050
 bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr)
 {
     return hdr->rsp == 0u;
@@ -234,6 +240,9 @@ static uint16_t be16(const uint8_t *p)
 //cfusa:req REQ-ACF-028
 //cfusa:req REQ-ACF-029
 //cfusa:req REQ-ACF-030
+//cfusa:req REQ-ACF-051
+//cfusa:req REQ-ACF-052
+//cfusa:req REQ-ACF-053
 bool rcp_acf_compound_wait_match(uint8_t evt, const uint8_t *payload, size_t payload_len,
                                   const uint8_t *status, size_t status_len)
 {
@@ -422,10 +431,10 @@ rcp_acf_errc_t rcp_acf_decode_abb(const uint8_t *b, size_t len,
 
 /* ── ACF_GBB ───────────────────────────────────────────────────────────────── */
 
-//cfusa:req REQ-ACF-004
-//cfusa:req REQ-ACF-006
 //cfusa:req REQ-ACF-011
-//cfusa:req REQ-ACF-014
+//cfusa:req REQ-ACF-038
+//cfusa:req REQ-ACF-040
+//cfusa:req REQ-ACF-044
 rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
                                 const uint8_t *payload, size_t payload_len)
 {
@@ -466,11 +475,12 @@ rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
     return frame;
 }
 
-//cfusa:req REQ-ACF-005
 //cfusa:req REQ-ACF-008
-//cfusa:req REQ-ACF-009
-//cfusa:req REQ-ACF-010
-//cfusa:req REQ-ACF-015
+//cfusa:req REQ-ACF-039
+//cfusa:req REQ-ACF-041
+//cfusa:req REQ-ACF-042
+//cfusa:req REQ-ACF-043
+//cfusa:req REQ-ACF-045
 rcp_acf_errc_t rcp_acf_decode_gbb(const uint8_t *b, size_t len,
                                   rcp_acf_gbb_header_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len)

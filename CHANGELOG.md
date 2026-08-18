@@ -34,6 +34,118 @@ the rationale.
 
 ## Releases
 
+### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ACF-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Triaged all 32 `REQ-ACF-*` requirements (`src/acf.c`/`include/rcp/acf.h`)
+against `CONTRIBUTING.md`'s "Writing a requirement" convention (#519/PR
+#525) -- the densest sub-batch in Group 1 (17/32 proxy-flagged, over
+half the group's flagged count).
+
+**15 bundled ids split into 35 total ids (20 new, `REQ-ACF-034`
+through `REQ-ACF-053`)**:
+
+- `REQ-ACF-002` (`rcp_acf_classify_response()`) -- 5-way split by
+  outcome (ACK-priority kept on 002; ERROR/WRITE/READ/ACK-for-NONE to
+  034/035/036/037), matching this codebase's own `REQ-PWM-002`..`-009`
+  per-switch-case convention and this same function's own sibling
+  `rcp_acf_compound_wait_match()`, already split per-mode.
+- `REQ-ACF-004/005/006/009/010/014/015` -- each bundled an ACF_ABB
+  clause with an ACF_GBB clause (sometimes via a compound-subject "X()
+  and Y() shall..." sentence the 2+-"shall" proxy missed entirely --
+  006/009/015 were NOT proxy-flagged but were bundled all the same,
+  found only by reading the actual text/code). Split ABB/GBB per this
+  file's own existing precedent (`REQ-ACF-007`/`-008` already split
+  this exact way). `REQ-ACF-010` further split into ABB round-trip
+  (kept), GBB round-trip (042), and GBB-only timestamp round-trip
+  (043) -- three distinct behaviours.
+- `REQ-ACF-016` (`rcp_acf_pack_header()`/`_unpack_header()`/
+  `rcp_acf_pad_len()`) -- 3-way split: three different functions, one
+  a functionally-unrelated arithmetic helper, under one id.
+- `REQ-ACF-017` (`RCP_ACF_MSG_TYPE_ABB`/`_GBB` constants) -- split, same
+  ABB/GBB precedent as above.
+- `REQ-ACF-019` (op-bit mapping) -- split into encode-side mapping
+  (kept) and decode-side "never produces `RCP_ACF_OP_NONE`" (049), two
+  different functions' behaviour.
+- `REQ-ACF-021` (`rcp_acf_request_header_constraints_valid()`/
+  `rcp_acf_header_is_request()`) -- split, two different functions.
+- `REQ-ACF-025` (`rcp_acf_compound_wait_match()` shared guards) --
+  split off the reserved-evt(0x3) fallback (051), a separate
+  defined behaviour from the shared status-length rule.
+- `REQ-ACF-029`/`REQ-ACF-030` -- each split its GE/LE pair (100b/101b,
+  110b/111b) into one mode per id (052/053), matching this same
+  function's own one-mode-per-id granularity already used for
+  `REQ-ACF-026`/`027`/`028`.
+
+Every split id's `//cfusa:req`/`//cfusa:test` tags were moved (or, for
+`tests/test_acf.c`, newly placed -- the whole file's own stacked
+16-id file-header block, and `include/rcp/acf.h`'s 22-id equivalent,
+were both retired in favour of per-declaration tags, per
+`CONTRIBUTING.md`'s convention) to sit directly above the exact
+function/test each id describes. Wrote 6 new focused tests where the
+existing ones didn't independently prove the split-off clause:
+`test_unpack_header_bit_positions_from_raw_bytes` (046, hand-crafted
+raw octets, independent of `rcp_acf_pack_header()`),
+`test_gbb_roundtrip_remaining_header_fields` (045),
+`test_header_is_request_true_for_rsp_zero_false_for_rsp_one` (050),
+`test_encode_abb_ignores_caller_supplied_acf_msg_length` /
+`test_encode_gbb_ignores_caller_supplied_acf_msg_length` (006/040),
+plus split two combined GE/LE test functions and one combined
+constants test into one-mode/one-constant tests each. Mutation-tested
+a representative sample across every split pattern: reverting a new
+split's own test-trace tag drops `cfusa trace --sec-tested 100`'s
+count by exactly one requirement every time (verified live for
+034/048/050/051, restored each time); reverting `rcp_acf_encode_abb()`
+to trust the caller-supplied `acf_msg_length` instead of recomputing
+it makes the new `REQ-ACF-006` test fail with a concrete wrong value
+(`Expected 3 Was 511`), not just a trace-coverage drop -- real
+behavioural proof, not only a tagging exercise. Every new id's own
+test-trace tag also occurs exactly once (or, for ids proven by
+multiple genuinely independent tests, 2-3 times) across `tests/*.c` --
+none inherited coverage from a leftover shared tag.
+
+**5 flagged-but-confirmed-atomic** (proxy said 2+ "shall", read and
+left alone): `REQ-ACF-012` (`rcp_acf_gbb_is_timed()` -- a boolean
+predicate's complete true/false spec is one behaviour, not two),
+`REQ-ACF-013`/`REQ-ACF-032` (one function's success-path + defined
+error-path, the same complete-single-function-contract pattern),
+`REQ-ACF-024` (the predicate's own single "shall" is its only
+operative clause; the second "shall" in its text is a TC18-quoted
+citation of a *different* requirement's, `REQ-SRV-019`'s, own
+downstream consequence, not this predicate's own scope), `REQ-ACF-033`
+(one function building one response shape; every "shall" the proxy
+counted is inside quoted TC18 spec text cited as justification, not
+this requirement's own operative sentence).
+
+**12 unflagged, confirmed atomic on inspection** (no action):
+`REQ-ACF-001`/`007`/`008`/`011`/`018`/`023`/`026`/`027`/`028`/`031`.
+Two further unflagged ids, `REQ-ACF-020`/`REQ-ACF-022`, carry zero
+"shall" occurrences at all (narrative fix-history text, not
+formally-worded requirements) -- left as-is (rewriting their prose is
+outside this audit's atomicity scope) but their previously
+file-header-only `//cfusa:req` tags were preserved by moving them to
+sit above `rcp_acf_byte_message_info_t`'s own declaration in
+`include/rcp/acf.h`, the struct whose fields they describe, rather
+than being silently dropped when that file's header block was
+retired.
+
+`.fusa-reqs.json` now carries 1157 requirements (1137 + 20 new,
+`REQ-ACF-034` through `REQ-ACF-053`, appended at the array's own tail
+per `REQ-ACF-032`'s own established workaround for
+[SoundMatt/c-FuSa#99](https://github.com/SoundMatt/c-FuSa/issues/99)'s
+`MAX_REQS=1024` truncation bug).
+
+Full 67-test suite (grew to include the new/split tests, net +8 test
+functions across `tests/test_acf.c`) + ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100` / `trace --sec-tested
+100` (run standalone -- the combined-flag reporting bug the #533
+REQ-CFG-* batch found is still present in this tool version) each
+100% (1157/1157 requirements, 512/512 functions).
+
+**Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, the remaining two prefixes in
+Group 1 -- other agents are working these concurrently per issue
+#533's own suggested execution order.
+
 ### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552: REQ-ISELED-028 scope corrected to retired)
 
 `REQ-ISELED-028`'s `text` already said "RETIRED" (2026-08-11,
