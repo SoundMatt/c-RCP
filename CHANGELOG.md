@@ -34,6 +34,53 @@ the rationale.
 
 ## Releases
 
+### v0.435.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-AUTH-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+This batch covers the `REQ-AUTH-*` prefix (`src/authz.c`,
+`tests/test_authz.c`) -- 11 requirements triaged, all read in full
+against their actual `//cfusa:req`/`//cfusa:test`-tagged code and
+tests, not just the 2+-"shall" proxy.
+
+`REQ-AUTH-009` -- the confirmed example #519 itself cited -- bundled
+three different functions' contracts under one id: `rcp_authz_policy_new()`'s
+alloc contract, `rcp_authz_policy_retain(NULL)`'s NULL-tolerance, and
+`rcp_authz_policy_release(NULL)`'s NULL-tolerance, the latter two
+overlapping `REQ-AUTH-010`/`-011`'s own separate non-NULL contracts.
+Split into three: `REQ-AUTH-009` keeps the (narrowed) alloc contract;
+new `REQ-AUTH-012` (`rcp_authz_policy_retain(NULL)` tolerance) and
+`REQ-AUTH-013` (`rcp_authz_policy_release(NULL)` tolerance) each got
+their own `//cfusa:req` tag directly above the function they describe
+and their own dedicated test function (`test_retain_null_returns_null`,
+`test_release_null_is_safe_noop`, split out of the previously-combined
+`test_retain_and_release_tolerate_null`) with its own `//cfusa:test`
+tag -- not a shared tag inherited from the pre-split id. Each split
+test was mutation-tested (tag+function temporarily deleted, confirmed
+`cfusa trace --gaps` flags exactly that id and `--sec-tested 100`
+regresses to 99%, then restored) to prove the coverage is real.
+
+Two proxy-flagged ids (`REQ-AUTH-008`, `REQ-AUTH-011`) were reviewed
+and confirmed genuinely atomic despite carrying 2+ "shall" occurrences:
+both restate one function's single behaviour (copy-by-value semantics;
+refcounted free-only-at-zero) using an "and"-joined compound object or
+a restated consequence, the "legitimate multi-clause-but-still-atomic
+text" case CONTRIBUTING.md's convention explicitly distinguishes from
+real bundling -- `REQ-AUTH-011` is in fact already CONTRIBUTING.md's
+own canonical atomic example, alongside `REQ-AUTH-010`. The remaining
+8 ids (`REQ-AUTH-001`-`007`, `-010`) were not proxy-flagged and were
+confirmed atomic on direct reading, no changes needed.
+
+`.fusa-reqs.json` (REQ-AUTH-009 narrowed, REQ-AUTH-012/013 added),
+`src/authz.c`, `tests/test_authz.c` only -- no other prefix's entries
+touched (rebased onto the concurrently-merged REQ-OBS and REQ-REC
+batches below; `.fusa-reqs.json` merged cleanly, disjoint prefixes).
+Full 67-test suite + ASan/UBSan (CI's exact flags) clean; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100
+--sec-tested 100`: 100%/100%, both split ids independently traced and
+tested.
+
 ### v0.434.0 -- 2026-08-20 ([c-RCP-18-tracker] issue #533 batch REQ-REC-*: requirement-atomicity audit, Group 3 server/dispatch)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by

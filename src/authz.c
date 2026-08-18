@@ -41,6 +41,7 @@ rcp_authz_policy_t *rcp_authz_policy_new(void)
 }
 
 //cfusa:req REQ-AUTH-010
+//cfusa:req REQ-AUTH-012
 rcp_authz_policy_t *rcp_authz_policy_retain(rcp_authz_policy_t *p)
 {
     if (p) rcp_atomic_inc(&p->refcount);
@@ -56,6 +57,7 @@ static void entry_free(policy_entry_t *e)
 }
 
 //cfusa:req REQ-AUTH-011
+//cfusa:req REQ-AUTH-013
 void rcp_authz_policy_release(rcp_authz_policy_t *p)
 {
     size_t i;
