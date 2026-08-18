@@ -475,7 +475,7 @@ jobs:
 
       - name: Build c-FuSa from source
         run: |
-          git clone --depth=1 --branch v0.5.54 https://github.com/SoundMatt/c-FuSa /tmp/cfusa
+          git clone --depth=1 --branch v0.6.1 https://github.com/SoundMatt/c-FuSa /tmp/cfusa
           cmake -B /tmp/cfusa/build -S /tmp/cfusa \
             -DCMAKE_BUILD_TYPE=Release -G Ninja
           cmake --build /tmp/cfusa/build --parallel
@@ -602,16 +602,64 @@ jobs:
       - name: Requirement + annotation coverage report (100% hard gate, both metrics)
         run: /tmp/cfusa/build/cfusa trace --req-coverage 100
 
-      # RELAY §20.1.2 also requires the "tested" metric (every requirement
-      # has a //cfusa:test or //cfusa:sec-test trace, not just a //cfusa:req
-      # impl tag) at 100%, which --req-coverage above does NOT gate --
-      # cfusa's own trace command treats --req-coverage and --sec-tested as
-      # two independent gates, not one combined check. Added (issue #106)
-      # after an audit found 13 requirements with an impl tag but no
-      # test/sec-test tag anywhere in the tree, undetected because this
-      # step didn't exist yet.
+      # RELAY §20.1 item 2 also requires "every requirement traced AND
+      # tested" -- the "tested" half is satisfied by ANY //cfusa:test or
+      # //cfusa:sec-test trace, not just a //cfusa:req impl tag (which
+      # --req-coverage above does not check). Originally gated via `cfusa
+      # trace --sec-tested 100` (added issue #106, after an audit found 13
+      # requirements with an impl tag but no test/sec-test tag anywhere in
+      # the tree), because --sec-tested's pre-v0.6.0 implementation had a
+      # bug (SoundMatt/c-FuSa#147) that made it silently count ANY test
+      # tag, not just //cfusa:sec-test -- which happened to line up with
+      # what this gate actually needs.
+      #
+      # c-FuSa v0.6.1 fixed #147: --sec-tested now correctly counts ONLY
+      # //cfusa:sec-test tags, which this codebase had never populated until
+      # this same PR (issue #575) -- so `--sec-tested 100` would now fail
+      # outright, not because coverage regressed, but because the flag's
+      # fixed semantics no longer match what this gate is checking. c-FuSa
+      # v0.6.1 also has no CLI flag left exposing the general "tested"
+      # metric as a hard gate -- filed upstream as SoundMatt/c-FuSa#214 --
+      # so, matching this file's own MC/DC-workaround precedent above
+      # (reading llvm-cov's real totals directly instead of routing through
+      # a mismatched flag), this step parses plain `cfusa trace`'s own
+      # "Coverage: N/N requirements traced, M/M tested" summary line
+      # directly and hard-fails if either count is not 100%.
       - name: Test-trace coverage report (100% hard gate, "tested" metric)
-        run: /tmp/cfusa/build/cfusa trace --sec-tested 100
+        run: |
+          out="$(/tmp/cfusa/build/cfusa trace)"
+          echo "$out" | tail -5
+          line="$(echo "$out" | grep -E '^Coverage: [0-9]+/[0-9]+ requirements traced, [0-9]+/[0-9]+ tested$')"
+          if [ -z "$line" ]; then
+            echo "::error::cfusa trace's summary line not found or not in the expected format -- cannot verify the 'tested' metric. Full output above."
+            exit 1
+          fi
+          traced_n=$(echo "$line" | sed -E 's#Coverage: ([0-9]+)/([0-9]+).*#\1#')
+          traced_d=$(echo "$line" | sed -E 's#Coverage: ([0-9]+)/([0-9]+).*#\2#')
+          tested_n=$(echo "$line" | sed -E 's#.*, ([0-9]+)/([0-9]+) tested#\1#')
+          tested_d=$(echo "$line" | sed -E 's#.*, ([0-9]+)/([0-9]+) tested#\2#')
+          if [ "$traced_n" != "$traced_d" ] || [ "$tested_n" != "$tested_d" ]; then
+            echo "::error::'tested' metric gate failed: $line (both counts must be equal for a 100% gate)"
+            exit 1
+          fi
+          echo "OK: $line"
+
+      # Genuine security-test coverage (distinct from the general "tested"
+      # gate above): CYBERSECURITY.md's own six security layers cite exactly
+      # 37 requirement ids as security-relevant (REQ-AUTH-001..008,
+      # REQ-E2E-011/012/014/015/020..027, REQ-DISC-015..022,
+      # REQ-RMAP-009..012, REQ-LIFECYCLE-018..020, REQ-RL-003/004), each now
+      # carrying a real //cfusa:sec-test tag alongside its existing
+      # //cfusa:test tag (issue #575). 37/1271 = 2.91%,
+      # hence the 2% floor -- NOT a claim that only 2% of this codebase is
+      # security-relevant; it is a regression floor against the exact,
+      # CYBERSECURITY.md-enumerated subset, low by construction since most
+      # of a protocol-plumbing library's requirements genuinely are not
+      # security-relevant. Raise this number only alongside a corresponding
+      # CYBERSECURITY.md layer addition, never by tagging more broadly than
+      # that document's own boundary.
+      - name: Security-test coverage report (2% floor, real CYBERSECURITY.md subset)
+        run: /tmp/cfusa/build/cfusa trace --sec-tested 2
 
   # ── c-FuSa: ctest integration → test-evidence.md ─────────────────────────────
   cfusa-verify:

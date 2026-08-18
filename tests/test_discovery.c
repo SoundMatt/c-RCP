@@ -23,6 +23,21 @@
 //cfusa:test REQ-DISC-022
 //cfusa:test REQ-DISC-023
 //cfusa:test REQ-DISC-024
+// Security-relevant subset (CYBERSECURITY.md §1.4, Layer 4 —
+// Discovery/Bootstrap Claim): first-claimant-wins bootstrap-claim
+// admission, preventing a second attacker from displacing an
+// already-bonded claimant during HW_UNCONFIGURED. See CYBERSECURITY.md
+// and tara.md TS-003 (first-claimant cryptographic authentication is
+// explicitly NOT covered here -- that gap is closed only by Layer 1
+// MACsec, not implemented in this library).
+//cfusa:sec-test REQ-DISC-015
+//cfusa:sec-test REQ-DISC-016
+//cfusa:sec-test REQ-DISC-017
+//cfusa:sec-test REQ-DISC-018
+//cfusa:sec-test REQ-DISC-019
+//cfusa:sec-test REQ-DISC-020
+//cfusa:sec-test REQ-DISC-021
+//cfusa:sec-test REQ-DISC-022
 //cfusa:test REQ-DISC-025
 //cfusa:test REQ-DISC-026
 //cfusa:test REQ-DISC-027

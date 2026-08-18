@@ -15,6 +15,16 @@
 //cfusa:test REQ-RMAP-012
 //cfusa:test REQ-RMAP-013
 //cfusa:test REQ-RMAP-014
+// Security-relevant subset (CYBERSECURITY.md §1.5, Layer 5 —
+// Register-Map Write Authorization): rcp_regmap_writer_ctx() grants
+// write authority only to the EP0 root-client or a request stream's
+// own owning stream; HW_GENERIC/FUNCTIONAL_W_STAR field-locking.
+// See CYBERSECURITY.md; formally verified via
+// tla/LifecycleStateMachine.tla's FieldLockMonotonicWhileConfigured.
+//cfusa:sec-test REQ-RMAP-009
+//cfusa:sec-test REQ-RMAP-010
+//cfusa:sec-test REQ-RMAP-011
+//cfusa:sec-test REQ-RMAP-012
 //cfusa:test REQ-RMAP-082
 //cfusa:test REQ-RMAP-015
 //cfusa:test REQ-RMAP-016
