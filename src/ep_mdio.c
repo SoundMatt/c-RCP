@@ -2,6 +2,8 @@
 #include "rcp/ep_mdio.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -395,7 +397,7 @@ rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     if (!payload) return empty;
 
     put_u16(payload, start_address);
-    memcpy(payload + RCP_EP_MDIO_RECONFIG_ADDR_LEN, data, data_len);
+    rcp_memcpy_bounded(payload + RCP_EP_MDIO_RECONFIG_ADDR_LEN, data_len, data, data_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;
@@ -669,7 +671,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
 
     payload[0] = (uint8_t)rcp_ep_mdio_mode_for_word_count(word_count);
     put_addr_prefix(&payload[MODE_OCTET_LEN], addr);
-    memcpy(&payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN], words_bytes.data, words_bytes.len);
+    rcp_memcpy_bounded(&payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN], words_bytes.len, words_bytes.data, words_bytes.len);
     rcp_bytes_free(&words_bytes);
 
     hdr.byte_bus_id     = byte_bus_id;
@@ -1024,7 +1026,7 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
 
     payload[0] = (uint8_t)rcp_ep_mdio_mms_mode_for_word_count(word_count);
     put_mms_addr_prefix(&payload[MODE_OCTET_LEN], addr);
-    memcpy(&payload[MODE_OCTET_LEN + MMS_ADDR_PREFIX_LEN], words_bytes.data, words_bytes.len);
+    rcp_memcpy_bounded(&payload[MODE_OCTET_LEN + MMS_ADDR_PREFIX_LEN], words_bytes.len, words_bytes.data, words_bytes.len);
     rcp_bytes_free(&words_bytes);
 
     hdr.byte_bus_id     = byte_bus_id;

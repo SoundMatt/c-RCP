@@ -2,6 +2,8 @@
 #include "rcp/e2e.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -235,7 +237,7 @@ rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
     data = (uint8_t *)rcp_malloc(acf_frame_len + RCP_E2E_CRC_LEN);
     if (!data) return out;
 
-    if (real_len > 0) memcpy(data, acf_frame, real_len);
+    if (real_len > 0) rcp_memcpy_bounded(data, acf_frame_len, acf_frame, real_len);
 
     /* Adapt the copy's acf_msg_length by +1 quadlet before computing the
      * CRC, per the coverage-span-and-length-accounting rule in the file
@@ -261,7 +263,7 @@ rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
      * memset(0)), so this function stays a faithful transport for
      * whatever bytes the caller's pad octets actually held, matching
      * unwrap()'s own byte-identical round-trip contract. */
-    if (pad_octets > 0) memcpy(data + real_len + RCP_E2E_CRC_LEN, acf_frame + real_len, pad_octets);
+    if (pad_octets > 0) rcp_memcpy_bounded(data + real_len + RCP_E2E_CRC_LEN, pad_octets, acf_frame + real_len, pad_octets);
 
     out.data = data;
     out.len  = acf_frame_len + RCP_E2E_CRC_LEN;
@@ -312,9 +314,9 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint8_t avtp_subtype, uint8_t header_octet1, bool 
     if (body_len > 0) {
         body_copy.data = (uint8_t *)rcp_malloc(body_len);
         if (body_copy.data) {
-            if (real_len > 0) memcpy(body_copy.data, frame, real_len);
+            if (real_len > 0) rcp_memcpy_bounded(body_copy.data, body_len, frame, real_len);
             if (pad_octets > 0) {
-                memcpy(body_copy.data + real_len, frame + real_len + RCP_E2E_CRC_LEN, pad_octets);
+                rcp_memcpy_bounded(body_copy.data + real_len, pad_octets, frame + real_len + RCP_E2E_CRC_LEN, pad_octets);
             }
             body_copy.len = body_len;
         }

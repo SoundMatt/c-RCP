@@ -16,6 +16,8 @@
 #include "rcp/l2.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "platform.h"
 
 #include <stdlib.h>
@@ -43,11 +45,11 @@ rcp_bytes_t rcp_l2_frame_encode(const uint8_t dst_mac[6], const uint8_t src_mac[
     buf = (uint8_t *)rcp_malloc(RCP_L2_HEADER_LEN + avtpdu_len);
     if (!buf) return out;
 
-    memcpy(buf, dst_mac, 6);
-    memcpy(buf + 6, src_mac, 6);
+    rcp_memcpy_bounded(buf, 6u, dst_mac, 6u);
+    rcp_memcpy_bounded(buf + 6, 6u, src_mac, 6u);
     buf[12] = (uint8_t)((RCP_L2_ETHERTYPE >> 8) & 0xFFu);
     buf[13] = (uint8_t)(RCP_L2_ETHERTYPE & 0xFFu);
-    if (avtpdu_len > 0) memcpy(buf + RCP_L2_HEADER_LEN, avtpdu, avtpdu_len);
+    if (avtpdu_len > 0) rcp_memcpy_bounded(buf + RCP_L2_HEADER_LEN, avtpdu_len, avtpdu, avtpdu_len);
 
     out.data = buf;
     out.len  = RCP_L2_HEADER_LEN + avtpdu_len;
@@ -66,8 +68,8 @@ bool rcp_l2_frame_decode(const uint8_t *frame, size_t frame_len,
     ethertype = (uint16_t)(((uint16_t)frame[12] << 8) | (uint16_t)frame[13]);
     if (ethertype != RCP_L2_ETHERTYPE) return false;
 
-    memcpy(out_dst_mac, frame, 6);
-    memcpy(out_src_mac, frame + 6, 6);
+    rcp_memcpy_bounded(out_dst_mac, 6u, frame, 6u);
+    rcp_memcpy_bounded(out_src_mac, 6u, frame + 6, 6u);
     *out_avtpdu     = frame + RCP_L2_HEADER_LEN;
     *out_avtpdu_len = frame_len - RCP_L2_HEADER_LEN;
     return true;
@@ -140,7 +142,7 @@ static int l2_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_t
     sll.sll_protocol = htons(RCP_L2_ETHERTYPE);
     sll.sll_ifindex  = l->ifindex;
     sll.sll_halen    = 6;
-    memcpy(sll.sll_addr, l->dst_mac, 6);
+    rcp_memcpy_bounded(sll.sll_addr, sizeof(sll.sll_addr), l->dst_mac, 6u);
 
     n = sendto(l->fd, wire.data, wire.len, 0, (struct sockaddr *)&sll, sizeof(sll));
     rcp_bytes_free(&wire);
@@ -235,7 +237,7 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                 rcp_free(tmp);
                 return RCP_ERR_BUSY;
             }
-            if (payload_len > 0) memcpy(buf, payload, payload_len);
+            if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
             rcp_free(tmp);
             return RCP_OK;
@@ -290,7 +292,7 @@ rcp_avtp_transport_t *rcp_l2_avtp_transport_new(const char *ifname, const uint8_
     l->base.time_sync_supported = time_sync_supported;
     l->fd                       = -1;
     rcp_mutex_init(&l->mu);
-    memcpy(l->dst_mac, dst_mac, 6);
+    rcp_memcpy_bounded(l->dst_mac, sizeof(l->dst_mac), dst_mac, 6u);
 
     iflen = ifname ? strlen(ifname) : 0;
     if (iflen == 0 || iflen >= sizeof(ifr.ifr_name)) return &l->base; /* ok() == false */
@@ -304,7 +306,7 @@ rcp_avtp_transport_t *rcp_l2_avtp_transport_new(const char *ifname, const uint8_
     if (l->fd < 0) return &l->base;
 
     memset(&ifr, 0, sizeof(ifr));
-    memcpy(ifr.ifr_name, ifname, iflen);
+    rcp_memcpy_bounded(ifr.ifr_name, sizeof(ifr.ifr_name), ifname, iflen);
     if (ioctl(l->fd, SIOCGIFINDEX, &ifr) < 0) {
         close(l->fd);
         l->fd = -1;
@@ -325,13 +327,13 @@ rcp_avtp_transport_t *rcp_l2_avtp_transport_new(const char *ifname, const uint8_
     /* Source MAC is read from the interface itself, never caller-supplied
      * -- see this module's own header doc comment for why. */
     memset(&ifr, 0, sizeof(ifr));
-    memcpy(ifr.ifr_name, ifname, iflen);
+    rcp_memcpy_bounded(ifr.ifr_name, sizeof(ifr.ifr_name), ifname, iflen);
     if (ioctl(l->fd, SIOCGIFHWADDR, &ifr) < 0) {
         close(l->fd);
         l->fd = -1;
         return &l->base;
     }
-    memcpy(l->src_mac, ifr.ifr_hwaddr.sa_data, 6);
+    rcp_memcpy_bounded(l->src_mac, sizeof(l->src_mac), ifr.ifr_hwaddr.sa_data, 6u);
 
     l->ok = true;
     return &l->base;
@@ -348,7 +350,7 @@ bool rcp_l2_avtp_transport_local_mac(rcp_avtp_transport_t *t, uint8_t out_mac[6]
 {
     rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)t;
     if (!l->ok) return false;
-    memcpy(out_mac, l->src_mac, 6);
+    rcp_memcpy_bounded(out_mac, 6u, l->src_mac, 6u);
     return true;
 }
 

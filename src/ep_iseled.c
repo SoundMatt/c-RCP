@@ -2,6 +2,8 @@
 #include "rcp/ep_iseled.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include "alloc_overflow.h"
 
 #include <stdlib.h>
@@ -357,7 +359,7 @@ rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     if (!payload) return empty;
 
     put_u16(payload, start_address);
-    memcpy(payload + RCP_EP_ISELED_RECONFIG_ADDR_LEN, data, data_len);
+    rcp_memcpy_bounded(payload + RCP_EP_ISELED_RECONFIG_ADDR_LEN, data_len, data, data_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;

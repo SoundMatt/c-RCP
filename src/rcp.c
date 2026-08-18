@@ -2,6 +2,8 @@
 #include "rcp/rcp.h"
 #include "rcp/alloc.h"
 
+#include "mem_bounded.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -50,7 +52,7 @@ rcp_bytes_t rcp_bytes_dup(const uint8_t *data, size_t len)
     b.data = (uint8_t *)rcp_malloc(len);
     if (!b.data) return b; /* len stays 0: allocation failure yields an empty buffer */
 
-    memcpy(b.data, data, len);
+    rcp_memcpy_bounded(b.data, len, data, len);
     b.len = len;
     return b;
 }

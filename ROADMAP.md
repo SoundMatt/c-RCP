@@ -19106,6 +19106,19 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.419.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, src/ half:
+memcpy/memmove/strncpy explicit-size-bounded wrappers)
+
+Second sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532, v0.417.0's predecessor).
+Resolves the `src/` half of **CY001** (CERT-C STR31-C, CWE-120): all
+74 `src/` findings across 31 files. See `CHANGELOG.md`'s matching
+entry for full detail (the `mem_bounded.h` wrapper design, per-site
+capacity derivation, the disclosed `CFUSA-L008` +4 trade-off, and
+the two mutation tests run). `tests/`'s remaining 66 findings are the
+next sub-effort; issue #523 stays open until CY001, L001, L008, and
+A003 are all resolved or explicitly dispositioned.
+
 ### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID
 pass + FTTI cross-check test)
 

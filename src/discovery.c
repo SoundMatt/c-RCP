@@ -3,6 +3,7 @@
 #include "rcp/alloc.h"
 
 #include "alloc_overflow.h"
+#include "mem_bounded.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -197,7 +198,7 @@ rcp_bytes_t rcp_discovery_encode_response(const rcp_regmap_general_t *map,
     copy_len = ((size_t)read_size < RCP_DISCOVERY_GENERAL_SLICE_LEN)
                    ? (size_t)read_size
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
-    memcpy(payload, slice, copy_len);
+    rcp_memcpy_bounded(payload, sizeof(payload), slice, copy_len);
 
     hdr.byte_bus_id              = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op                       = RCP_ACF_OP_READ;
@@ -279,7 +280,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
     copy_len = ((size_t)read_size < RCP_DISCOVERY_GENERAL_SLICE_LEN)
                    ? (size_t)read_size
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
-    memcpy(payload, slice, copy_len);
+    rcp_memcpy_bounded(payload, sizeof(payload), slice, copy_len);
 
     {
         size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
