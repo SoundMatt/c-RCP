@@ -42,6 +42,7 @@
 //cfusa:test REQ-RMAP-058
 //cfusa:test REQ-RMAP-059
 //cfusa:test REQ-WAKEUP-020
+//cfusa:test REQ-WAKEUP-026
 //cfusa:test REQ-RMAP-060
 //cfusa:test REQ-RMAP-061
 //cfusa:test REQ-RMAP-085
@@ -1623,6 +1624,7 @@ static void test_optional_subsystem_cfg_apply_reconfig_rejects_out_of_range_and_
  * arbitrary values distinct from every other row's own ep_type in this
  * test, matching the real caller's own responsibility to supply
  * ep_wakeup.h's actual RCP_EP_WAKEUP_EP_TYPE/_ENDPOINT_NUM). */
+//cfusa:test REQ-WAKEUP-026
 static void test_ep0_dispatcher_enforces_fixed_ep_id_for_configured_ep_type(void)
 {
     rcp_acf_byte_message_info_t  hdr = {0};
@@ -5099,6 +5101,7 @@ static void test_ep_id_map_flags_heterogeneous_shared_bus(void)
  * index-parallel ep_types[] array (this table's own row carries no
  * ep_type field) checked against a caller-supplied
  * target_ep_type/required_ep_id pair. */
+//cfusa:test REQ-WAKEUP-020
 static void test_ep_id_map_flags_wrong_ep_id_for_a_fixed_endpoint_type(void)
 {
     rcp_regmap_ep_id_map_entry_t correct[2];
@@ -5959,6 +5962,7 @@ static void test_ep0_dispatcher_applies_xor_write_op_to_sequencer_table(void)
  * too. Row 0 is WakeUp-typed (ep_type=9) with ep_id already fixed to
  * 1; both sub-cases OR at the SAME address with different data,
  * distinguished only by whether the COMBINED result keeps ep_id==1. */
+//cfusa:test REQ-WAKEUP-026
 static void test_ep0_dispatcher_or_write_op_respects_fixed_ep_id_after_combine(void)
 {
     rcp_acf_byte_message_info_t  hdr = {0};

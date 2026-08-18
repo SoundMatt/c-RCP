@@ -34,6 +34,97 @@ the rationale.
 
 ## Releases
 
+### v0.453.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-WAKEUP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-WAKEUP-*` prefix (`src/ep_wakeup.c`/`include/rcp/ep_wakeup.h`,
+plus one enforcement clause in `src/regmap.c`) -- 22 total, only 1
+proxy-flagged ("2+ shall"). All 22 read in full against their actual
+text and traced code/tests, not just the flagged one: several of the
+narrative-style "IMPLEMENTED .../PARTIAL ..." entries (0 "shall"
+occurrences, invisible to the proxy) turned out to bundle multiple
+functions' behavior under one id, the same failure mode Group 1's
+REQ-RMAP-* batch found.
+
+6 ids split into 14 new ones (`REQ-WAKEUP-023..036`):
+
+- `REQ-WAKEUP-013` -> `-013`/`-023`: `decode_sleepcmd_response()`'s
+  shared frame-validation-failure-mode clause (kept as `-013`) vs. its
+  own successfully-decoded-byte-to-`RCP_PWRMODE_ENTRY_*` fail-safe
+  mapping (`-023`) -- the one proxy-flagged id, and a real bundle: two
+  "shall" clauses, two independently-testable behaviors.
+- `REQ-WAKEUP-017` -> `-017`/`-024`: `encode_wakeup_message_with_source()`
+  (kept as `-017`) vs. `decode_wakeup_message_with_source()` (`-024`)
+  -- two different functions under one id, breaking this same file's
+  own established one-id-per-encode/decode-direction pattern
+  (`-010`/`-011`, `-012`/`-013`, `-014`/`-015` already split this way).
+- `REQ-WAKEUP-019` -> `-019`/`-025`: `encode_sleepcmd_response()`'s
+  refusal-as-ACF-error-response clause (kept as `-019`) vs.
+  `decode_sleepcmd_response()`'s own `REQUEST_CANCELED`-recognition
+  clause (`-025`) -- same encode/decode-direction bundling pattern.
+- `REQ-WAKEUP-020` -> `-020`/`-026`: `rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()`'s
+  read-only diagnostic (kept as `-020`) vs. `rcp_regmap_ep0_decode_write_request()`'s
+  own write-time enforcement (`-026`, issue #336) -- a diagnostic and
+  the enforcement mechanism it motivated, bundled under one id despite
+  being different functions with independently-testable contracts.
+- `REQ-WAKEUP-021` -> `-021`/`-027`/`-028`/`-029`/`-030`/`-031`: this id's
+  prior text (the wup_status bitmask redesign, issue #341 lineage)
+  bundled **7 different functions'** own behavior -- `render_registers()`'s
+  wup_status-rendering clause (kept as `-021`), `wup_status_clear_source()`
+  (`-027`), `wup_status_source_is_latched()` (`-028`), `apply_reconfig()`'s
+  own write-1-to-clear parsing clause (`-029`), `reconfig_strerror()`
+  (`-030`), and `encode_reconfig_request()` (`-031`, a generic EP_func
+  write-request encoder not really about wup_status at all -- its
+  inclusion under `-021` was itself a mistagging this split corrects).
+  `REQ-WAKEUP-006`'s own text was also corrected in place (not split,
+  no new id): it still described the retired index-free
+  `rcp_ep_wakeup_wup_status_latch()`/single-bit `s->latched` field,
+  stale since `-021`'s own 2026-08-14 redesign renamed it to the
+  per-source, index-taking `wup_status_latch_source()`.
+- `REQ-WAKEUP-022` -> `-022`/`-032`/`-033`/`-034`/`-035`: this id's prior
+  text (Table 40's 6 IO_SRC values, issue #341 lineage) bundled 4
+  different functions -- `render_registers()`'s IO_SRC-precedence
+  clause (kept as `-022`), `source_edge_state_init()` (`-032`),
+  `source_edge_asserted()` (`-033`), `any_source_edge_asserted()`
+  (`-034`, including its own deliberate no-short-circuit contract),
+  and `apply_reconfig()`'s own IO_SRC-parsing clause (`-035`) -- the
+  same LEVEL-mode/EDGE-mode pairing this file's own `-003`/`-004` and
+  `-007`/`-008` sibling ids already establish separately per function.
+- New `REQ-WAKEUP-036` (split out of `-021`'s own prior text, not
+  reusing any prior number): `apply_reconfig()`'s own general
+  short/out-of-range write-validation and read-only-register-skip
+  contract -- had no dedicated id at all before this split, its
+  coverage carried only incidentally by `-021`/`-022`'s own (now-
+  narrowed) tags on the same function.
+
+16 ids confirmed atomic on inspection (15 left entirely unchanged,
+plus `-006` above): `-001`, `-002`, `-003`, `-004` (a single function's
+complete false/true boolean contract, not two independent behaviors,
+despite two "shall"-equivalent clauses), `-005`, `-007`, `-008`,
+`-009`, `-010`, `-011`, `-012`, `-014`, `-015`, `-016`, `-018`.
+
+Tags moved/duplicated to sit directly above the exact function/test
+each id describes (not file-header-only) per `CONTRIBUTING.md`,
+including a new dedicated test
+(`test_sleepcmd_response_decode_shares_request_failure_modes`) for
+`-013`'s own shared-validation clause, which previously had no test
+proving it independently for the RESPONSE side (only the REQUEST
+side, via `-011`'s own tests). Every one of the 14 new ids' clauses
+mutation-tested against a real injected defect in its own function,
+confirmed to fail only its own dedicated test with no unexpected
+collateral failures, then reverted.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100`/`--sec-tested 100` (run
+standalone) each 100% (1188/1188 requirements, 512/512 functions).
+
+Part of #533. Not closing it -- other Group 2 per-endpoint prefixes
+remain, tracked as separate concurrent batches against the same
+tracker.
+
 ### v0.452.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-MDIO-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by

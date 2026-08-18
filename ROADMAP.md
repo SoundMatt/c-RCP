@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.453.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-WAKEUP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-WAKEUP-*` (`src/ep_wakeup.c`/
+`include/rcp/ep_wakeup.h`, plus one enforcement clause in
+`src/regmap.c`) -- 22 total, only 1 proxy-flagged -- triaged all 22
+in full, since several 0-"shall" narrative entries turned out to
+bundle multiple functions, same as Group 1's REQ-RMAP-* finding.
+
+6 ids split into 14 new ones (`REQ-WAKEUP-023..036`): `-013` (shared
+frame-validation vs. its own byte-to-enum fail-safe mapping, `-023`
+-- the one proxy-flagged id); `-017` (encode vs. decode of the
+WakeUp-with-source message, `-024`) and `-019` (encode vs. decode of
+the SleepCMD refusal-as-error-response, `-025`) -- both bundling two
+different functions under one id, breaking this file's own
+established one-id-per-encode/decode-direction pattern; `-020`
+(read-only diagnostic vs. `regmap.c`'s own write-time enforcement it
+motivated, `-026`, issue #336); `-021` (the wup_status bitmask
+redesign, issue #341 lineage, bundled **7 different functions** --
+kept as render's own rendering clause, split into `-027`..`-031` for
+`clear_source()`/`source_is_latched()`/`apply_reconfig()`'s parse
+clause/`reconfig_strerror()`/`encode_reconfig_request()`, the last of
+which isn't really about wup_status at all); `-022` (Table 40's edge
+detection, bundled 4 functions -- kept as render's own precedence
+clause, split into `-032`..`-035` for `source_edge_state_init()`/
+`source_edge_asserted()`/`any_source_edge_asserted()`/
+`apply_reconfig()`'s own IO_SRC-parsing clause). New `-036` (from
+`-021`'s text, no prior number reused): `apply_reconfig()`'s own
+general write-validation contract, previously untagged by any id at
+all. `-006`'s own text also corrected in place (no split): it still
+named the retired index-free `wup_status_latch()`/`s->latched` field,
+stale since `-021`'s 2026-08-14 redesign.
+
+16 ids confirmed atomic on inspection (`-001`/`-002`/`-003`/`-004`/
+`-005`/`-007`/`-008`/`-009`/`-010`/`-011`/`-012`/`-014`/`-015`/`-016`/
+`-018`, plus `-006` above) -- `-004`'s own two-clause (false-case/
+true-case) phrasing is one predicate's complete contract, not two
+independent behaviors.
+
+Tags moved/duplicated to sit above the exact function/test per split;
+one brand-new test (`test_sleepcmd_response_decode_shares_request_
+failure_modes`) closes a real gap -- `-013`'s shared-validation
+clause had no dedicated RESPONSE-side test before, only REQUEST-side
+coverage via `-011`. Every new id's clause mutation-tested against a
+real injected defect in its own function, confirmed to fail only its
+own dedicated test, then reverted.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1188/1188 requirements, 512/512 functions).
+
+**Next**: other Group 2 per-endpoint prefixes remain, tracked as
+separate concurrent batches against the same tracker.
+
 ### v0.452.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-MDIO-*: requirement-atomicity audit, Group 2 per-endpoint)
 

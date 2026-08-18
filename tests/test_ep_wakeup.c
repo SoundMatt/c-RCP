@@ -17,6 +17,17 @@
 //cfusa:test REQ-WAKEUP-016
 //cfusa:test REQ-WAKEUP-021
 //cfusa:test REQ-WAKEUP-022
+//cfusa:test REQ-WAKEUP-023
+//cfusa:test REQ-WAKEUP-027
+//cfusa:test REQ-WAKEUP-028
+//cfusa:test REQ-WAKEUP-029
+//cfusa:test REQ-WAKEUP-030
+//cfusa:test REQ-WAKEUP-031
+//cfusa:test REQ-WAKEUP-032
+//cfusa:test REQ-WAKEUP-033
+//cfusa:test REQ-WAKEUP-034
+//cfusa:test REQ-WAKEUP-035
+//cfusa:test REQ-WAKEUP-036
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -132,6 +143,8 @@ static void test_any_source_asserted_null_safe(void)
  * Struct field order is {enabled, active_high, pin_number,
  * trigger_on_rising_edge, trigger_on_falling_edge}. */
 
+//cfusa:test REQ-WAKEUP-033
+//cfusa:test REQ-WAKEUP-032
 static void test_source_edge_asserted_delegates_to_level_predicate_in_level_mode(void)
 {
     rcp_ep_wakeup_source_cfg_t        active_high = {true, true, 0, false, false};
@@ -151,6 +164,8 @@ static void test_source_edge_asserted_delegates_to_level_predicate_in_level_mode
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(active_high, &state, false));
 }
 
+//cfusa:test REQ-WAKEUP-033
+//cfusa:test REQ-WAKEUP-032
 static void test_source_edge_asserted_first_observation_only_seeds(void)
 {
     rcp_ep_wakeup_source_cfg_t        rising = {true, false, 0, true, false};
@@ -163,6 +178,7 @@ static void test_source_edge_asserted_first_observation_only_seeds(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising, &state, true));
 }
 
+//cfusa:test REQ-WAKEUP-033
 static void test_source_edge_asserted_fires_on_configured_rising_edge_only(void)
 {
     rcp_ep_wakeup_source_cfg_t        rising = {true, false, 0, true, false};
@@ -176,6 +192,7 @@ static void test_source_edge_asserted_fires_on_configured_rising_edge_only(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising, &state, false)); /* 1->0: wrong edge */
 }
 
+//cfusa:test REQ-WAKEUP-033
 static void test_source_edge_asserted_fires_on_configured_falling_edge_only(void)
 {
     rcp_ep_wakeup_source_cfg_t        falling = {true, false, 0, false, true};
@@ -189,6 +206,7 @@ static void test_source_edge_asserted_fires_on_configured_falling_edge_only(void
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(falling, &state, false)); /* 0->0 */
 }
 
+//cfusa:test REQ-WAKEUP-033
 static void test_source_edge_asserted_both_edges_fires_either_direction(void)
 {
     rcp_ep_wakeup_source_cfg_t        both = {true, false, 0, true, true};
@@ -201,6 +219,7 @@ static void test_source_edge_asserted_both_edges_fires_either_direction(void)
     TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(both, &state, false)); /* falling: fires */
 }
 
+//cfusa:test REQ-WAKEUP-033
 static void test_source_edge_asserted_disabled_updates_state_but_never_fires(void)
 {
     rcp_ep_wakeup_source_cfg_t        rising_disabled = {false, false, 0, true, false};
@@ -212,6 +231,7 @@ static void test_source_edge_asserted_disabled_updates_state_but_never_fires(voi
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising_disabled, &state, true));
 }
 
+//cfusa:test REQ-WAKEUP-034
 static void test_any_source_edge_asserted_true_when_one_fires(void)
 {
     rcp_ep_wakeup_functional_cfg_t    cfg;
@@ -240,6 +260,7 @@ static void test_any_source_edge_asserted_true_when_one_fires(void)
  * implementation would have missed updating source 3's state during
  * call 2, so it would incorrectly see no transition here and fail to
  * fire. */
+//cfusa:test REQ-WAKEUP-034
 static void test_any_source_edge_asserted_updates_every_source_state_not_just_until_first_hit(void)
 {
     rcp_ep_wakeup_functional_cfg_t    cfg;
@@ -274,6 +295,7 @@ static void test_any_source_edge_asserted_updates_every_source_state_not_just_un
                                                                                                edge */
 }
 
+//cfusa:test REQ-WAKEUP-034
 static void test_any_source_edge_asserted_null_safe(void)
 {
     rcp_ep_wakeup_functional_cfg_t    cfg;
@@ -298,6 +320,8 @@ static void test_wup_status_init_is_clear(void)
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&s));
 }
 
+//cfusa:test REQ-WAKEUP-007
+//cfusa:test REQ-WAKEUP-006
 static void test_wup_status_latch_then_clear(void)
 {
     rcp_ep_wakeup_wup_status_t s;
@@ -314,6 +338,8 @@ static void test_wup_status_latch_then_clear(void)
  * a per-source bitmask, "each bit represents a wake-up source" -- these
  * tests prove that shape directly, distinct from the aggregate
  * is_clear()/clear() whole-mask queries already covered above. */
+//cfusa:test REQ-WAKEUP-006
+//cfusa:test REQ-WAKEUP-028
 static void test_wup_status_latch_source_is_independent_per_index(void)
 {
     rcp_ep_wakeup_wup_status_t s;
@@ -327,6 +353,8 @@ static void test_wup_status_latch_source_is_independent_per_index(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&s)); /* something is latched */
 }
 
+//cfusa:test REQ-WAKEUP-027
+//cfusa:test REQ-WAKEUP-028
 static void test_wup_status_clear_source_leaves_other_sources_latched(void)
 {
     rcp_ep_wakeup_wup_status_t s;
@@ -342,6 +370,9 @@ static void test_wup_status_clear_source_leaves_other_sources_latched(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&s)); /* source 3 still latched */
 }
 
+//cfusa:test REQ-WAKEUP-006
+//cfusa:test REQ-WAKEUP-027
+//cfusa:test REQ-WAKEUP-028
 static void test_wup_status_out_of_range_source_index_is_a_no_op(void)
 {
     rcp_ep_wakeup_wup_status_t s;
@@ -489,6 +520,7 @@ static void test_sleepcmd_response_round_trip_refused(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-WAKEUP-023
 static void test_sleepcmd_response_decode_unrecognized_byte_is_refused(void)
 {
     rcp_bytes_t                frame;
@@ -502,6 +534,50 @@ static void test_sleepcmd_response_decode_unrecognized_byte_is_refused(void)
                                                                                 &out_result, &out_tn));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, out_result); /* fail-safe */
 
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-WAKEUP-013 (split 2026-08-18, issue #533 tracker, [c-RCP-18-tracker]
+ * REQ-WAKEUP batch, atomicity audit): decode_sleepcmd_response() shares
+ * its short-frame/wrong-message-type/wrong-bus/bad-opcode failure modes
+ * with decode_sleepcmd_request() -- this was previously proven only for
+ * the REQUEST side (see the "SleepCMD request round trip" tests above);
+ * this test proves it independently for the RESPONSE side too, so a
+ * regression here cannot hide behind REQUEST's own passing tests. */
+//cfusa:test REQ-WAKEUP-013
+static void test_sleepcmd_response_decode_shares_request_failure_modes(void)
+{
+    rcp_bytes_t                 frame;
+    rcp_pwrmode_entry_result_t  out_result;
+    uint8_t                     out_tn;
+    uint8_t                     tiny[3] = {0};
+    uint8_t                     gbb[16 + 2] = {0};
+
+    /* SHORT_FRAME: shorter than the ACF_ABB header. */
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_SHORT_FRAME,
+                       rcp_ep_wakeup_decode_sleepcmd_response(tiny, sizeof(tiny), BUS_ID,
+                                                               &out_result, &out_tn));
+
+    /* BAD_MSG_TYPE: not an ACF_ABB frame at all. */
+    gbb[0] = RCP_ACF_MSG_TYPE_GBB;
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE,
+                       rcp_ep_wakeup_decode_sleepcmd_response(gbb, sizeof(gbb), BUS_ID,
+                                                               &out_result, &out_tn));
+
+    /* WRONG_BUS: a genuine, non-error-response SleepCMD response
+     * addressed to a different byte_bus_id. */
+    frame = rcp_ep_wakeup_encode_sleepcmd_response(BUS_ID, RCP_PWRMODE_ENTRY_OK, 5);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_WRONG_BUS,
+                       rcp_ep_wakeup_decode_sleepcmd_response(frame.data, frame.len, BUS_ID + 1,
+                                                               &out_result, &out_tn));
+    rcp_bytes_free(&frame);
+
+    /* BAD_OPCODE: right shape, wrong fixed opcode byte. */
+    frame = rcp_ep_wakeup_encode_sleepcmd_response(BUS_ID, RCP_PWRMODE_ENTRY_OK, 5);
+    frame.data[8] = 0x00; /* corrupt the fixed opcode byte */
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
+                       rcp_ep_wakeup_decode_sleepcmd_response(frame.data, frame.len, BUS_ID,
+                                                               &out_result, &out_tn));
     rcp_bytes_free(&frame);
 }
 
@@ -590,6 +666,7 @@ static void test_is_wakeup_echo_false_for_sleepcmd_frame(void)
  * issue #341 lineage: it is now a genuine per-source bitmask, see the
  * tests below). */
 
+//cfusa:test REQ-WAKEUP-021
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -623,6 +700,7 @@ static void test_render_registers_matches_table_offsets(void)
 /* REQ-WAKEUP-021 (issue #341 lineage): proves the wire word is a genuine
  * multi-bit mask, not just bit 0 -- two independently-latched sources
  * render as two independently-set bits in the same 16-bit word. */
+//cfusa:test REQ-WAKEUP-021
 static void test_render_registers_wup_status_is_a_multi_bit_mask(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -639,6 +717,7 @@ static void test_render_registers_wup_status_is_a_multi_bit_mask(void)
     TEST_ASSERT_EQUAL_UINT8(0x09u, out[RCP_EP_WAKEUP_REG_WUP_STATUS + 1]);
 }
 
+//cfusa:test REQ-WAKEUP-036
 static void test_apply_reconfig_writes_ep_status(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -654,6 +733,7 @@ static void test_apply_reconfig_writes_ep_status(void)
     TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.ep_status);
 }
 
+//cfusa:test REQ-WAKEUP-029
 static void test_apply_reconfig_wup_status_write_one_clears(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -682,6 +762,7 @@ static void test_apply_reconfig_wup_status_write_one_clears(void)
  * bits clears only those sources, leaving every other latched source
  * untouched. The old single-aggregate-bit model could not even express
  * this scenario (there was only ever one bit to clear). */
+//cfusa:test REQ-WAKEUP-029
 static void test_apply_reconfig_wup_status_clears_only_the_named_sources(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -702,6 +783,7 @@ static void test_apply_reconfig_wup_status_clears_only_the_named_sources(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
 }
 
+//cfusa:test REQ-WAKEUP-035
 static void test_apply_reconfig_writes_source_slot(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -732,6 +814,7 @@ static void test_apply_reconfig_writes_source_slot(void)
  * triggered io_src values are now representable -- this test used to pin
  * the old "cannot represent it" gap for io_src 0x01 (rising edge); it now
  * proves the write is correctly APPLIED instead. */
+//cfusa:test REQ-WAKEUP-035
 static void test_apply_reconfig_rising_edge_io_src_sets_trigger_flag(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -761,6 +844,7 @@ static void test_apply_reconfig_rising_edge_io_src_sets_trigger_flag(void)
  * active_high/trigger_on_*_edge untouched rather than silently
  * misinterpreting it; pin_number still updates regardless, since it is
  * always representable. */
+//cfusa:test REQ-WAKEUP-035
 static void test_apply_reconfig_reserved_io_src_leaves_enabled_unchanged(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -788,6 +872,8 @@ static void test_apply_reconfig_reserved_io_src_leaves_enabled_unchanged(void)
 
 /* Round trip proof: render a BOTH_EDGES-configured slot, re-parse it, and
  * confirm both trigger flags survive. */
+//cfusa:test REQ-WAKEUP-022
+//cfusa:test REQ-WAKEUP-035
 static void test_render_then_apply_reconfig_both_edges_round_trips(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -815,6 +901,7 @@ static void test_render_then_apply_reconfig_both_edges_round_trips(void)
     TEST_ASSERT_EQUAL_UINT16(0x0013u, reparsed.sources[2].pin_number);
 }
 
+//cfusa:test REQ-WAKEUP-036
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -839,6 +926,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-WAKEUP-036
 static void test_apply_reconfig_rejects_short_payload(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -851,6 +939,7 @@ static void test_apply_reconfig_rejects_short_payload(void)
         rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
 }
 
+//cfusa:test REQ-WAKEUP-036
 static void test_apply_reconfig_rejects_out_of_range(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
@@ -869,6 +958,7 @@ static void test_apply_reconfig_rejects_out_of_range(void)
     TEST_ASSERT_EQUAL_UINT16(0x42u, cfg.sources[7].pin_number); /* untouched */
 }
 
+//cfusa:test REQ-WAKEUP-030
 static void test_reconfig_strerror_never_null_and_distinct(void)
 {
     const char *ok    = rcp_ep_wakeup_reconfig_strerror(RCP_EP_WAKEUP_RECONFIG_OK);
@@ -885,6 +975,7 @@ static void test_reconfig_strerror_never_null_and_distinct(void)
     TEST_ASSERT_NOT_EQUAL(0, strcmp(range, unknown));
 }
 
+//cfusa:test REQ-WAKEUP-031
 static void test_encode_reconfig_request_round_trip(void)
 {
     rcp_acf_byte_message_info_t hdr;
@@ -907,6 +998,7 @@ static void test_encode_reconfig_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-WAKEUP-031
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_wakeup_encode_reconfig_request(BUS_ID, 0u, NULL, 0u, 1u);
@@ -953,6 +1045,7 @@ int main(void)
     RUN_TEST(test_sleepcmd_response_round_trip_ok);
     RUN_TEST(test_sleepcmd_response_round_trip_refused);
     RUN_TEST(test_sleepcmd_response_decode_unrecognized_byte_is_refused);
+    RUN_TEST(test_sleepcmd_response_decode_shares_request_failure_modes);
 
     RUN_TEST(test_wakeup_message_round_trip);
     RUN_TEST(test_wakeup_message_opcode_distinct_from_sleepcmd);
