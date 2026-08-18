@@ -1,27 +1,15 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-MDIO-001
-//cfusa:test REQ-MDIO-002
-//cfusa:test REQ-MDIO-003
-//cfusa:test REQ-MDIO-004
-//cfusa:test REQ-MDIO-005
-//cfusa:test REQ-MDIO-006
-//cfusa:test REQ-MDIO-007
-//cfusa:test REQ-MDIO-008
-//cfusa:test REQ-MDIO-009
-//cfusa:test REQ-MDIO-010
-//cfusa:test REQ-MDIO-011
-//cfusa:test REQ-MDIO-012
-//cfusa:test REQ-MDIO-013
-//cfusa:test REQ-MDIO-014
-//cfusa:test REQ-MDIO-015
-//cfusa:test REQ-MDIO-016
-//cfusa:test REQ-MDIO-017
-//cfusa:test REQ-MDIO-018
-//cfusa:test REQ-MDIO-019
-//cfusa:test REQ-MDIO-021
-//cfusa:test REQ-MDIO-022
-//cfusa:test REQ-MDIO-023
-//cfusa:test REQ-MDIO-024
+/* c-RCP-18-tracker (issue #533): the per-id test-trace tags that used to
+ * be stacked here at the file header (satisfying cfusa's --sec-tested
+ * gate for every id in the file regardless of which test function, if
+ * any, actually exercises each one) have been moved to sit directly
+ * above the specific test function that proves each requirement, per
+ * CONTRIBUTING.md's "Writing a requirement" convention. See each test
+ * function below for its own tag(s). (Deliberately not spelling out the
+ * literal tag syntax in this paragraph -- cfusa's own scanner reads that
+ * exact character sequence anywhere in a line, comment or not, as a real
+ * tag with whatever word follows it as the id, which is exactly the
+ * dangling-reference noise this rewrite avoids.) */
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -69,12 +57,14 @@ static rcp_ep_mdio_mms_addr_t mms_addr(uint8_t mms, uint16_t addr_val)
 
 /* ── addr_valid ─────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_clause22_in_range(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_mdio_addr_valid(clause22_addr(0, 0)));
     TEST_ASSERT_TRUE(rcp_ep_mdio_addr_valid(clause22_addr(0x1F, 0x1F)));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_clause22_rejects_nonzero_devad(void)
 {
     rcp_ep_mdio_addr_t addr = clause22_addr(1, 1);
@@ -83,28 +73,33 @@ static void test_addr_valid_clause22_rejects_nonzero_devad(void)
     TEST_ASSERT_FALSE(rcp_ep_mdio_addr_valid(addr));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_clause22_rejects_regad_above_5_bits(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_mdio_addr_valid(clause22_addr(0, 0x20)));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_clause45_in_range(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_mdio_addr_valid(clause45_addr(0, 0, 0)));
     TEST_ASSERT_TRUE(rcp_ep_mdio_addr_valid(clause45_addr(0x1F, 0x1F, 0xFFFF)));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_clause45_rejects_devad_above_5_bits(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_mdio_addr_valid(clause45_addr(0, 0x20, 0)));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_rejects_prtad_above_5_bits_either_clause(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_mdio_addr_valid(clause22_addr(0x20, 0)));
     TEST_ASSERT_FALSE(rcp_ep_mdio_addr_valid(clause45_addr(0x20, 0, 0)));
 }
 
+//cfusa:test REQ-MDIO-001
 static void test_addr_valid_rejects_unknown_clause(void)
 {
     rcp_ep_mdio_addr_t addr = clause22_addr(0, 0);
@@ -115,26 +110,31 @@ static void test_addr_valid_rejects_unknown_clause(void)
 
 /* ── burst_next_regad ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-002
 static void test_burst_next_regad_clause22_increments(void)
 {
     TEST_ASSERT_EQUAL_UINT16(1, rcp_ep_mdio_burst_next_regad(RCP_EP_MDIO_CLAUSE_22, 0));
 }
 
+//cfusa:test REQ-MDIO-002
 static void test_burst_next_regad_clause22_wraps_at_5_bits(void)
 {
     TEST_ASSERT_EQUAL_UINT16(0, rcp_ep_mdio_burst_next_regad(RCP_EP_MDIO_CLAUSE_22, 0x1F));
 }
 
+//cfusa:test REQ-MDIO-002
 static void test_burst_next_regad_clause45_increments(void)
 {
     TEST_ASSERT_EQUAL_UINT16(0x1235, rcp_ep_mdio_burst_next_regad(RCP_EP_MDIO_CLAUSE_45, 0x1234));
 }
 
+//cfusa:test REQ-MDIO-002
 static void test_burst_next_regad_clause45_wraps_at_16_bits(void)
 {
     TEST_ASSERT_EQUAL_UINT16(0, rcp_ep_mdio_burst_next_regad(RCP_EP_MDIO_CLAUSE_45, 0xFFFF));
 }
 
+//cfusa:test REQ-MDIO-002
 static void test_burst_next_regad_unknown_clause_unchanged(void)
 {
     TEST_ASSERT_EQUAL_UINT16(42, rcp_ep_mdio_burst_next_regad((rcp_ep_mdio_clause_t)2, 42));
@@ -142,11 +142,13 @@ static void test_burst_next_regad_unknown_clause_unchanged(void)
 
 /* ── mdio_mode: REQ-MDIO-021 ────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-021
 static void test_mode_for_word_count_single(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMD_SINGLE, rcp_ep_mdio_mode_for_word_count(1));
 }
 
+//cfusa:test REQ-MDIO-021
 static void test_mode_for_word_count_multi(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMD_MULTI, rcp_ep_mdio_mode_for_word_count(2));
@@ -154,6 +156,7 @@ static void test_mode_for_word_count_multi(void)
                       rcp_ep_mdio_mode_for_word_count(RCP_EP_MDIO_MAX_BURST_WORDS));
 }
 
+//cfusa:test REQ-MDIO-021
 static void test_mode_is_unsupported_mms(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_mdio_mode_is_unsupported_mms(RCP_EP_MDIO_MODE_MMD_SINGLE));
@@ -165,6 +168,7 @@ static void test_mode_is_unsupported_mms(void)
 /* REQ-MDIO-021: a read request's own encoded mdio_mode octet (the byte
  * immediately after the 8-byte ACF_ABB header) reflects word_count's own
  * single-vs-multi distinction. */
+//cfusa:test REQ-MDIO-021
 static void test_read_request_encode_sets_mdio_mode_single(void)
 {
     rcp_ep_mdio_addr_t addr  = clause22_addr(1, 0);
@@ -178,6 +182,7 @@ static void test_read_request_encode_sets_mdio_mode_single(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-021
 static void test_read_request_encode_sets_mdio_mode_multi(void)
 {
     rcp_ep_mdio_addr_t addr  = clause22_addr(1, 0);
@@ -191,6 +196,7 @@ static void test_read_request_encode_sets_mdio_mode_multi(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-021
 static void test_write_request_encode_sets_mdio_mode_single(void)
 {
     rcp_ep_mdio_addr_t addr    = clause45_addr(1, 2, 0);
@@ -205,6 +211,7 @@ static void test_write_request_encode_sets_mdio_mode_single(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-021
 static void test_write_request_encode_sets_mdio_mode_multi(void)
 {
     rcp_ep_mdio_addr_t addr       = clause45_addr(1, 2, 0);
@@ -223,6 +230,8 @@ static void test_write_request_encode_sets_mdio_mode_multi(void)
  * octet decodes to an MMS value is recognized on the wire but rejected,
  * not silently misread as if it were MMD-shaped -- see the file header's
  * own "mdio_mode" section. */
+//cfusa:test REQ-MDIO-013
+//cfusa:test REQ-MDIO-021
 static void test_read_request_decode_rejects_mms_mode(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -245,6 +254,8 @@ static void test_read_request_decode_rejects_mms_mode(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
+//cfusa:test REQ-MDIO-021
 static void test_write_request_decode_rejects_mms_mode(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -269,6 +280,8 @@ static void test_write_request_decode_rejects_mms_mode(void)
 
 /* ── Register-word packing ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-003
+//cfusa:test REQ-MDIO-004
 static void test_word_encode_decode_round_trip(void)
 {
     uint8_t buf[2];
@@ -277,6 +290,7 @@ static void test_word_encode_decode_round_trip(void)
     TEST_ASSERT_EQUAL_UINT16(0xBEEF, rcp_ep_mdio_word_decode(buf));
 }
 
+//cfusa:test REQ-MDIO-003
 static void test_word_encode_is_big_endian(void)
 {
     uint8_t buf[2];
@@ -286,12 +300,15 @@ static void test_word_encode_is_big_endian(void)
     TEST_ASSERT_EQUAL_UINT8(0x34, buf[1]);
 }
 
+//cfusa:test REQ-MDIO-005
 static void test_pack_len(void)
 {
     TEST_ASSERT_EQUAL_UINT32(0, rcp_ep_mdio_pack_len(0));
     TEST_ASSERT_EQUAL_UINT32(6, rcp_ep_mdio_pack_len(3));
 }
 
+//cfusa:test REQ-MDIO-006
+//cfusa:test REQ-MDIO-008
 static void test_pack_words_round_trip(void)
 {
     uint16_t    words[3] = {0x0001, 0xBEEF, 0xFFFF};
@@ -310,6 +327,7 @@ static void test_pack_words_round_trip(void)
     rcp_bytes_free(&packed);
 }
 
+//cfusa:test REQ-MDIO-006
 static void test_pack_words_zero_count_returns_zeroed(void)
 {
     rcp_bytes_t packed = rcp_ep_mdio_pack_words(NULL, 0);
@@ -318,6 +336,7 @@ static void test_pack_words_zero_count_returns_zeroed(void)
     TEST_ASSERT_EQUAL_UINT32(0, packed.len);
 }
 
+//cfusa:test REQ-MDIO-007
 static void test_word_count_of_rejects_odd_length(void)
 {
     size_t word_count = 0;
@@ -325,6 +344,7 @@ static void test_word_count_of_rejects_odd_length(void)
     TEST_ASSERT_FALSE(rcp_ep_mdio_word_count_of(3, &word_count));
 }
 
+//cfusa:test REQ-MDIO-007
 static void test_word_count_of_accepts_even_length(void)
 {
     size_t word_count = 0;
@@ -335,6 +355,7 @@ static void test_word_count_of_accepts_even_length(void)
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-009
 static void test_functional_cfg_init_zeroes(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -350,6 +371,7 @@ static void test_functional_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
 }
 
+//cfusa:test REQ-MDIO-010
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t writer = {0};
@@ -361,6 +383,7 @@ static void test_functional_cfg_writable_false_hw_unconfigured(void)
         rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
+//cfusa:test REQ-MDIO-010
 static void test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
     rcp_lifecycle_writer_ctx_t none          = {0};
@@ -382,6 +405,7 @@ static void test_functional_cfg_writable_hw_configured_requires_authorization_or
     TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
+//cfusa:test REQ-MDIO-010
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t none       = {0};
@@ -401,6 +425,8 @@ static void test_functional_cfg_writable_rcp_configured_requires_authorization(v
 
 /* ── The EP_func register block ──────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-020
+//cfusa:test REQ-MDIO-023
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -421,6 +447,7 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT16(0x0006u, RCP_EP_MDIO_EP_FUNC_LEN);
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_apply_reconfig_writes_ep_status(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -437,6 +464,7 @@ static void test_apply_reconfig_writes_ep_status(void)
     TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.ep_status);
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -464,6 +492,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -481,6 +510,7 @@ static void test_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
@@ -494,6 +524,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_mdio_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -519,6 +550,7 @@ static void test_reconfig_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_mdio_encode_reconfig_request(0x00, 0, NULL, 0, 0);
@@ -526,6 +558,7 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-023
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_mdio_reconfig_errc_t codes[] = {
@@ -542,6 +575,7 @@ static void test_reconfig_strerror_never_null(void)
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-011
 static void test_strerror_never_null_and_distinct(void)
 {
     rcp_ep_mdio_errc_t codes[] = {
@@ -570,6 +604,8 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Read request round trip ───────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-012
+//cfusa:test REQ-MDIO-013
 static void test_read_request_round_trip_single_word(void)
 {
     rcp_ep_mdio_addr_t addr = clause45_addr(3, 1, 0x1234);
@@ -592,6 +628,8 @@ static void test_read_request_round_trip_single_word(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-012
+//cfusa:test REQ-MDIO-013
 static void test_read_request_round_trip_burst(void)
 {
     rcp_ep_mdio_addr_t addr = clause22_addr(2, 5);
@@ -608,6 +646,7 @@ static void test_read_request_round_trip_burst(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-012
 static void test_read_request_encode_rejects_invalid_addr(void)
 {
     rcp_ep_mdio_addr_t addr   = clause22_addr(0, 0);
@@ -619,6 +658,7 @@ static void test_read_request_encode_rejects_invalid_addr(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-012
 static void test_read_request_encode_rejects_zero_word_count(void)
 {
     rcp_bytes_t frame = rcp_ep_mdio_encode_read_request(1, clause22_addr(0, 0), 0, 0);
@@ -626,6 +666,7 @@ static void test_read_request_encode_rejects_zero_word_count(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-012
 static void test_read_request_encode_rejects_word_count_above_max(void)
 {
     rcp_bytes_t frame = rcp_ep_mdio_encode_read_request(
@@ -634,6 +675,7 @@ static void test_read_request_encode_rejects_word_count_above_max(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_wrong_bus(void)
 {
     rcp_bytes_t         frame = rcp_ep_mdio_encode_read_request(4, clause22_addr(0, 0), 1, 0);
@@ -647,6 +689,7 @@ static void test_read_request_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -668,6 +711,7 @@ static void test_read_request_decode_rejects_wrong_op(void)
 /* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
  * plain MDIO read request; every other value (here, 0b100, reserved in
  * MDIO's endpoint-type row) shall be rejected. */
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_nonzero_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -687,6 +731,7 @@ static void test_read_request_decode_rejects_nonzero_evt(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_bad_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -705,6 +750,7 @@ static void test_read_request_decode_rejects_bad_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_short_frame(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -724,6 +770,7 @@ static void test_read_request_decode_rejects_short_frame(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_bad_addr(void)
 {
     rcp_acf_byte_message_info_t hdr     = {0};
@@ -752,6 +799,7 @@ static void test_read_request_decode_rejects_bad_addr(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
 static void test_read_request_decode_rejects_zero_word_count(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -775,6 +823,8 @@ static void test_read_request_decode_rejects_zero_word_count(void)
 
 /* ── Read response round trip ──────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-014
+//cfusa:test REQ-MDIO-015
 static void test_read_response_round_trip_untimed(void)
 {
     uint16_t       words[2] = {0x1111, 0x2222};
@@ -799,6 +849,8 @@ static void test_read_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-025
+//cfusa:test REQ-MDIO-026
 static void test_read_response_round_trip_timed(void)
 {
     uint16_t       words[1] = {0xABCD};
@@ -819,6 +871,8 @@ static void test_read_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-014
+//cfusa:test REQ-MDIO-015
 static void test_read_response_empty_words(void)
 {
     rcp_bytes_t    frame    = rcp_ep_mdio_encode_read_response(3, NULL, 0, 2, false, 0);
@@ -836,6 +890,7 @@ static void test_read_response_empty_words(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-015
 static void test_read_response_decode_rejects_wrong_bus(void)
 {
     uint16_t       words[1] = {1};
@@ -852,6 +907,7 @@ static void test_read_response_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-015
 static void test_read_response_decode_rejects_short_frame(void)
 {
     uint8_t        too_short[3] = {0x0E, 0, 0};
@@ -865,6 +921,7 @@ static void test_read_response_decode_rejects_short_frame(void)
         too_short, sizeof(too_short), 2, &out_words_data, &out_word_count, &timed, &ts, &txn));
 }
 
+//cfusa:test REQ-MDIO-015
 static void test_read_response_decode_rejects_odd_payload_length(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -888,6 +945,8 @@ static void test_read_response_decode_rejects_odd_payload_length(void)
 
 /* ── Write request round trip ──────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-016
+//cfusa:test REQ-MDIO-017
 static void test_write_request_round_trip_single_word(void)
 {
     rcp_ep_mdio_addr_t addr        = clause45_addr(4, 2, 0x0010);
@@ -913,6 +972,8 @@ static void test_write_request_round_trip_single_word(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-016
+//cfusa:test REQ-MDIO-017
 static void test_write_request_round_trip_burst(void)
 {
     rcp_ep_mdio_addr_t addr       = clause22_addr(1, 0);
@@ -935,6 +996,7 @@ static void test_write_request_round_trip_burst(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-016
 static void test_write_request_encode_rejects_invalid_addr(void)
 {
     rcp_ep_mdio_addr_t addr    = clause22_addr(0, 0x20); /* regad out of range */
@@ -944,6 +1006,7 @@ static void test_write_request_encode_rejects_invalid_addr(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-016
 static void test_write_request_encode_rejects_zero_word_count(void)
 {
     rcp_bytes_t frame = rcp_ep_mdio_encode_write_request(1, clause22_addr(0, 0), NULL, 0, 0);
@@ -951,6 +1014,7 @@ static void test_write_request_encode_rejects_zero_word_count(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-016
 static void test_write_request_encode_rejects_word_count_above_max(void)
 {
     rcp_bytes_t frame = rcp_ep_mdio_encode_write_request(
@@ -959,6 +1023,7 @@ static void test_write_request_encode_rejects_word_count_above_max(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_wrong_bus(void)
 {
     uint16_t              word  = 1;
@@ -975,6 +1040,7 @@ static void test_write_request_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -997,6 +1063,7 @@ static void test_write_request_decode_rejects_wrong_op(void)
 /* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
  * plain MDIO write request; every other value (here, 0b001, reserved in
  * MDIO's endpoint-type row) shall be rejected. */
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_nonzero_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -1017,6 +1084,7 @@ static void test_write_request_decode_rejects_nonzero_evt(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_short_frame(void)
 {
     rcp_acf_byte_message_info_t hdr          = {0};
@@ -1037,6 +1105,7 @@ static void test_write_request_decode_rejects_short_frame(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_bad_addr(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1061,6 +1130,7 @@ static void test_write_request_decode_rejects_bad_addr(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
 static void test_write_request_decode_rejects_zero_words(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1085,6 +1155,8 @@ static void test_write_request_decode_rejects_zero_words(void)
 
 /* ── Write response round trip ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-018
+//cfusa:test REQ-MDIO-019
 static void test_write_response_round_trip_untimed(void)
 {
     uint16_t       accepted[2] = {0xAAAA, 0xBBBB};
@@ -1108,6 +1180,8 @@ static void test_write_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-027
+//cfusa:test REQ-MDIO-028
 static void test_write_response_round_trip_timed(void)
 {
     uint16_t       accepted[1] = {0x1};
@@ -1128,6 +1202,8 @@ static void test_write_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-018
+//cfusa:test REQ-MDIO-019
 static void test_write_response_nothing_accepted(void)
 {
     rcp_bytes_t    frame = rcp_ep_mdio_encode_write_response(3, NULL, 0, 6, false, 0);
@@ -1145,6 +1221,7 @@ static void test_write_response_nothing_accepted(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-019
 static void test_write_response_decode_rejects_wrong_bus(void)
 {
     uint16_t       accepted[1] = {1};
@@ -1161,6 +1238,7 @@ static void test_write_response_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-019
 static void test_write_response_decode_rejects_short_frame(void)
 {
     uint8_t        too_short[3] = {0x0E, 0, 0};
@@ -1184,23 +1262,27 @@ static void test_write_response_decode_rejects_short_frame(void)
  * rule itself (mms 0/1 -> 32-bit, else 16-bit) is TC18-literal, not an
  * assumption -- see rcp_ep_mdio_mms_uses_32bit_words(). */
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_addr_valid_in_range(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_mdio_mms_addr_valid(mms_addr(0, 0)));
     TEST_ASSERT_TRUE(rcp_ep_mdio_mms_addr_valid(mms_addr(RCP_EP_MDIO_MMS_MAX, 0xFFFFu)));
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_addr_valid_rejects_above_max(void)
 {
     TEST_ASSERT_FALSE(rcp_ep_mdio_mms_addr_valid(mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0)));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_uses_32bit_words_mms0_and_mms1(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_mdio_mms_uses_32bit_words(0));
     TEST_ASSERT_TRUE(rcp_ep_mdio_mms_uses_32bit_words(1));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_uses_32bit_words_false_for_other_mms(void)
 {
     uint8_t mms;
@@ -1210,21 +1292,25 @@ static void test_mms_uses_32bit_words_false_for_other_mms(void)
     }
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_burst_next_addr_increments(void)
 {
     TEST_ASSERT_EQUAL_HEX16(0x0002u, rcp_ep_mdio_mms_burst_next_addr(0x0001u));
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_burst_next_addr_wraps_at_16_bits(void)
 {
     TEST_ASSERT_EQUAL_HEX16(0x0000u, rcp_ep_mdio_mms_burst_next_addr(0xFFFFu));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_mode_for_word_count_single(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMS_SINGLE, rcp_ep_mdio_mms_mode_for_word_count(1));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_mode_for_word_count_multi(void)
 {
     TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMS_MULTI, rcp_ep_mdio_mms_mode_for_word_count(2));
@@ -1234,6 +1320,7 @@ static void test_mms_mode_for_word_count_multi(void)
 
 /* ── MMS word32 encode/decode ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-022
 static void test_word32_encode_decode_round_trip(void)
 {
     uint8_t buf[4];
@@ -1242,6 +1329,7 @@ static void test_word32_encode_decode_round_trip(void)
     TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, rcp_ep_mdio_word32_decode(buf));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_word32_encode_is_big_endian(void)
 {
     uint8_t buf[4];
@@ -1256,16 +1344,19 @@ static void test_word32_encode_is_big_endian(void)
 /* ── MMS pack/unpack: width follows mms per REQ-MDIO-022's own TC18-literal
  * rule ─────────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_pack_len_32bit_for_mms0(void)
 {
     TEST_ASSERT_EQUAL_size_t(12u, rcp_ep_mdio_mms_pack_len(0, 3u));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_pack_len_16bit_for_other_mms(void)
 {
     TEST_ASSERT_EQUAL_size_t(6u, rcp_ep_mdio_mms_pack_len(2, 3u));
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_pack_words_round_trip_32bit(void)
 {
     const uint32_t words[2] = {0x11223344u, 0xAABBCCDDu};
@@ -1278,6 +1369,7 @@ static void test_mms_pack_words_round_trip_32bit(void)
     rcp_bytes_free(&packed);
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_pack_words_round_trip_16bit(void)
 {
     const uint32_t words[2] = {0x1234u, 0xBEEFu};
@@ -1290,6 +1382,7 @@ static void test_mms_pack_words_round_trip_16bit(void)
     rcp_bytes_free(&packed);
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_pack_words_zero_count_returns_zeroed(void)
 {
     rcp_bytes_t packed = rcp_ep_mdio_mms_pack_words(0, NULL, 0);
@@ -1297,6 +1390,7 @@ static void test_mms_pack_words_zero_count_returns_zeroed(void)
     TEST_ASSERT_NULL(packed.data);
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_word_count_of_32bit_rejects_non_multiple_of_four(void)
 {
     size_t out;
@@ -1306,6 +1400,7 @@ static void test_mms_word_count_of_32bit_rejects_non_multiple_of_four(void)
     TEST_ASSERT_EQUAL_size_t(2u, out);
 }
 
+//cfusa:test REQ-MDIO-022
 static void test_mms_word_count_of_16bit_rejects_odd_length(void)
 {
     size_t out;
@@ -1317,6 +1412,8 @@ static void test_mms_word_count_of_16bit_rejects_odd_length(void)
 
 /* ── MMS read request/response ────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_round_trip_single_word_32bit(void)
 {
     rcp_ep_mdio_mms_addr_t      addr = mms_addr(0, 0xBEEFu); /* MMS0: 32-bit */
@@ -1338,6 +1435,8 @@ static void test_mms_read_request_round_trip_single_word_32bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_round_trip_burst_16bit(void)
 {
     rcp_ep_mdio_mms_addr_t      addr = mms_addr(3, 0x0100u); /* not 0/1: 16-bit */
@@ -1358,6 +1457,7 @@ static void test_mms_read_request_round_trip_burst_16bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_encode_rejects_invalid_addr(void)
 {
     rcp_ep_mdio_mms_addr_t addr = mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0);
@@ -1366,6 +1466,7 @@ static void test_mms_read_request_encode_rejects_invalid_addr(void)
     TEST_ASSERT_NULL(f.data);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_encode_rejects_zero_word_count(void)
 {
     rcp_bytes_t f = rcp_ep_mdio_encode_mms_read_request(0x10u, mms_addr(0, 0), 0u, 1u);
@@ -1373,6 +1474,7 @@ static void test_mms_read_request_encode_rejects_zero_word_count(void)
     TEST_ASSERT_NULL(f.data);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_encode_rejects_word_count_above_max(void)
 {
     rcp_bytes_t f = rcp_ep_mdio_encode_mms_read_request(
@@ -1381,6 +1483,7 @@ static void test_mms_read_request_encode_rejects_word_count_above_max(void)
     TEST_ASSERT_NULL(f.data);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_decode_rejects_wrong_bus(void)
 {
     rcp_bytes_t             f = rcp_ep_mdio_encode_mms_read_request(0x10u, mms_addr(0, 0), 1u, 1u);
@@ -1393,6 +1496,7 @@ static void test_mms_read_request_decode_rejects_wrong_bus(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_decode_rejects_bad_mms_addr(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1415,6 +1519,7 @@ static void test_mms_read_request_decode_rejects_bad_mms_addr(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_decode_rejects_zero_word_count(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1438,6 +1543,8 @@ static void test_mms_read_request_decode_rejects_zero_word_count(void)
 /* Mirror image of test_mdio_decode_rejects_mms_mode_fails_closed()
  * (test_tc18_gaps_ep2.c) -- the MMS decoder must equally refuse to
  * misread an MMD-mode frame as if it were MMS-shaped. */
+//cfusa:test REQ-MDIO-021
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_request_decode_rejects_mmd_mode(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1459,6 +1566,8 @@ static void test_mms_read_request_decode_rejects_mmd_mode(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_response_round_trip_untimed_32bit(void)
 {
     const uint32_t words[1] = {0xCAFEBABEu};
@@ -1480,6 +1589,8 @@ static void test_mms_read_response_round_trip_untimed_32bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_response_round_trip_timed_16bit(void)
 {
     const uint32_t words[1] = {0x4242u};
@@ -1500,6 +1611,7 @@ static void test_mms_read_response_round_trip_timed_16bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_read_response_decode_rejects_wrong_bus(void)
 {
     const uint32_t words[1] = {1u};
@@ -1518,6 +1630,7 @@ static void test_mms_read_response_decode_rejects_wrong_bus(void)
 /* A 32-bit-mms payload whose byte length is not a multiple of 4 must be
  * rejected -- distinct from the MMD family's own odd-length check, since
  * the modulus itself depends on which mms the caller supplies. */
+//cfusa:test REQ-MDIO-022
 static void test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms(void)
 {
     uint8_t                     odd_payload[3] = {0x01u, 0x02u, 0x03u};
@@ -1542,6 +1655,8 @@ static void test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms(v
 
 /* ── MMS write request/response ───────────────────────────────────────────── */
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_round_trip_single_word_32bit(void)
 {
     rcp_ep_mdio_mms_addr_t addr     = mms_addr(1, 0x0010u); /* MMS1: 32-bit */
@@ -1565,6 +1680,8 @@ static void test_mms_write_request_round_trip_single_word_32bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_round_trip_burst_16bit(void)
 {
     rcp_ep_mdio_mms_addr_t addr       = mms_addr(6, 0x0200u); /* not 0/1: 16-bit */
@@ -1586,6 +1703,7 @@ static void test_mms_write_request_round_trip_burst_16bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_encode_rejects_invalid_addr(void)
 {
     rcp_ep_mdio_mms_addr_t addr     = mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0);
@@ -1595,6 +1713,7 @@ static void test_mms_write_request_encode_rejects_invalid_addr(void)
     TEST_ASSERT_NULL(f.data);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_encode_rejects_zero_word_count(void)
 {
     rcp_bytes_t f = rcp_ep_mdio_encode_mms_write_request(0x10u, mms_addr(0, 0), NULL, 0, 1u);
@@ -1602,6 +1721,7 @@ static void test_mms_write_request_encode_rejects_zero_word_count(void)
     TEST_ASSERT_NULL(f.data);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_decode_rejects_wrong_op(void)
 {
     const uint32_t          words[1] = {1u};
@@ -1617,6 +1737,7 @@ static void test_mms_write_request_decode_rejects_wrong_op(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_decode_rejects_zero_words(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1638,6 +1759,8 @@ static void test_mms_write_request_decode_rejects_zero_words(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_response_round_trip_untimed(void)
 {
     const uint32_t accepted[1] = {0xAAAAu};
@@ -1659,6 +1782,8 @@ static void test_mms_write_response_round_trip_untimed(void)
 
 /* Mirror image of test_mms_read_request_decode_rejects_mmd_mode(), for
  * the write side. */
+//cfusa:test REQ-MDIO-021
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_decode_rejects_mmd_mode(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1680,6 +1805,8 @@ static void test_mms_write_request_decode_rejects_mmd_mode(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_response_nothing_accepted(void)
 {
     rcp_bytes_t    f = rcp_ep_mdio_encode_mms_write_response(0x10u, 0, NULL, 0, 5u, false, 0);
