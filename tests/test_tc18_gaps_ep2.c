@@ -26,13 +26,6 @@
 //cfusa:test REQ-MDIO-021
 //cfusa:test REQ-MDIO-022
 //cfusa:test REQ-MDIO-023
-//cfusa:test REQ-UART-032
-//cfusa:test REQ-UART-033
-//cfusa:test REQ-UART-034
-//cfusa:test REQ-UART-035
-//cfusa:test REQ-UART-036
-//cfusa:test REQ-UART-037
-//cfusa:test REQ-UART-038
 
 /*
  * test_tc18_gaps_ep2.c -- spec-literal conformance-and-deviation suite for
@@ -162,6 +155,7 @@ static rcp_lifecycle_writer_ctx_t any_writer(void)
  * other endpoint type's own precedent: PWM_OUT's/GPIO's/SPI's/I2C's own
  * register-block-only fields have no dedicated named setter either, only
  * the generic §12.7.1 write path). */
+//cfusa:test REQ-UART-038
 static void test_uart_functional_block_now_has_full_register_coverage(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
@@ -227,6 +221,7 @@ static void test_uart_functional_block_now_has_full_register_coverage(void)
     }
 }
 
+//cfusa:test REQ-UART-032
 static void test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpreted(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
@@ -282,6 +277,7 @@ static void test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpret
 /* REQ-UART-033 IMPLEMENTED (issue #336): TC18 §13.7.8.1's own three
  * read-completion triggers, arbitrated by rcp_ep_uart_read_completion_
  * decision() -- see that function's own doc comment for the exact rule. */
+//cfusa:test REQ-UART-033
 static void test_uart_read_completion_decision(void)
 {
     /* read_size satisfied before either the fifo fills to capacity or the
@@ -332,6 +328,7 @@ static void test_uart_read_completion_decision(void)
  * ever hold can never match (status shorter than payload never matches,
  * TC18's own rule) -- exactly the bound §13.7.8.1 describes, with no
  * UART-specific logic required. */
+//cfusa:test REQ-UART-035
 static void test_uart_compound_wait_now_resolved_via_generic_primitive(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
@@ -363,6 +360,7 @@ static void test_uart_compound_wait_now_resolved_via_generic_primitive(void)
  * one octet, silently truncating a conforming peer's request above 255;
  * *out_read_size is now the same 12-bit-wide uint16_t and round-trips
  * a value above 255 exactly. */
+//cfusa:test REQ-UART-034
 static void test_uart_read_size_above_one_octet_round_trips(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -391,6 +389,7 @@ static void test_uart_read_size_above_one_octet_round_trips(void)
  * diverging test into test_uart_stop_bits_now_representable_at_half_
  * unit_precision() below. The baud_rate/timeout deviations remain real,
  * separate, unaddressed limitations this fix does not touch. */
+//cfusa:test REQ-UART-048
 static void test_uart_register_units_diverge_from_table_48(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
@@ -422,6 +421,7 @@ static void test_uart_register_units_diverge_from_table_48(void)
  * RCP_EP_UART_STOP_BITS_ONE_HALF (2), so this is exactly representable
  * through the public setter -- no longer an unvalidated raw integer with
  * no named framing behind it. */
+//cfusa:test REQ-UART-049
 static void test_uart_stop_bits_now_representable_at_half_unit_precision(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;

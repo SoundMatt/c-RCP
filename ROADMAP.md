@@ -19106,6 +19106,60 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.450.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-UART-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-UART-*` (`src/ep_uart.c`/
+`include/rcp/ep_uart.h`), Group 2's tracker-listed 45 total, 4
+proxy-flagged (`-020`/`-022`/`-025`/`-031`) -- triaged all 45 in full,
+not just the flagged 4, per #519's own "the proxy is a candidate
+filter, not a verdict" finding.
+
+3 ids split into 4 new ones (`REQ-UART-046..049`): `-022` -> `-022`/
+`-046` and `-031` -> `-031`/`-047` (each an OK-path-vs-error-path
+split of a decode function, matching this module's own sibling
+decode functions' already-separate pattern; `-047` needed a brand-new
+test, mutation-tested against a real injected `WRONG_BUS` defect,
+since no existing test independently proved that clause); `-037` ->
+`-037`/`-048`/`-049` (three unrelated claims bundled under one id --
+`wire_timeout_us()`'s own contract stays `-037`, the baud/timeout
+register-width deviation becomes `-048`, `uart_stop_bits`'s three-way
+half-unit mapping becomes `-049`, the latter also picking up two
+previously-untagged helper functions, `stop_bits_to_half_units()`/
+`half_units_to_stop_bits()` -- the same blind spot #519 found in
+`ep_pwm.c`'s `saturating_add_u16`/`_sub_u16`).
+
+4 flagged-or-suspect ids (`-020`, `-025`, `-028`, `-033`) reviewed and
+confirmed genuinely atomic: `-020`/`-025`/`-028` each assert one
+decode function's collective malformed-frame-rejection contract, the
+same granularity `REQ-GPIO-027`/`-029`/`-032`, `REQ-SPI-027`/`-030`,
+`REQ-I2C-012`, `REQ-ADC-026`, and `REQ-ISELED-022` already use
+identically elsewhere in this codebase; `-033`'s three-trigger
+read-completion arbitration is one coherent decision procedure, not
+independent per-branch cases.
+
+Also tagged `reg_offset_read_only()`/`parse_registers()` with the
+already-existing `REQ-UART-040` (two more untagged helpers implementing
+behaviour that id's text already describes), and moved every
+`//cfusa:test` tag in `tests/test_ep_uart.c`/`tests/test_tc18_gaps_ep2.c`
+from a file-header block down to sit directly above the test function
+that proves it -- the same blind-spot fix v0.443.0 applied to
+`REQ-RMAP-*`.
+
+`cfusa trace`'s pre-existing `UNTRACED REQ-UART-038` note (zero
+`//cfusa:req REQ-UART-038` tags anywhere in this repo) confirmed
+genuinely pre-existing and untouched by this batch.
+
+Full 67-test suite (one new test) + ASan/UBSan clean; pinned `cfusa`
+v0.5.54: `check` 0 errors; `trace --req-coverage 100`/`--sec-tested
+100` (run standalone, per this version's own combined-invocation gap)
+each 100% (1178/1178 requirements, 512/512 functions).
+
+**Next**: remaining Group 2 per-endpoint prefixes and Group 4's
+residual prefixes remain, tracked as separate batches against the same
+tracker.
+
 ### v0.449.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-CANEP-*: requirement-atomicity audit, Group 2 per-endpoint)
 
