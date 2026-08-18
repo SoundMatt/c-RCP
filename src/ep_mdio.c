@@ -547,6 +547,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
 }
 
 //cfusa:req REQ-MDIO-014
+//cfusa:req REQ-MDIO-025
 rcp_bytes_t rcp_ep_mdio_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
                                               const uint16_t *words, size_t word_count,
                                               uint8_t transaction_num, bool timed,
@@ -589,6 +590,7 @@ rcp_bytes_t rcp_ep_mdio_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
 }
 
 //cfusa:req REQ-MDIO-015
+//cfusa:req REQ-MDIO-026
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_response(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      const uint8_t **out_words_data,
@@ -732,6 +734,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len
 }
 
 //cfusa:req REQ-MDIO-018
+//cfusa:req REQ-MDIO-027
 rcp_bytes_t rcp_ep_mdio_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
                                                const uint16_t *accepted_words,
                                                size_t accepted_word_count,
@@ -775,6 +778,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
 }
 
 //cfusa:req REQ-MDIO-019
+//cfusa:req REQ-MDIO-028
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_response(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       const uint8_t **out_words_data,

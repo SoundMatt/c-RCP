@@ -19106,6 +19106,77 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.452.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-MDIO-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-MDIO-*` (`src/ep_mdio.c`/`include/rcp/ep_mdio.h`,
+`tests/test_ep_mdio.c`) -- Group 2's only 0-proxy-flagged prefix
+(0/24 flagged "2+ shall"), per the tracker's own note that this batch
+"likely needs no work at all." Read all 24 in full anyway, per the
+tracker's own warning that Group 1's `REQ-RMAP-*` batch found real
+bundled requirements with 0 "shall" occurrences.
+
+4 ids split into 4 new ones (`REQ-MDIO-025..028`): `-014`/`-025`,
+`-015`/`-026`, `-018`/`-027`, `-019`/`-028`, each pair separating the
+ACF_ABB (untimed) encode/decode path of a read- or write-response
+function from its ACF_GBB (timed) path -- the original text bundled
+both under one id ("...encode an ACF_GBB frame ... when timed is
+true, or an ACF_ABB frame otherwise...", "...accept either an
+ACF_ABB or ACF_GBB frame..."). Directly matches the ABB/GBB
+dual-format splitting precedent the `REQ-ACF-*` batch (Group 1)
+already established (`REQ-ACF-004/-038`, `-005/-039`, `-006/-040`,
+`-009/-041`, `-010/-042/-043`, `-014/-044`, `-015/-045`) -- the first
+time that same pattern recurred outside `REQ-ACF-*` itself.
+
+19 other requirements confirmed genuinely atomic despite covering
+several branches or error codes under one id: `rcp_ep_mdio_addr_valid()`
+(a boolean predicate's complete truth table over prtad/clause/devad/
+regad, matching the already-established `REQ-ACF-024`/`-033`
+"boolean predicate's complete spec" pattern, not two behaviours);
+`rcp_ep_mdio_burst_next_regad()` (one function's one "compute the
+next address" contract covering all clause values, including its
+own unsupported-clause no-op, matching `REQ-AVTP-014`'s "restated
+corollary, not a second behaviour" reasoning); the guard-clause
+decode chains (`_decode_read_request()`/`_decode_write_request()`,
+each enumerating many error codes for ONE validate-and-decode
+pipeline of ONE message format -- deliberately NOT split
+per-error-code, since no batch in this audit series has split a
+guard-clause chain that granularly; the ABB/GBB axis above is the
+real, precedent-matched split boundary here, not the error taxonomy);
+and the `strerror()`/`pack_words()`/`word_count_of()` idioms already
+used unsplit, unremarked-on, throughout dozens of other prefixes.
+`REQ-MDIO-020`/`-021`/`-022`/`-023`/`-024` (narrative
+IMPLEMENTED/PARTIAL/FIXED audit-history entries, each legitimately
+spanning several functions by design) kept as-is, matching the
+`REQ-ACF-*` batch's own carve-out for its narrative entries
+(`REQ-ACF-020`/`-022`).
+
+Tag hygiene: `include/rcp/ep_mdio.h`'s and `tests/test_ep_mdio.c`'s
+stacked file-header tag blocks (24 ids each) retired in favor of
+per-declaration/per-test-function tags, per `CONTRIBUTING.md`.
+`src/ep_mdio.c` already tagged per-function and needed no change.
+All 114 test functions in `tests/test_ep_mdio.c` now carry their own
+tag(s) instead of inheriting file-header coverage.
+
+Every split mutation-tested: flipped the GBB `mtv`/`timed` value in
+each of the 4 encode/decode response functions in `src/ep_mdio.c` in
+turn, confirming only that split's own test
+(`test_read_response_round_trip_timed`/`test_write_response_round_trip_timed`)
+failed while its sibling untimed/ABB test and the rest of the suite
+stayed green, then reverted.
+
+Full 67-test suite + ASan/UBSan (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0` on
+macOS) clean; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100`/`--sec-tested 100` (standalone, per the #533
+REQ-CFG-* batch's combined-flag reporting-bug finding) each 100%
+(1178/1178 requirements, 512/512 functions).
+
+**Next**: other Group 2 prefixes (`REQ-ISELED-*`, `REQ-GPIO-*`,
+`REQ-UART-*`, etc.) and Groups 3/4 remain, tracked as separate
+concurrent batches against the same `[c-RCP-18-tracker]` (#533).
+
 ### v0.451.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-PWM-*: requirement-atomicity audit, Group 2 per-endpoint)
 

@@ -34,6 +34,67 @@ the rationale.
 
 ## Releases
 
+### v0.452.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-MDIO-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-MDIO-*` prefix (`src/ep_mdio.c`/`include/rcp/ep_mdio.h`,
+`tests/test_ep_mdio.c`) -- Group 2's only 0-proxy-flagged prefix
+(0/24), per the tracker's own note that this batch "likely needs no
+work at all." All 24 requirements read in full against their actual
+`text` and traced code/tests, not just the (empty) flagged set.
+
+4 ids split into 28 (24 originals + 4 new, `REQ-MDIO-025..028`):
+`-014`/`-025`, `-015`/`-026`, `-018`/`-027`, `-019`/`-028` -- each
+pair separates the ACF_ABB (untimed) encode/decode path of a read- or
+write-response function from its ACF_GBB (timed) path, bundled under
+one id in the original text ("...encode an ACF_GBB frame ... when
+timed is true, or an ACF_ABB frame otherwise..."/"...accept either an
+ACF_ABB or ACF_GBB frame..."). This is the same ABB/GBB dual-format
+bundling pattern the `REQ-ACF-*` batch (issue #533 Group 1) already
+established as splittable, applied here for the first time outside
+that batch.
+
+19 other requirements (including several multi-branch functions --
+`rcp_ep_mdio_addr_valid()`, the guard-clause decode chains, the
+strerror idiom) confirmed genuinely atomic despite covering several
+branches or error codes: each is one function's one complete
+contract (a boolean predicate's full truth table, or a validate-and-
+decode pipeline's full error taxonomy), matching this same audit
+series' own precedent (`REQ-ACF-024`/`-033`, `REQ-AVTP-014`) for
+distinguishing a legitimately compound sentence from real bundling.
+`REQ-MDIO-020`/`-021`/`-022`/`-023`/`-024` (narrative
+IMPLEMENTED/PARTIAL audit-history entries spanning many functions)
+kept as-is, matching the same carve-out the `REQ-ACF-*` batch
+established for its own narrative entries.
+
+Tag hygiene: `include/rcp/ep_mdio.h`'s and `tests/test_ep_mdio.c`'s
+stacked file-header `//cfusa:req`/`//cfusa:test` blocks (24 ids each)
+retired in favor of per-declaration/per-test-function tags, matching
+`CONTRIBUTING.md`'s convention and the `REQ-ACF-*`/`REQ-AVTP-*`
+batches' own tag-hygiene precedent (`src/ep_mdio.c` already had
+per-function tags and needed no change there). Every one of the 114
+test functions in `tests/test_ep_mdio.c` now carries its own tag(s).
+
+Every split mutation-tested against a real injected defect in
+`src/ep_mdio.c` (flipping the GBB `mtv`/`timed` value in each of the
+4 encode/decode response functions), reverted after confirming: in
+each case the newly-independent clause's own test
+(`test_read_response_round_trip_timed`/`test_write_response_round_trip_timed`)
+failed cleanly while its sibling untimed/ABB test stayed green.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0` on macOS) clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100`/`--sec-tested 100` (run
+standalone, per the #533 REQ-CFG-* batch's combined-flag
+reporting-bug finding) each 100% (1178/1178 requirements, 512/512
+functions).
+
+Part of #533. Not closing it -- other Group 2 prefixes
+(`REQ-ISELED-*`, `REQ-GPIO-*`, etc.) and Groups 3/4 remain, tracked as
+separate concurrent batches against the same tracker.
+
 ### v0.451.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-PWM-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
