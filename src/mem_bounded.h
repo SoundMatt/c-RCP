@@ -43,6 +43,29 @@ static inline void rcp_memmove_bounded(void *dst, size_t dst_cap,
     }
 }
 
+/* Hand-rolled equivalent of POSIX strnlen(), used instead of the real
+ * one below because strnlen() is a POSIX.1-2008/XSI extension, not
+ * ISO C99: under this project's own strict `-std=c99`
+ * (CMAKE_C_EXTENSIONS OFF, no _POSIX_C_SOURCE/_DEFAULT_SOURCE feature-test
+ * macro defined anywhere), glibc's <string.h> does not declare it. Every
+ * pre-c-RCP-16 compiler this project's CI used (gcc-12, clang-14) only
+ * *warned* on the resulting implicit-function-declaration and happened to
+ * link successfully against glibc's still-present symbol; clang 15+
+ * (introduced to CI by the c-RCP-16 `mcdc` job's clang-18 requirement,
+ * needed for -fcoverage-mcdc) treats an implicit declaration as a hard
+ * error by default, surfacing this latent non-conformance for the first
+ * time. Fixed at the root instead of reaching for a feature-test-macro
+ * workaround, consistent with this header's own "explicit bounded
+ * primitives, not a libc dependency" ethos. */
+static inline size_t rcp_strnlen_bounded(const char *s, size_t maxlen)
+{
+    size_t i = 0;
+    while (i < maxlen && s[i] != '\0') {
+        i++;
+    }
+    return i;
+}
+
 /* Copies up to dst_cap-1 bytes of src into dst and always NUL-terminates
  * within dst_cap bytes (unlike bare strncpy(), which does not terminate
  * if src's length is >= dst_cap, and every call site this replaces
@@ -55,7 +78,7 @@ static inline void rcp_strncpy_bounded(char *dst, size_t dst_cap,
     if (dst_cap == 0) {
         return;
     }
-    size_t len = strnlen(src, dst_cap - 1);
+    size_t len = rcp_strnlen_bounded(src, dst_cap - 1);
     memcpy(dst, src, len);
     dst[len] = '\0';
 }

@@ -100,7 +100,7 @@ point during operation corrupts every subsequent safety-tagged
 request's CRC32 safe-point computation. `watchdog.c`'s is narrower
 post-c-RCP-17: a hook only needs to behave correctly at the one
 `rcp_watchdog_keeper_new()`/`_destroy()` call pair surrounding the
-keeper's lifetime, not on every tick -- still a real dependency, not a
+keeper's lifetime, not on every tick — still a real dependency, not a
 zero one, but a smaller window than before this document's own
 drafting started. Two further mitigating facts are worth recording
 honestly rather than treated as closing the gap:
