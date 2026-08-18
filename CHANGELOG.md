@@ -34,6 +34,27 @@ the rationale.
 
 ## Releases
 
+### v0.418.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL hygiene batch 2 of N — issue #522 fully resolved)
+
+Completes issue #522: 94 defense-in-depth `= NULL;` additions across 31
+`src/` files, immediately after every remaining real raw-`free()`/
+`rcp_free()` CY006 candidate not already fixed by batch 1 (PR #530) or
+made moot by issue #521's concurrent `malloc`/`free`-elimination work.
+11 further sites reviewed and deliberately left unchanged (each with an
+inline rationale): 1 detector false positive (`alloc.c:52` matched
+`rcp_free()`'s own definition line, not a call), 8 sites where the
+freed field is zeroed one statement later by a full-struct
+`memset()`/state-reset call (`config.c` x6, `fragment.c` x2), and 2
+sites where the freed pointer is immediately reassigned to a fresh
+valid value on the next statement (`relay.c` x2, matching batch 1's
+own documented pattern). Full 67-test suite + ASan/UBSan clean;
+`cfusa check`: 0 errors, PASS, CY006 headline count unchanged at 1266
+(the detector cannot see a following `= NULL;` at all — a structural,
+already-documented fact, not a regression); `cfusa trace
+--req-coverage 100 --sec-tested 100`: 100%/100%, unchanged. See
+`ROADMAP.md`'s matching entry for the full accounting. Issue #522
+closed as fully resolved.
+
 ### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document, `cfusa qualify` regression fix)
 
 Addresses the first two items of c-RCP-16's (issue #518) five-item

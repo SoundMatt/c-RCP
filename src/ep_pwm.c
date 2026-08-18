@@ -293,6 +293,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     rcp_free(payload);
+    payload = NULL;
     return frame;
 }
 
@@ -816,6 +817,7 @@ rcp_bytes_t rcp_ep_pwm_in_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     rcp_free(payload);
+    payload = NULL;
     return frame;
 }
 

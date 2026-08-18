@@ -110,5 +110,7 @@ void rcp_ratelimit_limiter_destroy(rcp_ratelimit_limiter_t *rl)
     if (!rl) return;
     rcp_mutex_destroy(&rl->mu);
     rcp_free(rl->buckets);
+    rl->buckets = NULL;
     rcp_free(rl);
+    rl = NULL;
 }

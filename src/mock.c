@@ -350,6 +350,7 @@ void rcp_mock_server_destroy(rcp_mock_server_t *srv)
     }
     rcp_sequencer_table_free(&srv->sequencers);
     rcp_free(srv);
+    srv = NULL;
 }
 
 //cfusa:req REQ-MOCK-004

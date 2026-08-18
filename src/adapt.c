@@ -967,6 +967,7 @@ static void adapter_destroy(rcp_relay_caller_t *self)
     rcp_adapter_t *a = (rcp_adapter_t *)self;
     rcp_avtp_transport_release(a->transport);
     rcp_free(a);
+    a = NULL;
 }
 
 static const rcp_relay_caller_vtable_t adapter_vtable = {

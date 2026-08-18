@@ -373,6 +373,7 @@ rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     rcp_free(payload);
+    payload = NULL;
     return frame;
 }
 
@@ -429,6 +430,7 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_bitframe(const uint8_t *symbols, size_
             if (!rcp_ep_iseled_symbol_decode(symbols[2u * i], &hi) ||
                 !rcp_ep_iseled_symbol_decode(symbols[2u * i + 1u], &lo)) {
                 rcp_free(bytes);
+                bytes = NULL;
                 return RCP_EP_ISELED_ERR_BAD_SYMBOL;
             }
             bytes[i] = (uint8_t)((uint8_t)(hi << 4) | lo);
@@ -441,11 +443,13 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_bitframe(const uint8_t *symbols, size_
 
         if (bytes[byte_count - 1u] != want) {
             rcp_free(bytes);
+            bytes = NULL;
             return RCP_EP_ISELED_ERR_CRC_MISMATCH;
         }
 
         *out_data = rcp_bytes_dup(bytes, data_len);
         rcp_free(bytes);
+        bytes = NULL;
     } else {
         out_data->data = bytes;
         out_data->len  = byte_count;
@@ -671,6 +675,7 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
 
     if (rcp_fragment_plan(capped_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
         rcp_free(segs);
+        segs = NULL;
         return 0;
     }
 
@@ -712,6 +717,7 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
             rcp_free(segs);
+            segs = NULL;
             return 0;
         }
 
@@ -719,5 +725,6 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
     }
 
     rcp_free(segs);
+    segs = NULL;
     return count;
 }

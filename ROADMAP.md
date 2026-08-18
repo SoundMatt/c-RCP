@@ -19106,6 +19106,86 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.418.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL
+hygiene batch 2 of N, 94/94 remaining real sites)
+
+Continuation of issue #522's `cfusa check`-driven `free()`-without-NULL
+hygiene sweep (PR #530's batch 1 covered `relay.c`/`shmem.c`/`loan.c`/
+`ep_can.c`, 41/44 real sites; this batch covers the entire remainder).
+
+Re-derived the real-candidate pool from a fresh `cfusa check --format
+json` (pinned v0.5.54) rather than trusting the issue's own stated
+"~117 sites" figure verbatim, because a large volume of concurrent
+work (issue #521's `malloc`/`free` elimination effort) has been
+converting raw `free()` calls to the `rcp_free()` seam across the
+codebase since the issue was filed -- and confirmed real drift: raw
+`free()` in `src/` dropped from the issue's original 150 to 1 (only
+`alloc.c`'s own `rcp_free()` implementation still calls libc `free()`
+directly), while `rcp_free()` sites in `src/` rose from 17 to 153.
+Wrote a small script-driven classifier (not manual line-reading this
+time, given the volume) that: (1) filters `cfusa`'s 1266 CY006 hits to
+the 245 in `src/`, (2) excludes the six self-nulling wrapper-function
+names and the two semantic-mismatch (`find_free`) sites per the
+issue's own noise taxonomy, (3) for each remaining raw-`free()`/
+`rcp_free()` site, checks the same and next two source lines for an
+existing `<same-expression> = NULL;` re-assignment (bare identifier or
+`struct->field`/`array[i].field` form) to detect what batch 1 (and any
+`rcp_free()` sites #521 already converted with self-nulling intact)
+already fixed.
+
+Of 154 real `src/` candidates, 49 were already compliant (batch 1's
+work, plus some of #521's conversions). Of the 105 remaining, 94 got a
+defense-in-depth `<expr> = NULL;` added immediately after the
+`free()`/`rcp_free()` call, across 31 files (`ep_iseled.c` 7,
+`platform.c`/`l2.c`/`udp.c`/`admin.c` 6 each, `authz.c`/`deadline.c`/
+`mdns.c`/`powerstate.c`/`watchdog.c` 5 each, the rest 4 or fewer).
+11 were deliberately left alone, each with an inline rationale and a
+one-line justification here:
+
+- `alloc.c:52` -- not a call site at all: the CY006 substring detector
+  matched `rcp_free()`'s own *function definition* line
+  (`void rcp_free(void *ptr)`), which contains the literal text
+  `free(` but calls nothing. Excluded as a detector false positive,
+  not a code change.
+- `config.c:186-188`/`417-419` (6 sites) -- each freed field is
+  zeroed one or two statements later by an unconditional
+  `memset(m, 0, sizeof(*m))`/`memset(out, 0, sizeof(*out))` that
+  covers the whole struct; an individual `= NULL;` in between would
+  be dead code immediately overwritten by the memset.
+- `fragment.c:113`/`120` -- `r->buf` is freed then the very next
+  statement is either `rcp_fragment_reassembler_init(r, ...)` (whose
+  first action is `r->buf = NULL;`) or `memset(r, 0, sizeof(*r))` --
+  both are full-state resets that already NULL this field.
+- `relay.c:99`/`118` -- `m->id`/`m->meta[i].value` are freed then
+  immediately reassigned to a fresh valid pointer (`copy`/
+  `value_copy`) on the very next statement, the same
+  reassign-don't-NULL pattern batch 1 already documented for two of
+  `relay.c`'s own sites.
+
+No case among the 105 reviewed involved a live use-after-free or
+double-free risk -- consistent with this issue's and its follow-up
+comment's "cosmetic-hygiene-only, no live risk" finding holding across
+the full `src/` population. Mutation-tested a representative sample
+(temporarily reverted the `admin.c` and `l2.c` hunks; `cfusa check`'s
+own finding count is unaffected either way, confirming per the
+now-twice-confirmed structural fact that CY006's naive line-match
+detector cannot observe a following `= NULL;` at all -- the real
+regression signal here is the full test suite plus ASan/UBSan, which
+stayed green throughout).
+
+Full 67-test suite (clean build) + ASan/UBSan (CI's exact flags,
+`ASAN_OPTIONS=detect_leaks=0`) both 100% pass, no sanitizer traps.
+`cfusa check`: 0 errors, `Result: PASS`, CY006 headline count
+unchanged at 1266 (expected -- see above). `cfusa trace
+--req-coverage 100 --sec-tested 100`: 100%/100%, unchanged.
+
+**Remaining for issue #522**: none. All 154 real `src/`
+raw-`free()`/`rcp_free()` CY006 candidates identified from a fresh
+`cfusa check --format json` are now either already-compliant (49,
+batch 1 + concurrent #521 work), fixed this batch (94), or
+individually justified as already-safe-without-a-change (11, listed
+above). Issue #522 is closed as fully resolved by this release.
+
 ### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document,
 `cfusa qualify` regression fix)
 

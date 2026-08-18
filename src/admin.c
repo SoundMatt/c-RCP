@@ -48,9 +48,13 @@ void rcp_admin_server_destroy(rcp_admin_server_t *srv)
     if (!srv) return;
     rcp_mutex_destroy(&srv->mu);
     rcp_free(srv->endpoints);
+    srv->endpoints = NULL;
     rcp_free(srv->subscribers);
+    srv->subscribers = NULL;
     rcp_free(srv->counters);
+    srv->counters = NULL;
     rcp_free(srv);
+    srv = NULL;
 }
 
 static size_t find_endpoint_index(rcp_admin_server_t *srv, rcp_avtp_addr_t addr)
@@ -177,6 +181,7 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
         local[i].cb(&ev, local[i].user_data);
     }
     rcp_free(local);
+    local = NULL;
 }
 
 //cfusa:req REQ-ADMIN-005
@@ -271,5 +276,6 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
         out[to_copy] = '\0';
     }
     rcp_free(scratch);
+    scratch = NULL;
     return total;
 }

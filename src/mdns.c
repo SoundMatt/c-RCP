@@ -110,11 +110,15 @@ static void static_disc_destroy(rcp_mdns_discoverer_t *self)
     size_t i;
     for (i = 0; i < d->count; i++) {
         rcp_free(d->records[i].host);
+        d->records[i].host = NULL;
         rcp_free(d->records[i].instance_name);
+        d->records[i].instance_name = NULL;
     }
     rcp_free(d->records);
+    d->records = NULL;
     rcp_mutex_destroy(&d->mu);
     rcp_free(d);
+    d = NULL;
 }
 
 static const rcp_mdns_discoverer_vtable_t static_disc_vtable = {
@@ -139,6 +143,7 @@ rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info
         if (!entries) {
             rcp_mutex_destroy(&d->mu);
             rcp_free(d);
+            d = NULL;
             return NULL;
         }
         d->records = entries;

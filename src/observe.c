@@ -131,7 +131,9 @@ void rcp_in_memory_sink_destroy(rcp_in_memory_sink_t *s)
     if (!s) return;
     rcp_mutex_destroy(&s->mu);
     rcp_free(s->spans);
+    s->spans = NULL;
     rcp_free(s);
+    s = NULL;
 }
 
 /* ── Recording a request ──────────────────────────────────────────────────── */

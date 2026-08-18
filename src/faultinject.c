@@ -109,6 +109,8 @@ void rcp_faultinject_destroy(rcp_faultinject_t *fi)
 {
     if (!fi) return;
     rcp_free(fi->rules);
+    fi->rules = NULL;
     rcp_mutex_destroy(&fi->mu);
     rcp_free(fi);
+    fi = NULL;
 }

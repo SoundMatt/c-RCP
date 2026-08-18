@@ -50,7 +50,9 @@ rcp_authz_policy_t *rcp_authz_policy_retain(rcp_authz_policy_t *p)
 static void entry_free(policy_entry_t *e)
 {
     rcp_free(e->addrs);
+    e->addrs = NULL;
     rcp_free(e->request_types);
+    e->request_types = NULL;
 }
 
 //cfusa:req REQ-AUTH-011
@@ -63,7 +65,9 @@ void rcp_authz_policy_release(rcp_authz_policy_t *p)
     for (i = 0; i < p->entries_len; i++) entry_free(&p->entries[i]);
     rcp_mutex_destroy(&p->mu);
     rcp_free(p->entries);
+    p->entries = NULL;
     rcp_free(p);
+    p = NULL;
 }
 
 //cfusa:req REQ-AUTH-003
@@ -90,6 +94,7 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
         entry.request_types = alloc_bytes == 0 ? NULL : (uint8_t *)rcp_malloc(alloc_bytes);
         if (!entry.request_types) {
             rcp_free(entry.addrs);
+            entry.addrs = NULL;
             return false;
         }
         memcpy(entry.request_types, request_types, n_request_types * sizeof(*entry.request_types));

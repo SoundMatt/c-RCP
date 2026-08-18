@@ -30,6 +30,7 @@ rcp_sequencer_table_t rcp_sequencer_table_new(uint16_t count)
     owner = (uint8_t *)rcp_calloc((size_t)count, 1); /* RCP_SEQUENCER_OWNER_UNCLAIMED == 0 */
     if (!owner) {
         rcp_free(state);
+        state = NULL;
         return table; /* zeroed -- same failure convention, all-or-nothing allocation */
     }
 
