@@ -16,6 +16,7 @@
 //cfusa:test REQ-ISELED-027
 //cfusa:test REQ-ISELED-028
 //cfusa:test REQ-ISELED-029
+//cfusa:test REQ-ISELED-041
 //cfusa:test REQ-LINEP-023
 //cfusa:test REQ-LINEP-024
 //cfusa:test REQ-MDIO-020
@@ -1289,6 +1290,9 @@ static void test_iseled_response_has_no_read_size_ceiling(void)
  * module's own original, second, independent CRC-8 layer -- see
  * ep_iseled.h's file header); iseled_bit_clk_divider stays a distinct,
  * non-wire field from the new wire_clk_divider. */
+//cfusa:test REQ-ISELED-026
+//cfusa:test REQ-ISELED-027
+//cfusa:test REQ-ISELED-041
 static void test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;

@@ -34,7 +34,7 @@ the rationale.
 
 ## Releases
 
-### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-I2C-*: requirement-atomicity audit, Group 2 per-endpoint)
+### v0.449.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-I2C-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
 issue #533 (mirrors #256's pattern), executing the convention #519/PR
@@ -140,17 +140,93 @@ pinned cfusa v0.5.54: `check` 0 errors; `trace --req-coverage 100` /
 combined-flag reporting-bug finding) each 100% (1178/1178 requirements,
 512/512 functions).
 
-Version 0.445.0 -> 0.446.0 (`CMakeLists.txt`/`version.h`/`.fusa.json`
+Version 0.448.0 -> 0.449.0 (`CMakeLists.txt`/`version.h`/`.fusa.json`
 kept in sync, renumbered past the concurrently-merged `REQ-SPI-*`
-(`v0.444.0`) and `REQ-ADC-*` (`v0.445.0`) batches); dated
-`CHANGELOG.md`/`ROADMAP.md` entries above the current highest version
-header in each.
+(`v0.444.0`), `REQ-ADC-*` (`v0.445.0`), `REQ-LINEP-*` (`v0.446.0`),
+`REQ-GPIO-*` (`v0.447.0`), and `REQ-ISELED-*` (`v0.448.0`) batches);
+dated `CHANGELOG.md`/`ROADMAP.md` entries above the current highest
+version header in each.
 
 Part of #533. Not closing it -- other Group 2 (`REQ-CANEP-*`,
-`REQ-GPIO-*`, `REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-UART-*`,
-`REQ-ISELED-*`, `REQ-WAKEUP-*` -- `REQ-SPI-*`/`REQ-ADC-*` landed
-concurrently) and Group 4 prefixes remain, tracked as separate
+`REQ-MDIO-*`, `REQ-PWM-*`, `REQ-UART-*`, `REQ-WAKEUP-*` --
+`REQ-SPI-*`/`REQ-ADC-*`/`REQ-LINEP-*`/`REQ-GPIO-*`/`REQ-ISELED-*`
+landed concurrently) and Group 4 prefixes remain, tracked as separate
 concurrent batches against the same tracker.
+
+### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ISELED-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533, executing the convention #519/PR #525 added to
+`CONTRIBUTING.md`'s "Writing a requirement" section. Covers
+`REQ-ISELED-*` (`src/ep_iseled.c`/`include/rcp/ep_iseled.h`) --
+Group 2's densest sub-batch by proxy-flag density (8/31). All 30
+non-retired requirements read in full against their actual `text`
+and traced code/tests, not just the 8 flagged ones (`REQ-ISELED-028`
+was already retired by issue #552 as a stale duplicate of `-007`;
+skipped).
+
+10 ids split into 11 new ones (`REQ-ISELED-032..042`):
+
+- `-002` -> `-002`/`-032`: `rcp_ep_iseled_symbol_decode()`'s
+  invalid-parity reject vs. valid-parity accept-and-decode -- the
+  same guard-then-effect shape already split for `REQ-DL-001`/`-014`.
+- `-006` -> `-006`/`-033`/`-034`: `rcp_ep_iseled_crc8()`'s
+  determinism, zero-length base case, and content-sensitivity -- three
+  orthogonal, independently falsifiable claims about one function.
+- `-008` -> `-008`/`-035`: `rcp_ep_iseled_trigger_fires()`'s
+  `TRIGGER_NONE` vs. `TRIGGER_TX_COMPLETE` switch arms, the same
+  per-arm granularity `REQ-PWM-002..009` already established.
+- `-011`/`-012`/`-013`/`-014` -> paired with new `-036`/`-037`/`-038`/
+  `-039`: each writable-gated setter's deny-and-leave-unchanged clause
+  vs. its authorize-and-apply clause -- matching the
+  `REQ-LINEP-011`/`-012` precedent for the identical shape (found
+  already split there; `REQ-CANEP-009..014` still bundle it the old
+  way, out of this batch's scope).
+- `-025` -> `-025`/`-040`: `rcp_ep_iseled_encode_response_fragmented()`
+  (kept, plus the multi-response mock-dispatch capability it enables)
+  vs. `rcp_ep_iseled_response_fragment_count()`'s own frame-count
+  calculation -- two different functions under one id, zero "shall"
+  occurrences, the same proxy-missed pattern Group 1's `REQ-RMAP-*`
+  batch found.
+- `-027` -> `-027`/`-041`: `iseled_nr_leds` vs. `iseled_rcv_timeout`,
+  two distinct register fields at two distinct addresses bundled
+  under one id, also zero "shall" occurrences.
+- `-029` -> `-029`/`-042`: the register-block read/write mechanism
+  (`render_registers`/`apply_reconfig`/`encode_reconfig_request`,
+  kept) vs. `rcp_ep_iseled_reconfig_strerror()`'s own non-NULL/
+  distinct-per-code contract -- matching the `REQ-LINEP-028`/`-029`
+  precedent for the identical split, also zero "shall" occurrences.
+
+1 flagged id confirmed genuinely atomic: `-022`
+(`rcp_ep_iseled_decode_command_request()`'s multi-error-code
+validation pipeline) -- matching the established, repeated
+codebase-wide pattern (`REQ-GPIO-027`, `REQ-SPI-027`, `REQ-I2C-012`,
+`REQ-UART-020`, `REQ-PWM-026`, `REQ-LINEP-018`, `REQ-CANEP-017`,
+`REQ-MDIO-013`/`-017`, `REQ-WAKEUP-011`/`-015`) of keeping one
+function's whole validate-then-decode contract as a single id, not
+one id per error code. `-015` (`strerror`'s non-NULL+distinct
+compound text) also confirmed atomic against an even stronger,
+~20-prefix-wide precedent for that exact shape.
+
+Tags moved/duplicated to sit above the exact function/test per split
+(not file-header-only); every split verified with its own distinct
+test -- one brand-new test for `-032`, existing-but-unsplit tests
+divided into two focused functions for `-006`'s and `-008`'s splits,
+already-separately-tested setter pairs and fragment-count tests
+re-tagged directly, `-027`/`-041` sharing one round-trip test's own
+two independent assertion pairs. A representative sample
+(`-032`/`-035`/`-036`) mutation-tested against real injected defects
+in `src/ep_iseled.c` -- each caught only by its own split's test,
+confirming the sibling id's test stays green -- then reverted.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags) clean; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100`/
+`--sec-tested 100` (run separately, per this tool version's own
+combined-invocation gap) each 100% (1185/1185 requirements, 512/512
+functions).
+
+**Next**: other Group 2 prefixes (`REQ-GPIO-*`, `REQ-CANEP-*`, etc.)
+remain, tracked as separate batches against the same tracker.
 
 ### v0.447.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-GPIO-*: requirement-atomicity audit, Group 2 per-endpoint)
 

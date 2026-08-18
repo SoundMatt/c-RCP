@@ -40,6 +40,23 @@
  * section below for the full citation and rationale. */
 //cfusa:req REQ-ISELED-030
 //cfusa:req REQ-ISELED-031
+
+/* Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit): each id below
+ * was carved out of an existing bundled id above so every REQ-* id here
+ * asserts exactly one independently-testable behaviour, per
+ * CONTRIBUTING.md's "Writing a requirement" convention. See each id's
+ * own .fusa-reqs.json text for which prior id it split from. */
+//cfusa:req REQ-ISELED-032
+//cfusa:req REQ-ISELED-033
+//cfusa:req REQ-ISELED-034
+//cfusa:req REQ-ISELED-035
+//cfusa:req REQ-ISELED-036
+//cfusa:req REQ-ISELED-037
+//cfusa:req REQ-ISELED-038
+//cfusa:req REQ-ISELED-039
+//cfusa:req REQ-ISELED-040
+//cfusa:req REQ-ISELED-041
+//cfusa:req REQ-ISELED-042
 /*
  * ep_iseled.h -- ISELED endpoint for the TC18 Remote Control Protocol wire
  * layer (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 73).

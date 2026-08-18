@@ -47,6 +47,7 @@ uint8_t rcp_ep_iseled_symbol_encode(uint8_t nibble)
 }
 
 //cfusa:req REQ-ISELED-002
+//cfusa:req REQ-ISELED-032
 bool rcp_ep_iseled_symbol_decode(uint8_t symbol, uint8_t *out_nibble)
 {
     uint8_t s            = (uint8_t)(symbol & 0x1Fu);
@@ -113,6 +114,8 @@ static uint8_t crc8_update(uint8_t crc, uint8_t b)
 }
 
 //cfusa:req REQ-ISELED-006
+//cfusa:req REQ-ISELED-033
+//cfusa:req REQ-ISELED-034
 uint8_t rcp_ep_iseled_crc8(const uint8_t *data, size_t len)
 {
     uint8_t crc = 0x00u;
@@ -142,6 +145,7 @@ bool rcp_ep_iseled_requires_isp_n(bool use_rcv_clk)
 /* ── Transmission-complete trigger ─────────────────────────────────────────── */
 
 //cfusa:req REQ-ISELED-008
+//cfusa:req REQ-ISELED-035
 bool rcp_ep_iseled_trigger_fires(rcp_ep_iseled_trigger_t trigger, bool tx_complete_event)
 {
     switch (trigger) {
@@ -173,6 +177,7 @@ bool rcp_ep_iseled_functional_cfg_writable(rcp_lifecycle_state_t state,
 }
 
 //cfusa:req REQ-ISELED-011
+//cfusa:req REQ-ISELED-036
 bool rcp_ep_iseled_set_bit_clk_divider(rcp_ep_iseled_functional_cfg_t *cfg, uint32_t divider,
                                         rcp_lifecycle_state_t state,
                                         rcp_lifecycle_writer_ctx_t writer)
@@ -184,6 +189,7 @@ bool rcp_ep_iseled_set_bit_clk_divider(rcp_ep_iseled_functional_cfg_t *cfg, uint
 }
 
 //cfusa:req REQ-ISELED-012
+//cfusa:req REQ-ISELED-037
 bool rcp_ep_iseled_set_use_rcv_clk(rcp_ep_iseled_functional_cfg_t *cfg, bool use_rcv_clk,
                                     rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
@@ -194,6 +200,7 @@ bool rcp_ep_iseled_set_use_rcv_clk(rcp_ep_iseled_functional_cfg_t *cfg, bool use
 }
 
 //cfusa:req REQ-ISELED-013
+//cfusa:req REQ-ISELED-038
 bool rcp_ep_iseled_set_crc_enable(rcp_ep_iseled_functional_cfg_t *cfg, bool enable,
                                    rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
@@ -204,6 +211,7 @@ bool rcp_ep_iseled_set_crc_enable(rcp_ep_iseled_functional_cfg_t *cfg, bool enab
 }
 
 //cfusa:req REQ-ISELED-014
+//cfusa:req REQ-ISELED-039
 bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
                                 rcp_ep_iseled_trigger_t trigger, rcp_lifecycle_state_t state,
                                 rcp_lifecycle_writer_ctx_t writer)
@@ -287,7 +295,7 @@ static bool iseled_reg_offset_read_only(uint16_t addr)
            addr == (uint16_t)(RCP_EP_ISELED_REG_BASE_CLK + 1u);
 }
 
-//cfusa:req REQ-ISELED-029
+//cfusa:req REQ-ISELED-042
 const char *rcp_ep_iseled_reconfig_strerror(rcp_ep_iseled_reconfig_errc_t e)
 {
     switch (e) {
@@ -303,6 +311,7 @@ const char *rcp_ep_iseled_reconfig_strerror(rcp_ep_iseled_reconfig_errc_t e)
 }
 
 //cfusa:req REQ-ISELED-029
+//cfusa:req REQ-ISELED-042
 rcp_ep_iseled_reconfig_errc_t
 rcp_ep_iseled_apply_reconfig(rcp_ep_iseled_functional_cfg_t *cfg,
                               const uint8_t *payload, size_t payload_len)
@@ -642,7 +651,7 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_response(const uint8_t *b, size_t len,
     return RCP_EP_ISELED_OK;
 }
 
-//cfusa:req REQ-ISELED-025
+//cfusa:req REQ-ISELED-040
 size_t rcp_ep_iseled_response_fragment_count(size_t available_len, uint16_t read_size,
                                               size_t max_fragment_payload)
 {
