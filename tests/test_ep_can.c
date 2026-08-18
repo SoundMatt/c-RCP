@@ -27,6 +27,18 @@
 //cfusa:test REQ-CANEP-026
 //cfusa:test REQ-CANEP-027
 //cfusa:test REQ-CANEP-030
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit (2026-08-18):
+ * ids split out of the ones above now also carry their own per-test
+ * cfusa "test" tag directly above the specific test function that
+ * proves them, per CONTRIBUTING.md's "Writing a requirement"; this
+ * file-header block exists only so this file, taken as a whole, still
+ * satisfies cfusa's own file-level annotation gate. */
+//cfusa:test REQ-CANEP-033
+//cfusa:test REQ-CANEP-034
+//cfusa:test REQ-CANEP-035
+//cfusa:test REQ-CANEP-036
+//cfusa:test REQ-CANEP-038
+//cfusa:test REQ-CANEP-039
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -377,6 +389,7 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Frame request round trip: Classical ───────────────────────────────────── */
 
+//cfusa:test REQ-CANEP-033
 static void test_frame_request_round_trip_classical(void)
 {
     uint8_t     tx[8] = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -406,6 +419,7 @@ static void test_frame_request_round_trip_classical(void)
 
 /* ── Frame request round trip: CAN XL (extra header fields) ─────────────────── */
 
+//cfusa:test REQ-CANEP-033
 static void test_frame_request_round_trip_xl(void)
 {
     /* NOT RCP_EP_CAN_XL_MAX_DATA_LEN (2048): since the TC18 conformance
@@ -460,6 +474,7 @@ static void test_frame_request_round_trip_xl(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CANEP-016
 static void test_frame_request_encode_rejects_bad_frame_format(void)
 {
     rcp_bytes_t frame =
@@ -468,6 +483,7 @@ static void test_frame_request_encode_rejects_bad_frame_format(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-CANEP-016
 static void test_frame_request_encode_rejects_bad_arbitration_id(void)
 {
     rcp_bytes_t frame = rcp_ep_can_encode_frame_request(1, RCP_EP_CAN_FRAME_CBFF, 0x800u, NULL,
@@ -476,6 +492,7 @@ static void test_frame_request_encode_rejects_bad_arbitration_id(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-CANEP-016
 static void test_frame_request_encode_rejects_data_too_long(void)
 {
     uint8_t tx[9] = {0};
@@ -485,6 +502,7 @@ static void test_frame_request_encode_rejects_data_too_long(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-CANEP-016
 static void test_frame_request_encode_rejects_missing_xl_header(void)
 {
     rcp_bytes_t frame = rcp_ep_can_encode_frame_request(
@@ -493,6 +511,7 @@ static void test_frame_request_encode_rejects_missing_xl_header(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-CANEP-016
 static void test_frame_request_encode_rejects_unexpected_xl_header(void)
 {
     rcp_ep_can_xl_header_t xl_hdr = {0};
@@ -724,6 +743,7 @@ static void test_frame_request_decode_rejects_short_xl_prefix(void)
  * (1) in the top 3 bits (0b001), arbitration_id = 0x1ABCDEF (extended-29,
  * fits in the low 29 bits) -- combined leading quadlet =
  * (1 << 29) | 0x1ABCDEF = 0x21ABCDEF. */
+//cfusa:test REQ-CANEP-039
 static void test_frame_request_golden_leading_quadlet_bit_packing(void)
 {
     rcp_bytes_t frame = rcp_ep_can_encode_frame_request(
@@ -857,6 +877,7 @@ static void test_frame_response_encode_rejects_bad_frame_format(void)
 
 /* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
 
+//cfusa:test REQ-CANEP-034
 static void test_fragment_count_one_when_fits_in_one_fragment(void)
 {
     /* A 3-byte classical response's combined (4-byte prefix + 3-byte
@@ -876,6 +897,7 @@ static void test_fragment_count_one_when_fits_in_one_fragment(void)
  * (RCP_EP_CAN_XL_MAX_ENCODED_LEN = 2058 octets) at max_fragment_payload
  * = 8 needs ceil(2058/8) = 258 segments, one more than the 256-entry
  * ceiling. */
+//cfusa:test REQ-CANEP-034
 static void test_fragment_count_zero_when_segment_count_exceeds_max_fragment_segments(void)
 {
     rcp_ep_can_xl_header_t xl_hdr = {0};
@@ -885,6 +907,7 @@ static void test_fragment_count_zero_when_segment_count_exceeds_max_fragment_seg
     TEST_ASSERT_EQUAL_UINT(0, count);
 }
 
+//cfusa:test REQ-CANEP-023
 static void test_fragment_count_zero_for_bad_preconditions(void)
 {
     /* Invalid frame_format -> encode_preconditions_ok() fails -> 0. */
@@ -902,6 +925,8 @@ static void test_fragment_count_zero_for_bad_preconditions(void)
  * for this milestone. Encodes it fragmented at a max_fragment_payload
  * comfortably under that NTSCF ceiling, then reassembles it back via
  * fragment.h and this module's own reassembled-response decode helper. */
+//cfusa:test REQ-CANEP-024
+//cfusa:test REQ-CANEP-036
 static void test_fragment_worst_case_can_xl_response_round_trip(void)
 {
     uint8_t                     rx[RCP_EP_CAN_XL_MAX_DATA_LEN];
@@ -1002,6 +1027,7 @@ static void test_fragment_worst_case_can_xl_response_round_trip(void)
  * only ever passes timed=false. Small classical (CBFF) payload,
  * deliberately tiny max_fragment_payload to force multiple real
  * fragments cheaply rather than reusing the XL worst-case's own size. */
+//cfusa:test REQ-CANEP-024
 static void test_fragment_timed_response_round_trip(void)
 {
     uint8_t      rx[8]; /* RCP_EP_CAN_CLASSICAL_MAX_DATA_LEN -- CBFF's own data-length ceiling */
@@ -1096,6 +1122,7 @@ static void reset_counting_malloc(int fail_at_call)
  * encoded before this one" loop runs with real content (i == 1, not the
  * vacuous i == 0 case), exercising that loop's own body, not just its
  * zero-iteration form. */
+//cfusa:test REQ-CANEP-024
 static void test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails(void)
 {
     uint8_t     rx[8];
@@ -1115,6 +1142,7 @@ static void test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails
     TEST_ASSERT_EQUAL_UINT(0, count);
 }
 
+//cfusa:test REQ-CANEP-035
 static void test_fragment_response_unfragmented_matches_single_frame_path(void)
 {
     /* When the combined payload already fits in one fragment, the
@@ -1172,6 +1200,7 @@ static void test_fragment_decode_fragment_rejects_wrong_bus(void)
     rcp_bytes_free(&frames[0]);
 }
 
+//cfusa:test REQ-CANEP-027
 static void test_reassembled_decode_rejects_short_frame(void)
 {
     uint8_t                    too_short[3] = {0};
@@ -1192,6 +1221,7 @@ static void test_reassembled_decode_rejects_short_frame(void)
  * request decoders' own, operating directly on a post-fragmentation
  * reassembled buffer rather than an ACF-wrapped frame. Same
  * CBFF/oversized-id trick as the other two sites. */
+//cfusa:test REQ-CANEP-027
 static void test_reassembled_decode_rejects_bad_arbitration_id(void)
 {
     uint8_t                    reassembled[4] = {0x08, 0, 0, 0};
@@ -1207,8 +1237,89 @@ static void test_reassembled_decode_rejects_bad_arbitration_id(void)
                                                        &out_rx, &out_rx_len));
 }
 
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit: before this
+ * batch, RCP_EP_CAN_ERR_BAD_FRAME_FORMAT had no dedicated test of its
+ * own for this specific function -- SHORT_FRAME and BAD_ARBITRATION_ID
+ * both did (above), but the third leg of REQ-CANEP-027's own
+ * reject-taxonomy was only ever exercised incidentally via other
+ * functions' own tests. Top 3 bits = 110b (6), TC18 Table 57's first
+ * reserved FrameFormat code. */
+//cfusa:test REQ-CANEP-027
+static void test_reassembled_decode_rejects_bad_frame_format(void)
+{
+    uint8_t                    reserved_code[4] = {0xC0u, 0, 0, 0};
+    rcp_ep_can_frame_format_t  format;
+    uint32_t                   id = 0;
+    rcp_ep_can_xl_header_t     xl_hdr;
+    const uint8_t              *out_rx = NULL;
+    size_t                      out_rx_len = 0;
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_FRAME_FORMAT,
+        rcp_ep_can_decode_reassembled_frame_response(reserved_code, sizeof(reserved_code),
+                                                       &format, &id, &xl_hdr,
+                                                       &out_rx, &out_rx_len));
+}
+
+/* [c-RCP-18-tracker] issue #533 REQ-CANEP-* atomicity audit: REQ-CANEP-036
+ * split out of REQ-CANEP-027's own prior text as this function's own
+ * successful-populate contract. Before this batch, the only coverage of
+ * this specific outcome was folded into the multi-fragment round-trip
+ * tests above (test_fragment_worst_case_can_xl_response_round_trip/
+ * test_fragment_timed_response_round_trip), which exercise this
+ * function only as the last step of a full fragment/reassemble
+ * pipeline -- a shared assertion that happens to touch this function's
+ * own contract in passing, not a focused proof of it. This test calls
+ * rcp_ep_can_decode_reassembled_frame_response() directly against a
+ * combined payload built without ever going through fragment.h, proving
+ * this function's own contract independent of REQ-CANEP-024/-035's own
+ * fragmentation logic. */
+//cfusa:test REQ-CANEP-036
+static void test_reassembled_decode_round_trip_recovers_fields(void)
+{
+    uint8_t                     rx[3] = {0x11, 0x22, 0x33};
+    rcp_ep_can_xl_header_t      xl_hdr_in = {0};
+    rcp_bytes_t                 frame;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *combined_payload = NULL;
+    size_t                       combined_len = 0;
+    rcp_ep_can_frame_format_t    out_format;
+    uint32_t                     out_id = 0;
+    rcp_ep_can_xl_header_t       out_xl_hdr;
+    const uint8_t                *out_rx = NULL;
+    size_t                        out_rx_len = 0;
+
+    xl_hdr_in.sdt  = 0x5u;
+    xl_hdr_in.vcid = 0x9u;
+    xl_hdr_in.af   = 0xDEADBEEFu;
+
+    /* An unfragmented ACF_ABB response's own payload IS already the
+     * "combined prefix-then-data payload" rcp_ep_can_decode_reassembled_
+     * frame_response() expects -- no fragment.h reassembly required to
+     * exercise this function's own contract. */
+    frame = rcp_ep_can_encode_frame_response(9, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u, &xl_hdr_in,
+                                              rx, sizeof(rx), 3u, false, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+        rcp_acf_decode_abb(frame.data, frame.len, &hdr, &combined_payload, &combined_len));
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+        rcp_ep_can_decode_reassembled_frame_response(combined_payload, combined_len, &out_format,
+                                                       &out_id, &out_xl_hdr, &out_rx,
+                                                       &out_rx_len));
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, out_format);
+    TEST_ASSERT_EQUAL_UINT32(0x321u, out_id);
+    TEST_ASSERT_EQUAL_UINT8(0x5u, out_xl_hdr.sdt);
+    TEST_ASSERT_EQUAL_UINT8(0x9u, out_xl_hdr.vcid);
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, out_xl_hdr.af);
+    TEST_ASSERT_EQUAL_UINT(sizeof(rx), out_rx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, out_rx, sizeof(rx));
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── REQ-CANEP-030: CAN XL physical-layer provisioning ───────────────────── */
 
+//cfusa:test REQ-CANEP-038
 static void test_xl_pl_non_xl_frame_always_matches(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_CBFF));
@@ -1218,6 +1329,7 @@ static void test_xl_pl_non_xl_frame_always_matches(void)
     TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_FEFF));
 }
 
+//cfusa:test REQ-CANEP-038
 static void test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame(void)
 {
     TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_XL_NEW_PL));
@@ -1225,6 +1337,7 @@ static void test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame(void)
         rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL));
 }
 
+//cfusa:test REQ-CANEP-038
 static void test_xl_pl_classical_pl_provisioned_matches_only_classical_pl_frame(void)
 {
     TEST_ASSERT_TRUE(
@@ -1233,6 +1346,7 @@ static void test_xl_pl_classical_pl_provisioned_matches_only_classical_pl_frame(
         rcp_ep_can_xl_frame_matches_provisioned_pl(false, RCP_EP_CAN_FRAME_XL_NEW_PL));
 }
 
+//cfusa:test REQ-CANEP-030
 static void test_xl_pl_set_provisioned_requires_authorization(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
@@ -1397,6 +1511,8 @@ int main(void)
     RUN_TEST(test_fragment_decode_fragment_rejects_wrong_bus);
     RUN_TEST(test_reassembled_decode_rejects_short_frame);
     RUN_TEST(test_reassembled_decode_rejects_bad_arbitration_id);
+    RUN_TEST(test_reassembled_decode_rejects_bad_frame_format);
+    RUN_TEST(test_reassembled_decode_round_trip_recovers_fields);
 
     RUN_TEST(test_xl_pl_non_xl_frame_always_matches);
     RUN_TEST(test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame);

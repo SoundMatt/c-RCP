@@ -55,7 +55,7 @@ bool rcp_ep_can_frame_format_is_xl(rcp_ep_can_frame_format_t format)
     }
 }
 
-//cfusa:req REQ-CANEP-030
+//cfusa:req REQ-CANEP-038
 bool rcp_ep_can_xl_frame_matches_provisioned_pl(bool xl_new_pl_provisioned,
                                                  rcp_ep_can_frame_format_t format)
 {
@@ -246,6 +246,8 @@ static size_t prefix_len_for(rcp_ep_can_frame_format_t format)
 /* Figure 39's leading quadlet: frame_format in the top 3 bits, the
  * (right-aligned, for an 11-bit base id) arbitration_id in the bottom 29
  * bits. */
+//cfusa:req REQ-CANEP-039
+//cfusa:req REQ-CANEP-040
 static void write_prefix(uint8_t *p, rcp_ep_can_frame_format_t format, uint32_t arbitration_id,
                           const rcp_ep_can_xl_header_t *xl_header)
 {
@@ -321,6 +323,8 @@ static void build_payload(rcp_ep_can_frame_format_t frame_format, uint32_t arbit
 /* ── Frame request ─────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-CANEP-016
+//cfusa:req REQ-CANEP-032
+//cfusa:req REQ-CANEP-033
 rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
                                              rcp_ep_can_frame_format_t frame_format,
                                              uint32_t arbitration_id,
@@ -513,6 +517,7 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response(const uint8_t *b, size_t len,
 /* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
 
 //cfusa:req REQ-CANEP-023
+//cfusa:req REQ-CANEP-034
 size_t rcp_ep_can_frame_response_fragment_count(rcp_ep_can_frame_format_t frame_format,
                                                  uint32_t arbitration_id,
                                                  const rcp_ep_can_xl_header_t *xl_header,
@@ -536,6 +541,7 @@ size_t rcp_ep_can_frame_response_fragment_count(rcp_ep_can_frame_format_t frame_
 }
 
 //cfusa:req REQ-CANEP-024
+//cfusa:req REQ-CANEP-035
 size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
                                                     rcp_ep_can_frame_format_t frame_format,
                                                     uint32_t arbitration_id,
@@ -683,6 +689,7 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, si
 }
 
 //cfusa:req REQ-CANEP-027
+//cfusa:req REQ-CANEP-036
 rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *reassembled,
                                                                 size_t reassembled_len,
                                                                 rcp_ep_can_frame_format_t *out_frame_format,
@@ -740,6 +747,7 @@ rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *re
  * ep_clear_req_storage react to the wrong wire bit -- a real TC18 peer
  * setting bit 4 per spec would have had no effect on this endpoint. */
 //cfusa:req REQ-CANEP-028
+//cfusa:req REQ-CANEP-037
 #define CAN_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
 #define CAN_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
 
@@ -748,6 +756,7 @@ rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *re
 #define CAN_OPTIONS_BIT_SUPPRESS ((uint8_t)(1u << 7))
 
 //cfusa:req REQ-CANEP-028
+//cfusa:req REQ-CANEP-037
 void rcp_ep_can_render_registers(const rcp_ep_can_functional_cfg_t *cfg,
                                   uint8_t out[RCP_EP_CAN_EP_FUNC_LEN])
 {
@@ -780,6 +789,8 @@ void rcp_ep_can_render_registers(const rcp_ep_can_functional_cfg_t *cfg,
  * octet, base_clk, and the whole not-yet-decomposed span) are
  * deliberately not read back -- apply_reconfig() re-renders them from
  * cfg before patching, so a write covering them is a no-op. */
+//cfusa:req REQ-CANEP-028
+//cfusa:req REQ-CANEP-037
 static void parse_can_registers(rcp_ep_can_functional_cfg_t *cfg,
                                  const uint8_t in[RCP_EP_CAN_EP_FUNC_LEN])
 {
@@ -800,6 +811,7 @@ static void parse_can_registers(rcp_ep_can_functional_cfg_t *cfg,
 /* True iff the octet at relative offset addr belongs to a read-only
  * register of the block -- EP_LEN, the reserved octet, both octets of
  * base_clk, or any octet of the not-yet-decomposed 0x0008-0x001B span. */
+//cfusa:req REQ-CANEP-028
 static bool can_reg_offset_read_only(uint16_t addr)
 {
     return addr == RCP_EP_CAN_REG_EP_LEN || addr == RCP_EP_CAN_REG_RESERVED_01 ||

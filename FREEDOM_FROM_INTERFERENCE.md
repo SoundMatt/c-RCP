@@ -28,15 +28,15 @@ Issue #518's own text describes the split as `.fusa-reqs.json` mixing
 "the retired pre-TC18 Zone/Command surface, still linked into the same
 binary per `src/rcp.c`/`tests/legacy_mock.*`"). That framing is now
 **stale** — `.fusa-reqs.json`'s current `scope` values (verified by
-direct enumeration of all 1225 entries at HEAD, after the [c-RCP-16
+direct enumeration of all 1233 entries at HEAD, after the [c-RCP-16
 follow-up] issue #552 fix and the [c-RCP-18-tracker] issue #533 Group
 3/Group 1/Group 2 (REQ-ACF-*, REQ-AVTP-*, REQ-RMAP-*, REQ-SPI-*,
-REQ-ADC-*, REQ-GPIO-*, REQ-LINEP-*, REQ-ISELED-*, REQ-I2C-*) requirement-atomicity splits) are:
+REQ-ADC-*, REQ-GPIO-*, REQ-LINEP-*, REQ-ISELED-*, REQ-CANEP-*, REQ-I2C-*) requirement-atomicity splits) are:
 
 | `scope` | Count | ASIL mix | What it actually is today |
 |---|---|---|---|
-| `tc18` | 1189 | 1080 ASIL-B, 36 ASIL-A, 73 QM | The shipped TC18 behavior. The 73 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
-| `tc18-gap` | 20 | 20 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. |
+| `tc18` | 1196 | 1087 ASIL-B, 36 ASIL-A, 73 QM | The shipped TC18 behavior. The 73 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
+| `tc18-gap` | 21 | 21 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. The `REQ-CANEP-*` batch's own split added one new entry here (`REQ-CANEP-038`), moving this scope from 20 to 21. |
 | `retired` | 10 | 7 ASIL-B, 1 ASIL-A, 2 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. Includes `REQ-ISELED-028` (moved here from `tc18-gap` by issue #552 -- its own text already said RETIRED, only the scope field hadn't caught up) and `REQ-I2C-019` (retired by the `REQ-I2C-*` atomicity-split batch as a near-duplicate). |
 | `internal` | 6 | 6 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. See §2's main finding. |
 
