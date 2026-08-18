@@ -34,6 +34,113 @@ the rationale.
 
 ## Releases
 
+### v0.421.0 -- 2026-08-18 (c-RCP-19: category 1 remainder + ep_can.c fully closed (incl. its CAN-XL fragmented subsystem) + loan.c/tsn.c/shmem.c category 2 + category 3 (`_WIN32` carve-out documented) + CI line-coverage floor raised 88 -> 90)
+
+Third increment against issue #520 (c-RCP-19), continuing the two
+`adapt.c`-focused batches (v0.410.0/PR #526, and the same-day
+`adapt.c` dispatch-table-ceiling batch this issue's own backlog
+tracked separately). Closes out the remaining category 1 mechanical
+dispatch table, all of `loan.c`/`tsn.c`/`shmem.c`/`ep_can.c` -- the
+last of these including its CAN-XL fragmented encode/decode subsystem,
+originally scoped as a deferred future session but closed in this same
+batch once the malformed-input pattern proved to extend to it cleanly
+-- and category 3's documentation carve-out, then re-measures and
+raises the CI line floor to match.
+
+**Category 1 remainder.** `src/ep_can.c`'s `rcp_ep_can_apply_reconfig()`/
+`rcp_ep_can_reconfig_strerror()` pair had zero test coverage before this
+batch -- added tests for all three `rcp_ep_can_reconfig_errc_t`
+outcomes (OK/SHORT/OUT_OF_RANGE) plus `strerror()`'s full dispatch
+table and its `default` arm.
+
+**Category 2.** Malformed-input and allocation-fault-injection tests,
+mechanical and table-driven:
+- `src/loan.c`: `rcp_loan_pool_acquire()`'s two-site `!loan`/
+  `!release_ctx` cleanup and `pool_append()`'s growth-realloc failure,
+  via `alloc.h`'s own fault-injection harness (REQ-SEQ-002's
+  established pattern, `request_sequencer.c`'s prior sole caller).
+  Line 63.2% -> 98.9%; the one remaining uncovered line is a
+  `size_t`-overflow guard (`rcp_alloc_checked_size()`) that would need
+  ~60 real pool-doubling allocations (exabyte-scale) to trigger for
+  real -- a structurally-unreachable-in-practice ceiling, not an
+  untested gap.
+- `src/tsn.c`: `rcp_tsn_classify_frame()`'s NTSCF/TSCF decode-failure
+  arms, its previously entirely-unexercised TSCF-subtype branch, and
+  its non-repurposed-GBB-frame fail-safe path. Now 100% line/function.
+- `src/shmem.c`: `rcp_shmem_avtp_pair_new()`'s three-site partial-alloc
+  cleanup (via a call-counting fault-injection hook, since it makes 5
+  ordered `rcp_calloc()` calls) and `shmem_side_recv()`'s genuine
+  blocking `rcp_cond_wait()` path (previously unexercised by any test
+  in this file -- every existing test either queues data before
+  recv()'s call or recv()s on an already-closed side, never blocking
+  for real), added via a real second thread
+  (`rcp_thread_start()`/`rcp_sleep_ms()`, `src/platform.h`) that blocks
+  on an empty queue while the main thread sends the frame that wakes
+  it. Now 100% line/function.
+- `src/ep_can.c`: both remaining plain-response `rcp_ep_can_arbitration_id_valid()`
+  call sites (the response decoder's own, and the post-reassembly
+  decoder's own -- separate from the already-tested request-decode
+  site), plus the entire CAN-XL fragmented encode/decode subsystem
+  (`rcp_ep_can_encode_frame_response_fragmented()`/
+  `rcp_ep_can_decode_frame_response_fragment()`): a `timed=true`
+  round trip (the `timed=false` case was already covered, but the
+  `timed` branch -- ACF_GBB per-segment framing on encode, its
+  matching decode arm -- was entirely unexercised), plus
+  call-counting-hook fault-injection for the segment-plan-array
+  allocation and a later segment's own `rcp_acf_encode_gbb()`
+  allocation failing mid-loop (exercising the "free every frame
+  already encoded before this one" cleanup with real content, not
+  just its vacuous zero-iteration form). Line 87.6% -> 98.7%, branch
+  76.6% -> 86.1%. The one remaining uncovered branch
+  (`rcp_fragment_plan()` reporting a segment-count mismatch inside the
+  fragmented encoder) is a confirmed structurally-unreachable
+  consistency check: `rcp_ep_can_frame_response_fragment_count()` and
+  the encoder's own later `rcp_fragment_plan()` call recompute
+  `combined_len` from the identical `frame_format`/`rx_len`/
+  `max_fragment_payload` inputs, so they can only disagree given an
+  internal implementation bug, not any caller-reachable input --
+  matching `loan.c`'s own overflow-guard ceiling above in kind.
+
+**Category 3.** Documented the `_WIN32`-conditional carve-out
+(`AUDIT_PACK.md` §3) this issue's own investigation identified:
+`src/platform.c`'s Win32 mutex/condvar/thread wrappers and
+`src/clock.c`'s Win32 clock-read path are full working
+implementations exercised by the hard-gated `windows-2022 / msvc`
+`build-and-test` leg but structurally unreachable from the
+`ubuntu-22.04`-only `coverage` job; `src/udp.c`'s Win32 branch is by
+contrast a deliberate fail-closed stub (a missing-feature gap, not a
+missing-test gap). A permanent carve-out, not a backlog item -- fixing
+it would mean running `coverage` on Windows too and merging both
+runners' `coverage.info`, a CI-topology change out of scope here.
+
+**CI gate.** Re-measured (same `lcov --branch-coverage` build/CI-pinned
+`cfusa` v0.5.54 `coverage` invocation used throughout this issue) after
+this batch, on top of the CFUSA-CY001 wrapper-conversion batches
+(#537/#541) that landed since this gate's own comment last recorded a
+baseline: project-wide line 92.2% -> 93.0%, branch 79.6% -> 80.2%.
+Raised `cfusa-report`'s `Coverage regression gate` `--threshold`
+88 -> 90 (a real, re-measured cross-toolchain margin below the current
+number, not the original number this issue started from).
+
+**Branch-coverage floor (issue's own step 5) -- confirmed still
+blocked, upstream issue filed.** `cfusa coverage --help` (v0.5.54)
+confirms `--threshold` gates line coverage only; `--dal`/`--asil` gate
+branch coverage but only bundled with line at a fixed 100% -- there is
+no flag for an independent, sub-100% branch floor today. Filed
+SoundMatt/c-FuSa#137 requesting a `--branch-threshold <pct>` flag
+matching `--mcdc-threshold`'s existing convention. This item stays
+blocked on that upstream change, not on further work in this repo.
+
+Full 67-test suite (`test_loan` 6 -> 9, `test_tsn` 11 -> 15,
+`test_shmem` 11 -> 15, `test_ep_can` 55 -> 65 cases) + ASan/UBSan
+clean (the new `test_shmem` thread test included). `cfusa check`/
+`trace --req-coverage 100 --sec-tested 100` (v0.5.54): 0 errors,
+unchanged 100%/100% traced/annotated.
+
+**Next**: issue #520 stays open -- `mock.c`'s CRC/fault-injection
+paths are the one substantial category 2 piece left (largest single
+remaining chunk); the branch-coverage floor waits on c-FuSa#137.
+
 ### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half: memcpy/memmove/strncpy explicit-size-bounded wrappers, 66/66 `tests/` sites -- CY001 fully closed)
 
 Third sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle

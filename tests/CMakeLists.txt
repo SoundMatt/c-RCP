@@ -222,6 +222,11 @@ target_compile_options(test_mdns PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_mdns COMMAND test_mdns)
 
 add_executable(test_shmem test_shmem.c)
+# test_shmem reaches into the internal src/platform.h (not an installed
+# public header) for rcp_thread_start()/rcp_sleep_ms() to exercise
+# shmem_side_recv()'s genuine blocking rcp_cond_wait() path directly
+# (issue #520 category 2) -- same pattern as test_platform.
+target_include_directories(test_shmem PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_shmem PRIVATE rcp::rcp unity)
 target_compile_options(test_shmem PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_shmem COMMAND test_shmem)

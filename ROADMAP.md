@@ -19106,6 +19106,53 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.421.0 -- 2026-08-18 (c-RCP-19: category 1 remainder + ep_can.c
+fully closed (incl. CAN-XL fragmented subsystem) + loan.c/tsn.c/shmem.c
+category 2 + category 3 documented + CI floor 88 -> 90)
+
+Third increment against issue #520 (c-RCP-19). Closes `ep_can.c`'s
+remaining category-1 dispatch table
+(`rcp_ep_can_reconfig_strerror()`, zero coverage before this batch),
+all of category 2's four smaller files (`loan.c`/`tsn.c`/`shmem.c`
+line-complete; `ep_can.c` closed including its CAN-XL fragmented
+encode/decode subsystem -- originally scoped as a deferred future
+session, but the malformed-input/fault-injection pattern extended to
+it cleanly within the same batch), and category 3 (`AUDIT_PACK.md` §3
+now documents the `_WIN32` carve-out).
+
+`loan.c`/`shmem.c`/`ep_can.c` needed real fault-injection (alloc.h's
+own hook harness, including a call-counting variant to target one
+specific allocation among several ordered calls) and, for `shmem.c`'s
+genuine blocking `rcp_cond_wait()` path, a real second thread
+(`rcp_thread_start()`) -- no existing test in that file ever called
+`recv()` on a still-open, empty queue before this batch.
+
+`ep_can.c`'s one remaining uncovered branch (a `rcp_fragment_plan()`
+segment-count-mismatch check inside the fragmented encoder) is a
+confirmed structurally-unreachable consistency check: the two
+independent segment-count computations it compares are derived from
+identical inputs, so they can only disagree given an internal bug, not
+any caller-reachable input -- the same kind of ceiling as `loan.c`'s
+own overflow guard.
+
+Re-measured project-wide coverage on top of the CY001 batches that
+landed since this issue's last increment: line 92.2% -> 93.0%, branch
+79.6% -> 80.2%. Raised the CI `Coverage regression gate` `--threshold`
+88 -> 90.
+
+Filed SoundMatt/c-FuSa#137 requesting a `--branch-threshold` flag --
+confirmed via `cfusa coverage --help` that no existing flag can set an
+independent, sub-100% branch-coverage floor, blocking this issue's own
+step 5 on an upstream tooling change, not further work here.
+
+Full 67-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, unchanged 100%/100%. See `CHANGELOG.md`'s matching entry for
+full per-file detail.
+
+**Next**: issue #520 stays open -- `mock.c`'s CRC/fault-injection
+paths are the one substantial category 2 piece left; the
+branch-coverage floor waits on c-FuSa#137.
+
 ### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half:
 memcpy/memmove/strncpy explicit-size-bounded wrappers -- CY001 fully closed)
 

@@ -621,7 +621,7 @@ jobs:
 
       # Best-effort by design, not masking a real gate: DAL-B requires 100%
       # line + 100% branch coverage, and this project is not there yet
-      # (currently ~94% line / ~78% branch -- see coverage-report.json,
+      # (currently ~93% line / ~80% branch -- see coverage-report.json,
       # which is committed and does self-report FAIL against DAL-B
       # deliberately, as an honest, visible artifact of that gap). This
       # step exists to keep producing that report for the record, not to
@@ -634,12 +634,19 @@ jobs:
         run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --dal DAL-B --output coverage-report.json || true
 
       # The real gate: hard-fails if line coverage drops below a floor
-      # comfortably under the currently-measured ~94% (leaving margin for
+      # comfortably under the currently-measured ~93% (leaving margin for
       # cross-toolchain lcov/gcov variance), so this at least prevents
       # regression while the project works toward full DAL-B. Not itself
       # a DAL-B compliance claim -- see the step above.
+      #
+      # Raised 88 -> 90 (issue #520 / c-RCP-19, category 1/2 batches):
+      # local coverage build matching this job's exact lcov invocation
+      # measured 92.69% line coverage after closing adapt.c/loan.c/tsn.c/
+      # shmem.c/ep_can.c's dispatch-table and malformed-input gaps. 90
+      # keeps a real cross-toolchain margin below that re-measured
+      # number.
       - name: Coverage regression gate (line floor, not DAL-B)
-        run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --threshold 88
+        run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --threshold 90
 
       - name: Full compliance report (JSON)
         run: /tmp/cfusa/build/cfusa report --format json --output report.json || true

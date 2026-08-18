@@ -30,6 +30,7 @@
 #include "unity.h"
 
 #include <rcp/acf.h>
+#include <rcp/alloc.h>
 #include <rcp/avtp.h>
 #include <rcp/ep_can.h>
 #include <rcp/fragment.h>
@@ -37,10 +38,11 @@
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a fault-injection hook across tests */
 
 /* ── frame_format_valid ────────────────────────────────────────────────────── */
 
@@ -660,6 +662,35 @@ static void test_frame_request_decode_rejects_bad_arbitration_id(void)
     rcp_bytes_free(&frame);
 }
 
+/* Same defect, response side (rcp_ep_can_decode_frame_response() -- issue
+ * #520 category 2): its own arbitration-id validation is a separate call
+ * site from the request decoder's above, previously unexercised. */
+static void test_frame_response_decode_rejects_bad_arbitration_id(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_can_frame_format_t   format;
+    uint32_t                    id;
+    rcp_ep_can_xl_header_t      xl_hdr;
+    const uint8_t               *out_rx;
+    size_t                       out_rx_len;
+    bool                         timed = true;
+    uint64_t                     ts = 1;
+    uint8_t                      txn;
+    uint8_t                      payload[4] = {0x08, 0, 0, 0}; /* same CBFF/oversized-id trick */
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.rsp         = 1;
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_ARBITRATION_ID,
+        rcp_ep_can_decode_frame_response(frame.data, frame.len, 4, &format, &id, &xl_hdr, &out_rx,
+                                          &out_rx_len, &timed, &ts, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 /* frame_format = XL_NEW_PL (leading quadlet's top 3 bits = 101b = 5) but
  * payload is only the 4-byte leading quadlet, short of the 6-byte
  * SDT/VCID/AF prefix an XL frame requires. */
@@ -946,6 +977,140 @@ static void test_fragment_worst_case_can_xl_response_round_trip(void)
     for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
 }
 
+/* A timed fragmented response (issue #520 category 2):
+ * rcp_ep_can_encode_frame_response_fragmented()'s `timed` branch (each
+ * segment encoded as ACF_GBB, not ACF_ABB) and
+ * rcp_ep_can_decode_frame_response_fragment()'s matching GBB decode path
+ * were both entirely unexercised -- the worst-case round-trip test above
+ * only ever passes timed=false. Small classical (CBFF) payload,
+ * deliberately tiny max_fragment_payload to force multiple real
+ * fragments cheaply rather than reusing the XL worst-case's own size. */
+static void test_fragment_timed_response_round_trip(void)
+{
+    uint8_t      rx[8]; /* RCP_EP_CAN_CLASSICAL_MAX_DATA_LEN -- CBFF's own data-length ceiling */
+    size_t       i;
+    size_t       max_fragment_payload = 5; /* combined = 4 + 8 = 12 -> ceil(12/5) = 3 fragments */
+    size_t       count;
+    rcp_bytes_t  frames[4];
+    rcp_fragment_reassembler_t reasm;
+    size_t       combined_len = 4u + sizeof(rx);
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)(i + 1);
+
+    count = rcp_ep_can_frame_response_fragment_count(RCP_EP_CAN_FRAME_CBFF, 0x10, NULL,
+                                                       sizeof(rx), max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(3, count);
+
+    count = rcp_ep_can_encode_frame_response_fragmented(
+        7, RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, rx, sizeof(rx), 9, true, 99999,
+        max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(3, count);
+
+    rcp_fragment_reassembler_init(&reasm, combined_len);
+    for (i = 0; i < count; i++) {
+        bool                         ms;
+        uint8_t                      segnum;
+        const uint8_t                *payload;
+        size_t                        payload_len;
+        bool                          timed = false;
+        uint64_t                      ts = 0;
+        uint8_t                       txn = 0;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+            rcp_ep_can_decode_frame_response_fragment(frames[i].data, frames[i].len, 7, &ms,
+                                                        &segnum, &payload, &payload_len, &timed,
+                                                        &ts, &txn));
+        TEST_ASSERT_EQUAL_UINT8(9, txn);
+        TEST_ASSERT_TRUE(timed);
+        TEST_ASSERT_EQUAL_UINT64(99999, ts);
+
+        rc = rcp_fragment_reassembler_feed(&reasm, ms, segnum, payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t *reassembled;
+        size_t         reassembled_len;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(combined_len, reassembled_len);
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
+/* ── rcp_ep_can_encode_frame_response_fragmented()'s allocation-failure
+ * cleanup paths (issue #520 category 2). It makes an ordered sequence of
+ * rcp_malloc() calls -- build_payload()'s combined buffer, then the segs
+ * plan array, then one more per segment inside rcp_acf_encode_gbb()/
+ * _abb() -- so a call-counting fault-injection hook (alloc.h's own
+ * harness, same pattern as shmem.c's counting_calloc) can fail exactly
+ * the Nth one and leave the rest to the real allocator. */
+
+static int g_can_malloc_call_count;
+static int g_can_malloc_fail_at_call;
+
+static void *counting_malloc(size_t size)
+{
+    g_can_malloc_call_count++;
+    if (g_can_malloc_call_count == g_can_malloc_fail_at_call) return NULL;
+    return malloc(size);
+}
+
+static void reset_counting_malloc(int fail_at_call)
+{
+    rcp_alloc_hooks_t hooks = {0};
+    g_can_malloc_call_count    = 0;
+    g_can_malloc_fail_at_call  = fail_at_call;
+    hooks.malloc_fn = counting_malloc;
+    rcp_alloc_set_hooks(&hooks);
+}
+
+static void test_fragmented_encode_returns_zero_when_segs_allocation_fails(void)
+{
+    uint8_t     rx[8];
+    size_t      i;
+    rcp_bytes_t frames[4];
+    size_t      count;
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)i;
+
+    reset_counting_malloc(2); /* build_payload's combined = call 1, segs = call 2 */
+
+    count = rcp_ep_can_encode_frame_response_fragmented(
+        7, RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, rx, sizeof(rx), 1, false, 0, 5, frames);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+/* Fails the *second* segment's own rcp_acf_encode_gbb()/rcp_malloc() call
+ * (not the first), so the failure path's own "free every frame already
+ * encoded before this one" loop runs with real content (i == 1, not the
+ * vacuous i == 0 case), exercising that loop's own body, not just its
+ * zero-iteration form. */
+static void test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails(void)
+{
+    uint8_t     rx[8];
+    size_t      i;
+    rcp_bytes_t frames[4];
+    size_t      count;
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)i;
+
+    /* combined = call 1, segs = call 2, segment[0] encode = call 3,
+     * segment[1] encode = call 4. */
+    reset_counting_malloc(4);
+
+    count = rcp_ep_can_encode_frame_response_fragmented(
+        7, RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, rx, sizeof(rx), 1, true, 42, 5, frames);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
 static void test_fragment_response_unfragmented_matches_single_frame_path(void)
 {
     /* When the combined payload already fits in one fragment, the
@@ -1018,6 +1183,26 @@ static void test_reassembled_decode_rejects_short_frame(void)
                                                        &out_rx, &out_rx_len));
 }
 
+/* Third (and last) rcp_ep_can_arbitration_id_valid() call site (issue
+ * #520 category 2) -- a separate check from both the plain-response and
+ * request decoders' own, operating directly on a post-fragmentation
+ * reassembled buffer rather than an ACF-wrapped frame. Same
+ * CBFF/oversized-id trick as the other two sites. */
+static void test_reassembled_decode_rejects_bad_arbitration_id(void)
+{
+    uint8_t                    reassembled[4] = {0x08, 0, 0, 0};
+    rcp_ep_can_frame_format_t  format;
+    uint32_t                   id = 0;
+    rcp_ep_can_xl_header_t     xl_hdr;
+    const uint8_t              *out_rx = NULL;
+    size_t                      out_rx_len = 0;
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_ARBITRATION_ID,
+        rcp_ep_can_decode_reassembled_frame_response(reassembled, sizeof(reassembled),
+                                                       &format, &id, &xl_hdr,
+                                                       &out_rx, &out_rx_len));
+}
+
 /* ── REQ-CANEP-030: CAN XL physical-layer provisioning ───────────────────── */
 
 static void test_xl_pl_non_xl_frame_always_matches(void)
@@ -1063,6 +1248,80 @@ static void test_xl_pl_set_provisioned_requires_authorization(void)
     TEST_ASSERT_TRUE(rcp_ep_can_set_xl_new_pl_provisioned(&cfg, true,
                                                            RCP_LIFECYCLE_HW_CONFIGURED, owning));
     TEST_ASSERT_TRUE(cfg.xl_new_pl_provisioned);
+}
+
+/* ── rcp_ep_can_apply_reconfig()/rcp_ep_can_reconfig_strerror() ─────────────
+ * (issue #520 category 2/1: this whole escape-hatch pair had zero test
+ * coverage before this batch -- neither the reconfig write's own three
+ * outcomes nor its dispatch-table strerror() had ever been exercised.) */
+
+static void test_apply_reconfig_rejects_short_payload(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    uint8_t                     payload[RCP_EP_CAN_RECONFIG_ADDR_LEN]; /* addr only, no data */
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    memset(payload, 0, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_ERR_SHORT,
+                       rcp_ep_can_apply_reconfig(&cfg, payload, sizeof(payload)));
+}
+
+static void test_apply_reconfig_rejects_span_past_end_of_block(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    /* start_address = RCP_EP_CAN_EP_FUNC_LEN - 1 (last valid octet), plus
+     * 2 data octets -- the span extends 1 octet past the block. */
+    uint8_t payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 2] = {0, 0, 0xAA, 0xBB};
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    payload[0] = (uint8_t)((RCP_EP_CAN_EP_FUNC_LEN - 1) >> 8);
+    payload[1] = (uint8_t)(RCP_EP_CAN_EP_FUNC_LEN - 1);
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE,
+                       rcp_ep_can_apply_reconfig(&cfg, payload, sizeof(payload)));
+}
+
+static void test_apply_reconfig_applies_in_range_write(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    uint8_t                     payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 1];
+    uint8_t                     before[RCP_EP_CAN_EP_FUNC_LEN];
+    uint8_t                     after[RCP_EP_CAN_EP_FUNC_LEN];
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    rcp_ep_can_render_registers(&cfg, before);
+
+    payload[0] = 0;
+    payload[1] = 0;
+    payload[2] = 0xFF; /* one octet write at address 0 (can_ep_len, read-only -- ignored) */
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                       rcp_ep_can_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    /* can_ep_len (address 0) is documented read-only -- applying a write
+     * there must leave the rendered block unchanged, confirming the
+     * read-only-octet skip this function's own header comment describes,
+     * not merely that RCONFIG_OK was returned. */
+    rcp_ep_can_render_registers(&cfg, after);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(before, after, sizeof(before));
+}
+
+static void test_reconfig_strerror_covers_every_code(void)
+{
+    TEST_ASSERT_EQUAL_STRING("rcp/ep_can: CAN configuration write applied",
+                              rcp_ep_can_reconfig_strerror(RCP_EP_CAN_RECONFIG_OK));
+    TEST_ASSERT_EQUAL_STRING("rcp/ep_can: CAN configuration write has no address and data",
+                              rcp_ep_can_reconfig_strerror(RCP_EP_CAN_RECONFIG_ERR_SHORT));
+    TEST_ASSERT_EQUAL_STRING(
+        "rcp/ep_can: CAN configuration write extends past the EP_func block",
+        rcp_ep_can_reconfig_strerror(RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE));
+}
+
+static void test_reconfig_strerror_rejects_out_of_range_code(void)
+{
+    TEST_ASSERT_EQUAL_STRING("rcp/ep_can: CAN unknown configuration-write error",
+                              rcp_ep_can_reconfig_strerror((rcp_ep_can_reconfig_errc_t)99));
 }
 
 int main(void)
@@ -1113,6 +1372,7 @@ int main(void)
     RUN_TEST(test_frame_request_decode_rejects_bad_evt);
     RUN_TEST(test_frame_request_decode_rejects_bad_frame_format);
     RUN_TEST(test_frame_request_decode_rejects_bad_arbitration_id);
+    RUN_TEST(test_frame_response_decode_rejects_bad_arbitration_id);
     RUN_TEST(test_frame_request_golden_leading_quadlet_bit_packing);
     RUN_TEST(test_frame_request_decode_rejects_short_xl_prefix);
 
@@ -1125,15 +1385,24 @@ int main(void)
     RUN_TEST(test_fragment_count_one_when_fits_in_one_fragment);
     RUN_TEST(test_fragment_count_zero_for_bad_preconditions);
     RUN_TEST(test_fragment_worst_case_can_xl_response_round_trip);
+    RUN_TEST(test_fragment_timed_response_round_trip);
+    RUN_TEST(test_fragmented_encode_returns_zero_when_segs_allocation_fails);
+    RUN_TEST(test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails);
     RUN_TEST(test_fragment_response_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_encode_rejects_bad_preconditions);
     RUN_TEST(test_fragment_decode_fragment_rejects_wrong_bus);
     RUN_TEST(test_reassembled_decode_rejects_short_frame);
+    RUN_TEST(test_reassembled_decode_rejects_bad_arbitration_id);
 
     RUN_TEST(test_xl_pl_non_xl_frame_always_matches);
     RUN_TEST(test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame);
     RUN_TEST(test_xl_pl_classical_pl_provisioned_matches_only_classical_pl_frame);
     RUN_TEST(test_xl_pl_set_provisioned_requires_authorization);
+    RUN_TEST(test_apply_reconfig_rejects_short_payload);
+    RUN_TEST(test_apply_reconfig_rejects_span_past_end_of_block);
+    RUN_TEST(test_apply_reconfig_applies_in_range_write);
+    RUN_TEST(test_reconfig_strerror_covers_every_code);
+    RUN_TEST(test_reconfig_strerror_rejects_out_of_range_code);
 
     return UNITY_END();
 }

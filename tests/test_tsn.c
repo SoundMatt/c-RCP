@@ -124,6 +124,88 @@ static void test_classify_malformed_frame_fails_safe_to_standard(void)
     }
 }
 
+/* Every remaining rcp_tsn_classify_frame() fail-safe-to-Standard return
+ * (issue #520 category 2): a valid subtype byte but a body too short for
+ * rcp_avtp_decode_ntscf() itself to parse -- distinct from the malformed
+ * (non-NTSCF/TSCF-subtype) junk bytes test_classify_malformed_frame_...
+ * above already covers. */
+static void test_classify_ntscf_decode_failure_fails_safe_to_standard(void)
+{
+    rcp_bytes_t frame = make_standard_frame();
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(frame.data, 1));
+    rcp_bytes_free(&frame);
+}
+
+/* The TSCF-subtype branch (src/tsn.c) was previously entirely unexercised
+ * -- every other classify test builds an NTSCF-wrapped frame. A valid TSCF
+ * frame with no ACF body decodes successfully (payload_len == 0), which
+ * itself fails the very next guard (payload_len == 0 -> fail-safe
+ * Standard), covering both the TSCF success branch and that guard in one
+ * frame. */
+static void test_classify_tscf_frame_with_empty_body_fails_safe_to_standard(void)
+{
+    rcp_avtp_tscf_header_t hdr = {0};
+    rcp_bytes_t frame;
+
+    hdr.stream_id = rcp_stream_id_make(kMac, 1);
+    frame = rcp_avtp_encode_tscf(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(frame.data, frame.len));
+
+    rcp_bytes_free(&frame);
+}
+
+/* TSCF's own decode failure, mirroring the NTSCF case above. */
+static void test_classify_tscf_decode_failure_fails_safe_to_standard(void)
+{
+    rcp_avtp_tscf_header_t hdr = {0};
+    rcp_bytes_t frame;
+
+    hdr.stream_id = rcp_stream_id_make(kMac, 1);
+    frame = rcp_avtp_encode_tscf(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(frame.data, 1));
+
+    rcp_bytes_free(&frame);
+}
+
+/* A genuine, NTSCF-wrapped ACF_GBB frame that is *not* the
+ * repurposed-compound-request encoding rcp_compound_peek_request_type()
+ * looks for -- an ordinary timed endpoint response (mtv =
+ * RCP_ACF_MTV_VALID, matching rcp_ep_gpio_encode_response()'s own timed
+ * variant, src/ep_gpio.c), built directly via rcp_acf_encode_gbb() and
+ * make_ntscf_frame() (not rcp_ep_gpio_encode_response() itself, which
+ * returns a *raw* ACF_GBB payload with no NTSCF/TSCF framing at all --
+ * ep_*.h's encode_response() functions are meant to be wrapped by
+ * adapt.c's own build_frame(), not fed to rcp_tsn_classify_frame()
+ * directly). RCP_ACF_MTV_VALID is not the RCP_ACF_MTV_UNTIMED marker the
+ * compound-request repurposing trick requires, so
+ * rcp_compound_peek_request_type() correctly reports
+ * RCP_COMPOUND_ERR_NOT_REPURPOSED and classification fails safe. */
+static void test_classify_non_repurposed_gbb_frame_fails_safe_to_standard(void)
+{
+    rcp_acf_gbb_header_t hdr = {0};
+    uint8_t payload[4] = {0, 0, 0, 0};
+    rcp_bytes_t acf_msg;
+    rcp_bytes_t frame;
+
+    hdr.info.byte_bus_id = 3;
+    hdr.info.op           = RCP_ACF_OP_READ;
+    hdr.info.rsp          = 1;
+    hdr.info.mtv          = RCP_ACF_MTV_VALID;
+    hdr.message_timestamp = 12345;
+
+    acf_msg = rcp_acf_encode_gbb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(acf_msg.data);
+
+    frame = make_ntscf_frame(acf_msg); /* frees acf_msg internally */
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(frame.data, frame.len));
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── Transport wrapper ─────────────────────────────────────────────────────── */
 
 static void test_send_applies_pcp_then_delegates_to_inner(void)
@@ -242,6 +324,10 @@ int main(void)
     RUN_TEST(test_classify_standard_frame);
     RUN_TEST(test_classify_cancellation_frame);
     RUN_TEST(test_classify_malformed_frame_fails_safe_to_standard);
+    RUN_TEST(test_classify_ntscf_decode_failure_fails_safe_to_standard);
+    RUN_TEST(test_classify_tscf_frame_with_empty_body_fails_safe_to_standard);
+    RUN_TEST(test_classify_tscf_decode_failure_fails_safe_to_standard);
+    RUN_TEST(test_classify_non_repurposed_gbb_frame_fails_safe_to_standard);
     RUN_TEST(test_send_applies_pcp_then_delegates_to_inner);
 #if defined(__linux__)
     RUN_TEST(test_send_sets_so_priority_to_the_frames_own_pcp);
