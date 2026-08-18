@@ -22,7 +22,7 @@ TC18 protocol and its own measured evidence.
 | Cybersecurity Architecture | `CYBERSECURITY.md` | Complete — re-derived, Phase 22 |
 | Formal Verification | `FORMAL_VERIFICATION.md` + `tla/*.tla` | Complete — re-derived, Phase 22 |
 | Portability Audit | `PORTABILITY.md` | Complete (unaffected by the protocol replacement — KEEP AS-IS per `ROADMAP.md`'s Satellite Package Disposition table) |
-| Safety Requirements | `.fusa-reqs.json` | 1095 requirements; 947 `scope: "tc18"` (859 ASIL-B / 30 ASIL-A / 58 QM — this project's ISO 26262 safety-case basis), 136 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 6 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/"legacy-compat" figures, which described a pre-v0.91.0 codebase state) |
+| Safety Requirements | `.fusa-reqs.json` | 1095 requirements; 1063 `scope: "tc18"` (959 ASIL-B / 34 ASIL-A / 70 QM — this project's ISO 26262 safety-case basis), 20 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 6 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/779/"legacy-compat" and 947/136 figures — the latter predate the [c-RCP-16 follow-up] issue #548 pass that reclassified 116 `tc18-gap` entries whose text had drifted to reporting a complete implementation back to `scope: "tc18"` with a real ASIL rating) |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
@@ -542,10 +542,10 @@ All of the following gates run on every tagged release
 ## 6. Traceability Matrix
 
 Requirements → implementation tracing is maintained in `.fusa-reqs.json`
-(1095 requirements at HEAD: 947 `scope: "tc18"` covering the
+(1095 requirements at HEAD: 1063 `scope: "tc18"` covering the
 register-map, lifecycle FSM, E2E safe points, every endpoint type's
 request/response shape, discovery, power-mode transitions, and every
-ADAPT-class satellite; 136 `scope: "tc18-gap"` marking TC18 normative
+ADAPT-class satellite; 20 `scope: "tc18-gap"` marking TC18 normative
 clauses this implementation does or doesn't fully meet, QM by
 definition; 6 `scope: "retired"` — dead requirement text kept only
 because a surviving `//cfusa:req` tag still names the ID, see
@@ -554,7 +554,12 @@ allocator-hook indirection layer. This table's earlier 854/779/75
 "legacy-compat" figures described a pre-v0.91.0 codebase state — the
 pre-TC18 Zone/Command surface and `tests/legacy_mock.*` they referred
 to were fully removed at v0.91.0 per `CHANGELOG.md`'s Deprecation &
-Removal Log; see `FREEDOM_FROM_INTERFERENCE.md` §1 for the current
+Removal Log; the subsequent 947/136 figures predate the
+[c-RCP-16 follow-up] issue #548 pass, which independently re-verified
+every `tc18-gap` entry against its actual `//cfusa:req`/`//cfusa:test`
+code and reclassified 116 of them (a stale `scope` left over from
+closing the gap they described) to `scope: "tc18"` with a real ASIL
+rating; see `FREEDOM_FROM_INTERFERENCE.md` §1/§4 for the current
 verified breakdown). `cfusa trace
 --req-coverage 100` validates both metrics at 100% in CI: Metric 2
 (function-annotation density) has been a hard gate since v0.1.0; Metric

@@ -32,8 +32,8 @@ direct enumeration of all 1095 entries at HEAD) are:
 
 | `scope` | Count | ASIL mix | What it actually is today |
 |---|---|---|---|
-| `tc18` | 947 | 859 ASIL-B, 30 ASIL-A, 58 QM | The shipped TC18 behavior. The 58 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
-| `tc18-gap` | 136 | 126 QM, 10 ASIL-B | Catalog markers for TC18 normative clauses this implementation does or doesn't fully meet. Only **3** of the 136 still read "NOT IMPLEMENTED" in their own text today; the rest (including, inconsistently, all 10 of the ASIL-B-rated ones — `tc18-gap`'s own catalog note says this scope should always be QM) describe text-status/scope-field drift, a data-hygiene finding in its own right — see §4. |
+| `tc18` | 1063 | 959 ASIL-B, 34 ASIL-A, 70 QM | The shipped TC18 behavior. The 70 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
+| `tc18-gap` | 20 | 20 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. |
 | `retired` | 6 | 4 ASIL-B, 1 ASIL-A, 1 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. |
 | `internal` | 6 | 6 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. See §2's main finding. |
 
@@ -186,41 +186,57 @@ fields it described are real, still-declared code, but they are
 not a code path, so it adds no new interference surface beyond what
 §1 already covers for `REQ-RMAP-039`.
 
-## 4. `tc18-gap` entries: three genuinely zero-footprint, the rest need the ordinary QM posture (and a catalog-hygiene caveat)
+## 4. `tc18-gap` entries: the text/scope-field drift this section flagged is now fixed (issue #548)
 
-Precisely **3** of the 136 `tc18-gap`-scope entries have text that
-still literally *begins* "NOT IMPLEMENTED" at HEAD — `REQ-RMAP-081`,
-`REQ-SPI-037`, `REQ-CANEP-029` (verified by exact-prefix match, not
-substring search — a plain substring search for "NOT IMPLEMENTED"
-over-matches two further entries, `REQ-ADC-034`/`REQ-UART-032`, whose
-text actually *begins* "IMPLEMENTED" and only contains the phrase
-"NOT IMPLEMENTED" while quoting their own superseded wording). These 3
-describe TC18 normative clauses this implementation provides no code
-for at all — there is no function, branch, or state write to analyze,
-the same "zero live footprint" argument as §3.
+This section originally found (at the 136-entry HEAD this document was
+first written against) that the `tc18-gap` scope's own catalog-note
+invariant — QM by definition, never part of the ASIL-B safety-case
+basis — did not actually hold: at least 49 entries' text began
+"IMPLEMENTED" outright while `scope` was simply never moved back to
+`tc18`, including all 10 of the scope's own ASIL-B-rated entries. That
+finding was filed as issue #548 and closed by a dedicated
+[c-RCP-16 follow-up] pass: every one of the (then-)136 `tc18-gap`
+entries was independently re-verified against its actual
+`//cfusa:req`/`//cfusa:test`-tagged code and tests (not trusted at the
+text's own word), and 116 were confirmed genuinely complete and
+reclassified to `scope: "tc18"` with a real ASIL rating derived from
+sibling `tc18`-scope entries in the same functional area (mostly
+ASIL-B; register-map informational/capacity fields and a handful of
+narrative/config-plumbing entries correctly stayed QM even at `tc18`
+scope, matching their siblings). A few PROMOTE-looking cases were
+deliberately held back — e.g. `REQ-ISELED-028`, whose own text
+self-describes as a stale duplicate of `REQ-ISELED-007` rather than a
+closed implementation gap, so promoting it would have double-counted
+`REQ-ISELED-007`'s ASIL-B coverage under a second id.
 
-The other 133 entries are a mix: at least 49 begin "IMPLEMENTED"
-outright (several explicitly self-flagged as a "catalog-drift
-correction" whose `scope` field was simply never moved back to
-`tc18` — a genuine, if minor, **data-hygiene finding in
-`.fusa-reqs.json`** worth a dedicated follow-up pass), at least 29
-begin "PARTIAL" (correctly `tc18-gap`-scoped: some but not all of the
-described obligation is implemented), and the remainder describe
-status without a leading keyword this analysis can classify
-mechanically. All of these, whatever their precise status text, share
-one property that *is* verifiable without a per-entry audit: they are
-QM-rated (`.fusa-reqs.json`'s own catalog note is unambiguous that
-`tc18-gap` is never part of the ASIL-B safety-case basis), so whatever
-live code they describe is subject to exactly the same interference
-question as any other QM-rated `tc18`-scope code in §1's table — not a
+**20 entries remain genuinely `tc18-gap`** at HEAD, all QM (the
+catalog note's invariant now actually holds, with zero exceptions):
+`REQ-RMAP-023/043/044/045/065/067/081`, `REQ-ADC-037`,
+`REQ-CANEP-029/030`, `REQ-DISC-029`, `REQ-GPIO-035`, `REQ-ISELED-028`,
+`REQ-LIFECYCLE-022/025/034`, `REQ-MDIO-024`, `REQ-PWM-057`,
+`REQ-SPI-037`, `REQ-SRV-017`. Three of these
+(`REQ-RMAP-081`/`REQ-SPI-037`/`REQ-CANEP-029`) still literally *begin*
+"NOT IMPLEMENTED" and describe TC18 normative clauses this
+implementation provides no code for at all — there is no function,
+branch, or state write to analyze, the same "zero live footprint"
+argument as §3. The rest are genuine partial implementations or
+narrower open questions, each confirmed by direct code inspection
+during the #548 pass to have a real remaining gap the entry's own text
+(read in full, not just its leading word) still honestly describes.
+
+All 20 remaining `tc18-gap` entries, and the 116 now-`tc18`-scope
+entries this section previously worried about, share one property that
+*is* verifiable without a further per-entry audit: whatever their
+ASIL rating, the live code they describe is subject to exactly the
+same interference question as any other code in §1's table — not a
 special "gap" category requiring separate treatment, and not exempt
 from §2's shared-allocator-hook finding either. This document has
-**not** individually audited each of these ~130 live-code entries'
-functions for a direct write into ASIL-owned state beyond the general
-allocator-hook argument in §2; that would be a genuine per-function
-freedom-from-interference review, materially larger than a
-documentation pass, and is recorded here as real remaining scope
-rather than asserted as already covered.
+**not** individually audited every one of these entries' functions for
+a direct write into ASIL-owned state beyond the general allocator-hook
+argument in §2 and the #548 pass's own per-entry code verification
+(which checked implementation completeness, not interference); a
+dedicated per-function freedom-from-interference review remains real
+remaining scope, not asserted as already covered.
 
 ## 5. Conclusion
 
@@ -228,7 +244,7 @@ Freedom-from-interference between c-RCP's QM-rated and ASIL-A/B-rated
 requirement surface holds **by construction** for the `retired` (§3,
 6 entries) and the 3 genuinely-not-implemented `tc18-gap` entries (§4)
 — all have zero runtime footprint. It holds for the `tc18`-scope
-QM-rated features and the ~130 live-code `tc18-gap` entries **only
+QM-rated features and the 17 live-code `tc18-gap` entries **only
 insofar as they do not call `rcp_alloc_set_hooks()`** — a real,
 load-bearing dependency the two allocating ASIL-B safety mechanisms
 (§2) share with every other caller in the process, with no partition
@@ -236,13 +252,15 @@ c-RCP can unilaterally enforce. That dependency is now recorded as
 AoU-8 (`SEOOC_BOUNDARY.md`), not asserted as closed — consistent with
 this issue's own instruction to document evidence rigor honestly
 rather than claim a stronger posture than the code supports. §4's
-`tc18-gap` text/scope-field drift (49+ entries reporting "IMPLEMENTED"
-while still scoped as a gap, including all 10 of the scope's own
-ASIL-B-rated entries despite the scope's catalog note saying it should
-always be QM) is recorded as a real, separate `.fusa-reqs.json`
-catalog-hygiene item this document surfaced but did not fix — worth
-its own dedicated follow-up pass, distinct from the interference
-question this document answers.
+`tc18-gap` text/scope-field drift this document originally surfaced
+(49+ entries reporting "IMPLEMENTED" while still scoped as a gap,
+including all 10 of the scope's own ASIL-B-rated entries despite the
+scope's catalog note saying it should always be QM) was filed as issue
+#548 and has since been fixed by a dedicated [c-RCP-16 follow-up] pass
+— 116 entries reclassified to `scope: "tc18"` with a verified real
+ASIL rating, 20 confirmed to have a genuine remaining gap and correctly
+left `tc18-gap`/QM. The catalog-hygiene item is closed; this document's
+own counts (§1, §4) reflect the corrected state.
 
 ---
 _Document owner: SoundMatt/c-RCP maintainers_

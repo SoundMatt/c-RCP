@@ -19106,6 +19106,49 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.432.0 -- 2026-08-20 ([c-RCP-16 follow-up] issue #548:
+.fusa-reqs.json tc18-gap scope/text drift, 116 entries reclassified to
+tc18)
+
+Closes issue #548, filed by `FREEDOM_FROM_INTERFERENCE.md` §4
+(c-RCP-16, PR #546): a large majority of `.fusa-reqs.json`'s
+`scope: "tc18-gap"` entries had drifted from the scope's own catalog
+note (a TC18 normative clause not fully met, QM by definition, never
+part of the ASIL-B safety-case basis) -- their `text` had been updated
+to report a complete implementation, but `scope`/`asil` were never
+moved back to `tc18` to match.
+
+Re-enumerated all 136 `tc18-gap` entries fresh against current HEAD
+(exactly 49 began "IMPLEMENTED", 29 "PARTIAL", 3 "NOT IMPLEMENTED", 55
+had no leading keyword and needed individual reading). Every entry was
+independently re-verified against its actual `//cfusa:req`/
+`//cfusa:test`-tagged code and tests, not trusted at the text's own
+word. 116 were genuinely complete and reclassified to `scope: "tc18"`
+with a real `asil`/`level` derived from sibling `tc18`-scope entries in
+the same functional area (mostly ASIL-B, a handful ASIL-A/QM matching
+precedent) -- including all 10 of the scope's own previously
+inconsistent ASIL-B-rated `tc18-gap` entries, so the catalog note's
+"always QM" invariant now actually holds. 20 entries had a genuine
+remaining gap and correctly stayed `tc18-gap`/QM (3 still literally
+"NOT IMPLEMENTED", the rest confirmed-genuine partial implementations
+or open questions on direct code inspection). `REQ-ISELED-028`
+deliberately was not promoted despite IMPLEMENTED-adjacent text: it
+self-describes as a stale duplicate of `REQ-ISELED-007`, not a closed
+gap -- promoting it would double-count that entry's ASIL-B coverage;
+its `scope` arguably belongs at `"retired"`, left for a follow-up.
+
+`AUDIT_PACK.md` §1/§6 and `FREEDOM_FROM_INTERFERENCE.md` §1/§4/§5
+updated to the corrected counts (1063 `tc18` / 20 `tc18-gap`, was
+947/136); §4 rewritten to describe the pass that closed the drift
+finding rather than merely flagging it.
+
+`.fusa-reqs.json`-only change (plus the doc files above) -- no source
+or test files touched. Full 67-test suite + ASan/UBSan (CI's exact
+flags) clean; pinned `cfusa` v0.5.54: `check` 0 errors (554
+warnings/1420 info, unchanged); `trace --req-coverage 100
+--sec-tested 100`: 100%/100% (1095/1095 reqs, 512/512 functions),
+unchanged from baseline.
+
 ### v0.431.0 -- 2026-08-19 ([c-RCP-17] round 4, final pass: exhaustive
 Phase (c) re-audit, discovery.c fragment-plan conversion, Phase (b)
 closed)

@@ -34,6 +34,80 @@ the rationale.
 
 ## Releases
 
+### v0.432.0 -- 2026-08-20 ([c-RCP-16 follow-up] issue #548: .fusa-reqs.json tc18-gap scope/text drift, 116 entries reclassified to tc18)
+
+Closes issue #548, filed by `FREEDOM_FROM_INTERFERENCE.md` §4
+(c-RCP-16, PR #546): a large majority of `.fusa-reqs.json`'s
+`scope: "tc18-gap"` entries had drifted from the scope's own catalog
+note (a TC18 normative clause this implementation does **not** fully
+meet, QM by definition, never part of the ASIL-B safety-case basis) --
+their `text` field had been updated to report a complete
+implementation, but `scope`/`asil` were simply never moved back to
+`tc18` to match.
+
+**Re-enumerated all 136 `tc18-gap` entries fresh against current HEAD**
+(the issue's own "49+ begin IMPLEMENTED" was a lower bound, not a
+final count -- re-verified: exactly 49 began "IMPLEMENTED", 29 began
+"PARTIAL", 3 began "NOT IMPLEMENTED", and the remaining 55 described
+status without a leading keyword a mechanical classifier could sort,
+requiring individual reading). Every one of the 136 was independently
+re-verified against the actual code and tests its own
+`//cfusa:req`/`//cfusa:test` tags name -- not trusted at the text's
+own word, including the literal "IMPLEMENTED"-leading ones, since a
+self-reported status string is exactly the kind of claim this
+project's own history (c-RCP-AUDIT-04 through -14) has learned not to
+take at face value.
+
+**116 entries were genuinely complete** and reclassified from
+`scope: "tc18-gap"` to `scope: "tc18"`, with `asil`/`level` moved off
+the scope-mandated `QM` to a real rating derived from how sibling
+`tc18`-scope entries in the same functional area (register-map,
+lifecycle, E2E, endpoint request/response shapes) are rated --
+overwhelmingly ASIL-B, a handful ASIL-A (non-normative RECOMMENDED
+diagnostics, matching precedent), and a handful correctly stayed QM
+even at `tc18` scope (informational/capacity register fields,
+narrative config plumbing) matching their own siblings' precedent, not
+a default. This includes all 10 of the scope's own previously
+inconsistent ASIL-B-rated `tc18-gap` entries (e.g. `REQ-RMAP-072`,
+`REQ-E2E-021/045/046`, `REQ-LIFECYCLE-038/039`, `REQ-UART-044/045`,
+`REQ-CANCEL-012`) -- the catalog note's invariant (`tc18-gap` is
+always QM) now actually holds with zero exceptions.
+
+**20 entries have a genuine remaining gap and correctly stayed
+`tc18-gap`/QM**: `REQ-RMAP-023/043/044/045/065/067/081`,
+`REQ-ADC-037`, `REQ-CANEP-029/030`, `REQ-DISC-029`, `REQ-GPIO-035`,
+`REQ-ISELED-028`, `REQ-LIFECYCLE-022/025/034`, `REQ-MDIO-024`,
+`REQ-PWM-057`, `REQ-SPI-037`, `REQ-SRV-017`. Three of these
+(`REQ-RMAP-081`/`REQ-SPI-037`/`REQ-CANEP-029`) still literally begin
+"NOT IMPLEMENTED"; the rest are confirmed-genuine partial
+implementations or open architectural questions, each entry's own
+full text (read past its leading word, not just its first sentence)
+still honestly describing the real gap on direct code inspection.
+`REQ-ISELED-028` deliberately was **not** promoted despite its text
+containing "IMPLEMENTED"-adjacent language: it self-describes as a
+stale duplicate of `REQ-ISELED-007`, not a closed implementation gap
+-- promoting it would have double-counted `REQ-ISELED-007`'s ASIL-B
+coverage under a second id. Its `scope` arguably belongs at `"retired"`
+rather than `"tc18-gap"`, but that reclassification is a separate
+data-hygiene action outside this issue's mandate and is left for a
+follow-up.
+
+`AUDIT_PACK.md` §1 (Document Index) and §6 (Traceability Matrix), and
+`FREEDOM_FROM_INTERFERENCE.md` §1's scope table and §4/§5, updated to
+the corrected counts (1063 `tc18` / 20 `tc18-gap`, was 947/136); §4
+rewritten to describe the pass that closed the drift finding it
+originally surfaced rather than merely flagging it.
+
+`.fusa-reqs.json`-only change (plus the four doc files above) --  no
+source or test files touched, so req-coverage/sec-tested and every
+test outcome are unchanged by construction. Full 67-test suite +
+ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54: `check` 0
+errors (554 warnings/1420 info, unchanged); `trace --req-coverage 100
+--sec-tested 100`: 100%/100% (1095/1095 reqs, 512/512 functions),
+unchanged from baseline.
+
+[c-RCP-16 follow-up]
+
 ### v0.431.0 -- 2026-08-19 ([c-RCP-17] round 4, final pass: exhaustive Phase (c) re-audit, discovery.c fragment-plan conversion, Phase (b) closed)
 
 Final pass on issue #521. Round 3's own status comment closed with "No
