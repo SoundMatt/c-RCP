@@ -27,7 +27,7 @@
 
 #include <rcp/avtp.h>
 #include <rcp/rcp.h>
-#include <rcp/request_timed.h>
+#include <rcp/request.h>
 
 #include <string.h>
 

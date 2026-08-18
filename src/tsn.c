@@ -9,7 +9,7 @@
 #include "rcp/tsn.h"
 
 #include "rcp/acf.h"
-#include "rcp/request_compound.h"
+#include "rcp/request.h"
 #include "rcp/alloc.h"
 
 #include <stdlib.h>

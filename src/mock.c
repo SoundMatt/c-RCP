@@ -6,9 +6,7 @@
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/e2e.h"
-#include "rcp/request_cancel.h"
-#include "rcp/request_chained.h"
-#include "rcp/request_compound.h"
+#include "rcp/request.h"
 #include "rcp/scheduler.h"
 #include "rcp/alloc.h"
 

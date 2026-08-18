@@ -52,7 +52,7 @@
 #include <rcp/e2e.h>
 #include <rcp/mock.h>
 #include <rcp/regmap.h>
-#include <rcp/request_timed.h>
+#include <rcp/request.h>
 #include <rcp/scheduler.h>
 #include <rcp/watchdog.h>
 

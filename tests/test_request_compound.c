@@ -32,8 +32,8 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
-#include <rcp/request_compound.h>
 #include <rcp/rcp.h>
+#include <rcp/request.h>
 #include <rcp/request_sequencer.h>
 
 #include <string.h>

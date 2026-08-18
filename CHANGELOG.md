@@ -34,6 +34,68 @@ the rationale.
 
 ## Releases
 
+### v0.424.0 -- 2026-08-17 (c-RCP-165: unify the 5-file conditional-request split into `request.h`/`request.c`)
+
+Purely organizational, zero-behavior-change refactor closing issue #165
+(`[c-RCP-AUDIT-03]`). `src/request_{compound,triggered,chained,timed,
+cancel}.c` and their matching `include/rcp/request_*.h` headers (2558
+lines across 10 files) are merged into one `include/rcp/request.h` /
+`src/request.c` pair, matching cpp-RCP's `include/rcp/request.hpp` and
+rust-RCP's `src/request.rs` (RELAY's `docs/RCP-ARCHITECTURE.md`, canonical
+choice #4).
+
+Every function, type, constant, and `REQ-CMP-*`/`REQ-TRIG-*`/
+`REQ-CHAIN-*`/`REQ-TIMED-*`/`REQ-CANCEL-*` requirement id is unchanged --
+only the file boundary moved. The five originally-split translation
+units each carried a byte-identical private `put_u64()` byte-order
+helper (independently justified in each file's own comment as "this
+TU's own copy... not shared across modules"); merging into one
+translation unit required collapsing those five identical definitions
+into the single copy in `request.c` (an ODR requirement of the merge
+itself, not a discretionary simplification -- the five bodies were
+byte-for-byte identical). No other logic changed.
+
+Two of RCP-ARCHITECTURE.md's other named target-shape properties already
+existed as their own already-shared modules before this merge and are
+untouched by it: `request_sequencer.h`/`request_sequencer.c` already
+owns the one shared sequencer-state bank (`REQ-SEQ-*`), and
+`scheduler.h`/`scheduler.c` already owns the one shared request-kind
+classification enum (`rcp_sched_kind_t`) and cross-kind execution-priority
+ordering (`REQ-SCHED-*`) cpp-RCP's `RequestCategory`/`priority_rank`/
+`select_next_due` implement in-file. Both are left as their own modules,
+matching this issue's own stated scope (the five originally-split files
+only).
+
+Updated every includer (`scheduler.h`, `tsn.c`, `mock.c`, and 13 test
+files) to `#include <rcp/request.h>`, `CMakeLists.txt`'s source list, and
+`README.md`'s module table. Rebased four times past concurrent CFUSA/
+coverage work landing on `main` during this PR's own CI cycle:
+v0.419.0's CY001 `src/` sub-effort (PR #537), v0.420.0's CY001 `tests/`
+sub-effort (PR #541), v0.421.0's CY006 batch 2 (PR #534), and issue
+#520's c-RCP-19 `adapt.c` coverage increment (PR #540, which took the
+v0.423.0 slot this entry originally targeted, test-only/no source
+overlap) -- each carried forward into the merge rather than dropped. The
+`src/` half's `rcp_memcpy_bounded()` conversion (`src/mem_bounded.h`) now
+lives in the merged `request.c`'s four payload-copy sites (compound,
+triggered, chained, timed), matching what its four now-deleted
+predecessor files had.
+
+**Verification**: clean rebuild (0 errors/warnings from this change);
+full test suite unchanged and green (67/67, including all six
+`rcp_request_*`/`rcp_scheduler`/`rcp_conditional_dispatch` binaries with
+their pre-existing test files, assertions untouched); ASan/UBSan build
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`) green,
+67/67; `cfusa check` 0 errors; `cfusa trace --req-coverage 100
+--sec-tested 100` both metrics 100%. Mutation-tested: (1) inverted the
+chained `cs`-bit abort/continue branch in the merged `rcp_chained_advance`
+-- 4 of `rcp_request_chained`'s 17 assertions failed as expected, then
+reverted and reconfirmed green; (2) corrupted one byte offset in the
+now-single shared `put_u64()` -- `rcp_request_compound`,
+`rcp_request_triggered`, and `rcp_request_timed` (the three kinds whose
+test vectors exercise that byte) failed as expected, then reverted and
+reconfirmed green, confirming the collapsed helper is genuinely load-
+bearing for multiple request kinds rather than dead code.
+
 ### v0.423.0 -- 2026-08-18 (c-RCP-19: adapt.c dispatch-table branch/line coverage closed to its structural ceiling)
 
 Continues issue #520's category 1 backlog (the smaller op-kind/strerror/

@@ -65,7 +65,7 @@
 #include <rcp/power.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/request_timed.h>
+#include <rcp/request.h>
 #include <rcp/server.h>
 
 #include <stddef.h>
