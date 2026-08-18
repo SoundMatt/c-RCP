@@ -263,11 +263,23 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
     uint8_t                  payload[256];
     size_t                   copy_len;
     size_t                   count;
-    rcp_fragment_segment_t  *segs;
+    /* Issue #521 round 4: fixed-capacity, not heap-allocated -- see
+     * RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS's own doc comment (discovery.h)
+     * for why 255 is a mathematically exact ceiling here (read_size is a
+     * real uint8_t parameter, unlike ep_uart.c's equivalent). */
+    rcp_fragment_segment_t   segs[RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS];
     size_t                   i;
 
     count = rcp_discovery_response_fragment_count(read_size, max_fragment_payload);
     if (count == 0) return 0;
+    /* Provably unreachable, not merely believed so: count is
+     * rcp_fragment_plan_count((size_t)read_size, ...), which never returns
+     * more than payload_len (== read_size, a uint8_t, so <= 255 ==
+     * RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS) for any max_fragment_payload >=
+     * 1 -- see that constant's own doc comment (discovery.h). Kept as a
+     * defensive bounds check on segs[] anyway (a stack array, unlike the
+     * heap array it replaces) rather than trusting the proof silently. */
+    if (count > RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS) return 0;
 
     put_u32(&slice[0],  map->magic);
     put_u32(&slice[4],  map->svr_version); /* 32 bit, not 16 -- see
@@ -282,15 +294,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
     rcp_memcpy_bounded(payload, sizeof(payload), slice, copy_len);
 
-    {
-        size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
-        segs = alloc_bytes == 0 ? NULL : (rcp_fragment_segment_t *)rcp_malloc(alloc_bytes);
-    }
-    if (!segs) return 0;
-
     if (rcp_fragment_plan((size_t)read_size, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        rcp_free(segs);
-        segs = NULL;
         return 0;
     }
 
@@ -312,8 +316,6 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            rcp_free(segs);
-            segs = NULL;
             return 0;
         }
 
@@ -327,16 +329,12 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            rcp_free(segs);
-            segs = NULL;
             return 0;
         }
 
         out_frames[i] = frame;
     }
 
-    rcp_free(segs);
-    segs = NULL;
     return count;
 }
 

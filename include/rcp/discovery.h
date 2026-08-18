@@ -279,8 +279,40 @@ rcp_discovery_errc_t rcp_discovery_decode_response(const uint8_t *b, size_t len,
  * against a deliberately small max_fragment_payload, closing the deferred
  * single-AVTPDU-worst-case test milestone 63 left open. See
  * rcp_ep_uart_read_response_fragment_count()'s own comment for the same
- * reasoning applied there. */
+ * reasoning applied there.
+ *
+ * Issue #521 (ASIL-D-oriented no-dynamic-allocation push), round 4: unlike
+ * ep_uart.h's rx_len (a plain size_t with no small compile-time ceiling --
+ * REQ-UART-034's own fix means a genuine UART read response can carry up
+ * to 4095 octets, per that header's file comment -- so ep_uart.c's
+ * fragment-plan array stays heap-allocated, the same "no small ceiling"
+ * reasoning ep_iseled.h's own file comment gives), read_size HERE is
+ * actually typed uint8_t, not size_t -- a hard compile-time guarantee that
+ * the payload_len rcp_discovery_encode_response_fragmented() ever plans
+ * against cannot exceed 255, regardless of max_fragment_payload. That
+ * previous paragraph's "like ep_uart.h's read responses" comparison is
+ * about real-world traffic patterns, not about the two functions' actual
+ * worst-case bounds, which differ: this module's is a genuine, provable
+ * small constant (RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS below), ep_uart's is
+ * not. See RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS's own comment. */
 size_t rcp_discovery_response_fragment_count(uint8_t read_size, size_t max_fragment_payload);
+
+/* Issue #521 (ASIL-D-oriented no-dynamic-allocation push), round 4: fixed
+ * capacity of rcp_discovery_encode_response_fragmented()'s own internal
+ * fragment-plan array. rcp_fragment_plan_count(payload_len,
+ * max_fragment_payload) never returns more than payload_len segments for
+ * any max_fragment_payload >= 1 (each segment carries at least one
+ * octet), and payload_len here is read_size, an actual uint8_t parameter
+ * -- not merely a value this module happens to keep small in practice --
+ * so 255 is a mathematically exact ceiling, not a "realistic" one the way
+ * RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS (ep_can.h) is. Same array-too-large-
+ * for-a-safe-stack-frame concern that constant's own comment discusses
+ * does not apply here: 255 entries of rcp_fragment_segment_t (fragment.h)
+ * is the same order of magnitude as that already-accepted 256-entry
+ * array. A caller-supplied max_fragment_payload of 0 already yields 0
+ * (fragment.h's own "disabled" convention) before this ceiling is ever
+ * relevant. */
+#define RCP_DISCOVERY_MAX_FRAGMENT_SEGMENTS ((size_t)255u)
 
 /* Encodes the discovery response as one or more full NTSCF-framed
  * ACF_ABB messages, fragmenting via fragment.h's ms/segment_num mechanism
