@@ -85,6 +85,7 @@ static void emit(rcp_deadline_monitor_t *m, stream_watch_t *st, bool alive)
 }
 
 //cfusa:req REQ-DL-001
+//cfusa:req REQ-DL-014
 bool rcp_deadline_monitor_heartbeat(rcp_deadline_monitor_t *m, uint64_t stream_id)
 {
     stream_watch_t *st;
@@ -104,6 +105,7 @@ bool rcp_deadline_monitor_heartbeat(rcp_deadline_monitor_t *m, uint64_t stream_i
 }
 
 //cfusa:req REQ-DL-006
+//cfusa:req REQ-DL-015
 bool rcp_deadline_monitor_notify_overflow(rcp_deadline_monitor_t *m, uint64_t stream_id)
 {
     stream_watch_t *st;
@@ -172,6 +174,8 @@ static void run_thread_fn(void *arg)
 }
 
 //cfusa:req REQ-DL-010
+//cfusa:req REQ-DL-017
+//cfusa:req REQ-DL-018
 rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
                                                   const rcp_deadline_stream_cfg_t *streams,
                                                   size_t n_streams)
@@ -233,6 +237,7 @@ bool rcp_deadline_monitor_subscribe(rcp_deadline_monitor_t *m, rcp_deadline_live
 
 //cfusa:req REQ-DL-007
 //cfusa:req REQ-DL-008
+//cfusa:req REQ-DL-016
 void rcp_deadline_monitor_close(rcp_deadline_monitor_t *m)
 {
     rcp_mutex_lock(&m->mu);
@@ -246,6 +251,7 @@ void rcp_deadline_monitor_close(rcp_deadline_monitor_t *m)
 }
 
 //cfusa:req REQ-DL-013
+//cfusa:req REQ-DL-019
 void rcp_deadline_monitor_destroy(rcp_deadline_monitor_t *m)
 {
     if (!m) return;

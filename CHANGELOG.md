@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.437.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-DL-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+First `[c-RCP-18-tracker]` (#533) batch, prefix `REQ-DL-*`. Triaged all
+13 `REQ-DL-*` requirements against CONTRIBUTING.md's "Writing a
+requirement" convention (#519/PR #525); split the 5 the tracker's own
+"2+ shall" proxy flagged (all confirmed genuinely bundled on manual
+read) into 11 ids total, minting `REQ-DL-014` through `REQ-DL-019`;
+confirmed the other 8 flagged-adjacent-but-unflagged ids already
+atomic. See `ROADMAP.md`'s v0.437.0 entry for the full per-id
+breakdown, mutation-test evidence, and the one near-miss it caught
+(an initial `REQ-DL-017` tag placement that mutation-testing proved
+hollow before this landed). Full 67-test suite + ASan/UBSan clean;
+`cfusa check`: 0 errors; `cfusa trace --req-coverage 100 --sec-tested
+100`: 100%/100%, re-verified against the combined catalog after
+rebasing onto the concurrently-landed `REQ-OBS-*`/`REQ-REC-*`/
+`REQ-AUTH-*` batches immediately below (all disjoint prefixes, clean
+auto-merges in `.fusa-reqs.json`).
+
 ### v0.436.0 -- 2026-08-21 ([c-RCP-18] issue #533 batch REQ-ADMIN-*: requirement-atomicity audit, Group 3 server/dispatch)
 
 First landed batch of #533, the requirement-atomicity audit tracker
