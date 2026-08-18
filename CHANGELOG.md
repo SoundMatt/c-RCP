@@ -34,6 +34,101 @@ the rationale.
 
 ## Releases
 
+### v0.447.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-GPIO-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-GPIO-*` prefix (`src/ep_gpio.c`/`include/rcp/ep_gpio.h`),
+one of Group 2's densest sub-batches by the tracker's own crude
+"2+ shall" proxy (5/39 flagged) -- per the tracker's own warning that
+Group 1's `REQ-RMAP-*` batch found real bundled requirements with
+*zero* "shall" occurrences, all 39 requirements were read in full
+against their actual `text` and traced code/tests, not just the 5
+flagged ones.
+
+4 ids split into 46 total (39 originals + 7 new,
+`REQ-GPIO-040..046`):
+
+- `REQ-GPIO-012` -> `-012`/`-045`/`-046`: `rcp_ep_gpio_apply_write()`'s
+  own `RESERVED4` no-op contract (kept as `-012`) bundled two other
+  functions' behavior under the same id -- `rcp_ep_gpio_decode_write_request()`'s
+  own `RCP_EP_GPIO_ERR_RESERVED_EVT` detection (`-045`) and
+  `rcp_ep_gpio_wire_error()`'s own mapping of that code to
+  `RCP_ERROR_UNSUPPORTED_CMD` (`-046`) -- three different functions,
+  the same `REQ-AUTH-009` shape #519 already flagged as the canonical
+  bad pattern. All three clauses were already independently asserted
+  by one existing test (`test_gpio_reserved_evt_is_ignored_and_reports_unsupported_cmd`,
+  `tests/test_tc18_gaps_ep.c`), just under one shared tag; now
+  per-clause tagged.
+- `REQ-GPIO-013` -> `-013`/`-040`/`-041`/`-042`: `rcp_ep_gpio_apply_reconfig()`'s
+  own core addressed-write mechanism (kept as `-013`, zero "shall"
+  occurrences in the original text -- the proxy would never have
+  flagged this one) bundled three further, independently-testable
+  clauses in prose form -- the SHORT-payload rejection (`-040`), the
+  out-of-range-span rejection (`-041`), and the read-only-octet-skip
+  behavior (`-042`) -- each already covered by its own distinct,
+  already-existing test in `tests/test_ep_gpio.c`
+  (`test_apply_reconfig_rejects_payload_without_data`,
+  `test_apply_reconfig_rejects_write_past_ep_len`,
+  `test_apply_reconfig_ignores_read_only_registers`), just sharing one
+  id and one file-header-stacked test tag.
+- `REQ-GPIO-033` (text-only correction, no split): previously also
+  asserted `rcp_ep_gpio_pin_mask()`/`_pin_get()`'s own LSB-first
+  bit-to-pin mapping is conformant by construction -- true, but that
+  claim is entirely owned by `REQ-GPIO-003`/`REQ-GPIO-004`'s own
+  already-tested contracts, a near-duplicate restating another id's
+  behavior rather than a distinct testable claim of its own, the same
+  `REQ-RMAP-059`/`-061` attribution hazard this tracker calls out.
+  Trimmed to its own real, distinct contract:
+  `rcp_ep_gpio_wire_error()`'s `BAD_PAYLOAD_LEN` -> `INVALID_PARAMETER`
+  mapping.
+- `REQ-GPIO-035` -> `-035`/`-044`: `rcp_ep_gpio_debounce_state_init()`
+  carried this id's own req tag but this entry's own text never
+  described `_init()`'s behavior at all -- it describes the register
+  format and `rcp_ep_gpio_debounce_sample()`'s filtering rule instead,
+  a different function. Split into `-044`, matching the
+  `REQ-GPIO-018` ("`functional_cfg_init()` zero-initializes cfg")
+  sibling pattern already established for the endpoint's other
+  zero-init function. No existing test independently asserted
+  `_init()`'s own zero-init postcondition (every debounce test called
+  it first but only inferred zeroing from `debounce_sample()`'s first
+  return value) -- a new, focused test
+  (`test_debounce_state_init_zeroes`) checks the struct's own fields
+  directly; mutation-tested by temporarily breaking `_init()` to leave
+  `consecutive_count` non-zero, confirming the new test (and only that
+  test) fails, then restoring.
+- `REQ-GPIO-010`/`REQ-GPIO-011` (proxy-flagged, confirmed atomic): each
+  describes one `evt[2:0]` case's complete outcome -- the arithmetic
+  result *and* its saturation boundary -- as a single behavior, the
+  same shape `REQ-PWM-006`/`REQ-PWM-007` already establish as the
+  atomic pattern for the identical TC18-13.5-003 rule shared by GPIO
+  and PWM_OUT; the double "shall" phrasing is a proxy false positive,
+  not real bundling.
+- `REQ-GPIO-004` (proxy-flagged, confirmed atomic): a single accessor's
+  complete return-value mapping over its whole domain (valid pin index
+  vs. invalid), the same "total function over domain" idiom already
+  established by sibling `REQ-GPIO-002`/`REQ-GPIO-003` in the same
+  file.
+- `REQ-GPIO-037` (confirmed atomic): `rcp_ep_gpio_apply_masked_write()`'s
+  masking formula (`combined & output_mask | current & ~output_mask`)
+  is one coherent contract over its whole domain -- an "iff
+  output-flagged" pattern, not two separable behaviors.
+- `REQ-GPIO-034`/`REQ-GPIO-036` (confirmed atomic): each is one
+  function's one classifier contract (`rcp_ep_gpio_trigger_signal_number()`'s
+  uniform `3n+trigger` formula; `rcp_ep_gpio_response_timing()`'s
+  op/payload-driven classification) -- narratively worded but not
+  multiple independently-testable behaviors under one id.
+
+Full clean rebuild + full 67-test suite (100% pass), ASan/UBSan build
+with CI's exact flags (100% pass), `cfusa check` (0 errors),
+`cfusa trace --req-coverage 100`/`--sec-tested 100` (run separately,
+both 100%) all verified against this batch. Each of the 7 new ids'
+test coverage was independently confirmed by temporarily disabling
+just that id's `//cfusa:test` tag and re-running
+`cfusa trace --sec-tested 100`, watching the gate fail specifically
+for that id, then restoring.
+
 ### v0.446.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by

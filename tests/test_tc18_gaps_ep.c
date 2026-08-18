@@ -4,8 +4,6 @@
 //cfusa:test REQ-ACF-019
 //cfusa:test REQ-ACF-020
 //cfusa:test REQ-ACF-021
-//cfusa:test REQ-GPIO-012
-//cfusa:test REQ-GPIO-033
 //cfusa:test REQ-GPIO-034
 //cfusa:test REQ-GPIO-035
 //cfusa:test REQ-GPIO-036
@@ -322,6 +320,7 @@ static void test_acf_request_header_constraints_cs_exemption(void)
  * maps RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN to RCP_ERROR_INVALID_PARAMETER, so
  * a caller building an Error Response frame (acf.h's
  * rcp_acf_build_error_response()) has the TC18-conformant code available. */
+//cfusa:test REQ-GPIO-033
 static void test_gpio_request_payload_is_four_octets(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -392,7 +391,16 @@ static void test_gpio_wire_error_is_none_for_local_only_codes(void)
  * rcp_ep_gpio_decode_write_request() now returns the dedicated
  * RCP_EP_GPIO_ERR_RESERVED_EVT for that same evt value, which
  * rcp_ep_gpio_wire_error() maps to RCP_ERROR_UNSUPPORTED_CMD -- closing
- * the previously-missing error-response half of the rule. */
+ * the previously-missing error-response half of the rule. SPLIT 2026-08-18
+ * (c-RCP-18-tracker, REQ-GPIO-* atomicity audit, issue #533): the three
+ * behaviors this one test independently asserts -- apply_write()'s own
+ * no-op (REQ-GPIO-012), decode_write_request()'s own RESERVED_EVT
+ * detection (REQ-GPIO-045), and wire_error()'s own UNSUPPORTED_CMD
+ * mapping (REQ-GPIO-046) -- are now three separate requirement ids,
+ * each still proven by its own distinct assertion below. */
+//cfusa:test REQ-GPIO-012
+//cfusa:test REQ-GPIO-045
+//cfusa:test REQ-GPIO-046
 static void test_gpio_reserved_evt_is_ignored_and_reports_unsupported_cmd(void)
 {
     rcp_bytes_t frame;

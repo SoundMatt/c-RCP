@@ -19106,6 +19106,55 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.447.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-GPIO-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-GPIO-*` (`src/ep_gpio.c`/`include/rcp/ep_gpio.h`),
+one of Group 2's densest sub-batches (5/39 proxy-flagged) -- triaged
+all 39 in full rather than only the 5 flagged, per the tracker's own
+warning that Group 1's `REQ-RMAP-*` batch found real bundled
+requirements with zero "shall" occurrences.
+
+4 ids split into 7 new ones (`REQ-GPIO-040..046`): `-012` (apply_write()'s
+own RESERVED4 no-op, kept, vs. decode_write_request()'s own
+RESERVED_EVT detection `-045` and wire_error()'s own UNSUPPORTED_CMD
+mapping `-046` -- three different functions under one id, the same
+`REQ-AUTH-009` shape), `-013` (apply_reconfig()'s own core mechanism,
+kept, zero "shall" occurrences in the original text, vs. its
+SHORT-payload rejection `-040`, out-of-range-span rejection `-041`,
+and read-only-octet-skip behavior `-042`, each already independently
+tested), and `-035` (debounce_sample()'s own filtering rule, kept, vs.
+debounce_state_init()'s own zero-init contract `-044` -- a different
+function this entry's own text never actually described). `-033`
+trimmed (no split): its own LSB-first bit-to-pin mapping claim was a
+near-duplicate of `-003`/`-004`'s already-tested contracts, removed to
+avoid two ids describing the same behavior. 3 proxy-flagged ids
+confirmed genuinely atomic: `-004` (a single accessor's complete
+return-value mapping, matching sibling `-002`/`-003`'s "total function
+over domain" idiom), `-010`/`-011` (each one evt-case's complete
+outcome -- value and saturation boundary together -- matching
+`REQ-PWM-006`/`-007`'s identical pattern for the same TC18-13.5-003
+rule).
+
+Tags moved/duplicated to sit above the exact function/test per split;
+every split verified with its own distinct test (one brand-new test,
+`test_debounce_state_init_zeroes`, for `-044`; the rest already
+existing but shared/mis-tagged). Every new id's coverage confirmed
+independently by temporarily disabling just that id's own
+`//cfusa:test` tag and re-running `cfusa trace --sec-tested 100`,
+watching the gate fail specifically for that id, then restoring;
+`-044` additionally mutation-tested against a real injected defect in
+`rcp_ep_gpio_debounce_state_init()` itself.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1181/1181 requirements, 512/512 functions).
+
+**Next**: other Group 2 per-endpoint prefixes (`REQ-ADC-*`,
+`REQ-CANEP-*`, `REQ-I2C-*`, `REQ-ISELED-*`, etc.) remain, tracked as
+separate concurrent batches against the same tracker.
+
 ### v0.446.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
 
