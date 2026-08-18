@@ -19106,6 +19106,97 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.423.0 -- 2026-08-18 (c-RCP-19: adapt.c dispatch-table branch/line
+coverage closed to its structural ceiling)
+
+Second increment against issue #520 (c-RCP-19), continuing v0.410.0's
+small-dispatch-table slice: the two large per-op switches in
+`src/adapt.c` (`rcp_message_to_request()`'s 18-arm encode dispatch and
+`response_to_message_impl()`'s 17-arm decode dispatch), plus the
+`rcp_adapter_t` transport wrapper's own error/unwrap branches, were
+previously exercised for only a handful of ops each.
+
+Added 41 new `tests/test_adapt.c` cases: one request-encode round
+trip per previously-untested op, one response-decode success mapping
+per op, one response-decode failure per op (wrong-bus-id mismatch,
+hitting each op's own `fail_decode()` call site individually), three
+new `rcp_adapt()` `call()` tests (DISCOVERY's no-NTSCF-unwrap branch,
+a malformed-NTSCF-reply decode failure, an oversized-reply transport
+error), one `send()` transport-error test (queue-capacity overflow),
+both switches' `default` (out-of-range op) arms, both entry points'
+documented `out_err == NULL` tolerance, and `meta_get_u32()`'s
+empty-string short-circuit. No source change. Mutation-tested a
+sample (CAN response arm, DISCOVERY `call()` branch) -- both new
+tests failed as expected, both reverted.
+
+Measured impact (same local `lcov --branch-coverage` build/CI-pinned
+`cfusa` v0.5.54 `coverage` invocation as v0.410.0): `src/adapt.c`
+line 63.3% -> 99.8%, branch 53.1% -> 85.1%, function 87.1% -> 100%;
+project-wide line 92.2% -> 93.7%, branch 79.6% -> 80.9%.
+
+`src/adapt.c`'s remaining branch gap is one confirmed
+structurally-unreachable defensive check (`meta_get_u32()`'s `!end`
+arm -- C99's `strtoul()` contract always writes `endptr`) plus a
+residual of multi-clause guard combinations; not this file's final
+ceiling, a next batch can still close more.
+
+Full 67-test suite (`test_adapt` 46 -> 96 cases) + ASan/UBSan clean.
+`cfusa check`/`trace --req-coverage 100 --sec-tested 100` (v0.5.54):
+0 errors, unchanged 100%/100% traced/annotated -- no `.fusa-reqs.json`
+change.
+
+**Next**: issue #520 stays open -- category 2 (`mock.c` CRC/
+fault-injection paths, `ep_can.c`/`shmem.c`/`tsn.c`/`loan.c`), category
+3 (`_WIN32`-block carve-out documentation), and the CI
+threshold-gate/branch-floor sequencing are all still unstarted.
+
+### v0.422.0 -- 2026-08-18 (c-RCP-19: category 1 remainder + ep_can.c
+fully closed (incl. CAN-XL fragmented subsystem) + loan.c/tsn.c/shmem.c
+category 2 + category 3 documented + CI floor 88 -> 90)
+
+Third increment against issue #520 (c-RCP-19). Closes `ep_can.c`'s
+remaining category-1 dispatch table
+(`rcp_ep_can_reconfig_strerror()`, zero coverage before this batch),
+all of category 2's four smaller files (`loan.c`/`tsn.c`/`shmem.c`
+line-complete; `ep_can.c` closed including its CAN-XL fragmented
+encode/decode subsystem -- originally scoped as a deferred future
+session, but the malformed-input/fault-injection pattern extended to
+it cleanly within the same batch), and category 3 (`AUDIT_PACK.md` §3
+now documents the `_WIN32` carve-out).
+
+`loan.c`/`shmem.c`/`ep_can.c` needed real fault-injection (alloc.h's
+own hook harness, including a call-counting variant to target one
+specific allocation among several ordered calls) and, for `shmem.c`'s
+genuine blocking `rcp_cond_wait()` path, a real second thread
+(`rcp_thread_start()`) -- no existing test in that file ever called
+`recv()` on a still-open, empty queue before this batch.
+
+`ep_can.c`'s one remaining uncovered branch (a `rcp_fragment_plan()`
+segment-count-mismatch check inside the fragmented encoder) is a
+confirmed structurally-unreachable consistency check: the two
+independent segment-count computations it compares are derived from
+identical inputs, so they can only disagree given an internal bug, not
+any caller-reachable input -- the same kind of ceiling as `loan.c`'s
+own overflow guard.
+
+Re-measured project-wide coverage on top of the CY001 batches that
+landed since this issue's last increment: line 92.2% -> 93.0%, branch
+79.6% -> 80.2%. Raised the CI `Coverage regression gate` `--threshold`
+88 -> 90.
+
+Filed SoundMatt/c-FuSa#137 requesting a `--branch-threshold` flag --
+confirmed via `cfusa coverage --help` that no existing flag can set an
+independent, sub-100% branch-coverage floor, blocking this issue's own
+step 5 on an upstream tooling change, not further work here.
+
+Full 67-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, unchanged 100%/100%. See `CHANGELOG.md`'s matching entry for
+full per-file detail.
+
+**Next**: issue #520 stays open -- `mock.c`'s CRC/fault-injection
+paths are the one substantial category 2 piece left; the
+branch-coverage floor waits on c-FuSa#137.
+
 ### v0.421.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL
 hygiene batch 2 of N, 94/94 remaining real sites)
 
@@ -19185,53 +19276,6 @@ raw-`free()`/`rcp_free()` CY006 candidates identified from a fresh
 batch 1 + concurrent #521 work), fixed this batch (94), or
 individually justified as already-safe-without-a-change (11, listed
 above). Issue #522 is closed as fully resolved by this release.
-
-### v0.422.0 -- 2026-08-18 (c-RCP-19: category 1 remainder + ep_can.c
-fully closed (incl. CAN-XL fragmented subsystem) + loan.c/tsn.c/shmem.c
-category 2 + category 3 documented + CI floor 88 -> 90)
-
-Third increment against issue #520 (c-RCP-19). Closes `ep_can.c`'s
-remaining category-1 dispatch table
-(`rcp_ep_can_reconfig_strerror()`, zero coverage before this batch),
-all of category 2's four smaller files (`loan.c`/`tsn.c`/`shmem.c`
-line-complete; `ep_can.c` closed including its CAN-XL fragmented
-encode/decode subsystem -- originally scoped as a deferred future
-session, but the malformed-input/fault-injection pattern extended to
-it cleanly within the same batch), and category 3 (`AUDIT_PACK.md` §3
-now documents the `_WIN32` carve-out).
-
-`loan.c`/`shmem.c`/`ep_can.c` needed real fault-injection (alloc.h's
-own hook harness, including a call-counting variant to target one
-specific allocation among several ordered calls) and, for `shmem.c`'s
-genuine blocking `rcp_cond_wait()` path, a real second thread
-(`rcp_thread_start()`) -- no existing test in that file ever called
-`recv()` on a still-open, empty queue before this batch.
-
-`ep_can.c`'s one remaining uncovered branch (a `rcp_fragment_plan()`
-segment-count-mismatch check inside the fragmented encoder) is a
-confirmed structurally-unreachable consistency check: the two
-independent segment-count computations it compares are derived from
-identical inputs, so they can only disagree given an internal bug, not
-any caller-reachable input -- the same kind of ceiling as `loan.c`'s
-own overflow guard.
-
-Re-measured project-wide coverage on top of the CY001 batches that
-landed since this issue's last increment: line 92.2% -> 93.0%, branch
-79.6% -> 80.2%. Raised the CI `Coverage regression gate` `--threshold`
-88 -> 90.
-
-Filed SoundMatt/c-FuSa#137 requesting a `--branch-threshold` flag --
-confirmed via `cfusa coverage --help` that no existing flag can set an
-independent, sub-100% branch-coverage floor, blocking this issue's own
-step 5 on an upstream tooling change, not further work here.
-
-Full 67-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
-0 errors, unchanged 100%/100%. See `CHANGELOG.md`'s matching entry for
-full per-file detail.
-
-**Next**: issue #520 stays open -- `mock.c`'s CRC/fault-injection
-paths are the one substantial category 2 piece left; the
-branch-coverage floor waits on c-FuSa#137.
 
 ### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half:
 memcpy/memmove/strncpy explicit-size-bounded wrappers -- CY001 fully closed)
