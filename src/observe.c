@@ -18,7 +18,9 @@ uint64_t rcp_span_duration_ms(const rcp_span_t *span)
 //cfusa:req REQ-OBS-005
 static void noop_record_span(const rcp_span_t *span, void *ctx) { (void)span; (void)ctx; }
 //cfusa:req REQ-OBS-012
+//cfusa:req REQ-OBS-020
 static void noop_record_gauge(const rcp_metric_t *metric, void *ctx) { (void)metric; (void)ctx; }
+//cfusa:req REQ-OBS-021
 static void noop_record_counter(const char *name, rcp_avtp_addr_t addr, double delta, void *ctx)
 {
     (void)name; (void)addr; (void)delta; (void)ctx;
@@ -126,6 +128,7 @@ size_t rcp_in_memory_sink_spans(rcp_in_memory_sink_t *s, rcp_span_t *out, size_t
 }
 
 //cfusa:req REQ-OBS-019
+//cfusa:req REQ-OBS-022
 void rcp_in_memory_sink_destroy(rcp_in_memory_sink_t *s)
 {
     if (!s) return;

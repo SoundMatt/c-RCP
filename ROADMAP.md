@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS:
+requirement-atomicity audit, Group 3 server/dispatch)
+
+Group 3 batch of the issue #533 requirement-atomicity audit tracker
+(#519's convention, `CONTRIBUTING.md`'s "Writing a requirement"
+section), scoped to `REQ-OBS-*` (`src/observe.c`/
+`include/rcp/observe.h`). Triaged all 19 entries; the 2+-"shall" proxy
+flagged 2 (`REQ-OBS-005`, `REQ-OBS-019`), both confirmed genuinely
+bundled on manual review.
+
+`REQ-OBS-005` bundled three different functions (`record_span`,
+`record_gauge`, `record_counter`) under one id -- `record_counter` had
+zero requirement tags of its own before this, reachable only via the
+bundled id. Reused for `record_span`; minted `REQ-OBS-020`
+(`record_gauge`) and `REQ-OBS-021` (`record_counter`), each with a
+dedicated canary-based side-effect test (points a real, non-NULL `ctx`
+at a struct and `memcmp`s it before/after the call -- a distinct check
+from "did not crash").
+
+`REQ-OBS-019` bundled `rcp_in_memory_sink_destroy()`'s NULL-input
+no-op branch with its non-NULL cleanup-ordering branch -- the same
+shape as #519's own `REQ-DL-001` example. Reused for the NULL clause;
+minted `REQ-OBS-022` for the non-NULL clause. The NULL branch had no
+test at all before this batch (every prior call site passes a live
+sink); a pre-existing test tag that actually exercised the non-NULL
+path was corrected from `REQ-OBS-019` to `REQ-OBS-022` to match.
+
+Every split id's independence was mutation-tested: each new/reused
+id's dedicated `//cfusa:test` tag was removed in turn, `cfusa trace
+--gaps`/`--sec-tested 100` confirmed only that id (not any sibling)
+dropped out, then restored. No other `REQ-OBS-*` entry was bundled
+despite occasional multi-field/multi-clause phrasing (`REQ-OBS-001`,
+`-012`, `-014`, `-016`, `-018`) -- each is one function's one behavior
+via a compound-object-joined-by-"and", the same accepted pattern
+`REQ-PWM-002`-`009` already uses.
+
+19 -> 22 `REQ-OBS-*` entries (net +3). Full 67-test suite (`test_observe`
+14/14, was 10): 100% passing. ASan/UBSan (CI's exact flags): clean.
+Pinned `cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100
+--sec-tested 100`: 100%/100% (1098/1098 reqs, 512/512 functions).
+
 ### v0.432.0 -- 2026-08-20 ([c-RCP-16 follow-up] issue #548:
 .fusa-reqs.json tc18-gap scope/text drift, 116 entries reclassified to
 tc18)
