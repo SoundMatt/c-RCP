@@ -171,7 +171,9 @@ bool rcp_ep_uart_set_trigger(rcp_ep_uart_functional_cfg_t *cfg, rcp_ep_uart_trig
 #define UART_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
 
 /* uart_stop_bits's own half-stop-bit units <-> rcp_ep_uart_stop_bits_t --
- * see the file header for the exact three-way mapping (REQ-UART-037). */
+ * see the file header for the exact three-way mapping (REQ-UART-049,
+ * split 2026-08-18 from this id's former home under REQ-UART-037). */
+//cfusa:req REQ-UART-049
 static uint8_t stop_bits_to_half_units(uint8_t stop_bits)
 {
     if (stop_bits == (uint8_t)RCP_EP_UART_STOP_BITS_TWO) return 4u;
@@ -179,6 +181,7 @@ static uint8_t stop_bits_to_half_units(uint8_t stop_bits)
     return 2u; /* RCP_EP_UART_STOP_BITS_ONE, and any other/invalid value */
 }
 
+//cfusa:req REQ-UART-049
 static uint8_t half_units_to_stop_bits(uint8_t half_units)
 {
     if (half_units == 3u) return (uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF;
@@ -224,6 +227,7 @@ void rcp_ep_uart_render_registers(const rcp_ep_uart_functional_cfg_t *cfg,
  * patched block image. The read-only offsets (EP_LEN, the reserved
  * octet) are deliberately not read back -- apply_reconfig() re-renders
  * them from cfg before patching, so a write covering them is a no-op. */
+//cfusa:req REQ-UART-040
 static void parse_registers(rcp_ep_uart_functional_cfg_t *cfg,
                              const uint8_t in[RCP_EP_UART_EP_FUNC_LEN])
 {
@@ -260,6 +264,7 @@ static void parse_registers(rcp_ep_uart_functional_cfg_t *cfg,
 
 /* True iff the octet at relative offset addr belongs to a read-only
  * register of the block -- EP_LEN or the reserved octet. */
+//cfusa:req REQ-UART-040
 static bool reg_offset_read_only(uint16_t addr)
 {
     return addr == RCP_EP_UART_REG_EP_LEN || addr == RCP_EP_UART_REG_RESERVED_01;
@@ -453,6 +458,7 @@ rcp_bytes_t rcp_ep_uart_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
 }
 
 //cfusa:req REQ-UART-022
+//cfusa:req REQ-UART-046
 rcp_ep_uart_errc_t rcp_ep_uart_decode_write_response(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       const uint8_t **out_accepted_data,
@@ -775,6 +781,7 @@ size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id
 }
 
 //cfusa:req REQ-UART-031
+//cfusa:req REQ-UART-047
 rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, size_t len,
                                                               rcp_byte_bus_id_t expected_bus_id,
                                                               bool *out_ms,
