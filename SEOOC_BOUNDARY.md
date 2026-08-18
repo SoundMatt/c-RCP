@@ -18,6 +18,12 @@ supersedes nothing; every underlying fact it restates remains the
 source-of-record in the document that already stated it, and this file
 is updated whenever any of those change.
 
+`FREEDOM_FROM_INTERFERENCE.md` (added c-RCP-16 item 4) is this
+document's companion for the QM/ASIL-A/B co-existence question ISO
+26262-6:2018 Clause 7 / ISO 26262-9:2018 Clause 6 raises for a single
+linked binary; AoU-8 below is its one substantive finding, restated
+here for completeness rather than duplicated in full.
+
 ---
 
 ## 1. Item Definition boundary — what c-RCP does *not* own
@@ -80,6 +86,7 @@ the citation after each item is that fact's source-of-record.
 | AoU-5 | `rcp_e2e_endpoint_in_safe_state()` fails closed (returns "not safe") on a misconfigured `safestate_sequencer` index or an unrecognized `rx_safety_measure` value, by explicit design choice rather than a spec mandate. An integrator must confirm this fail-closed posture is what their own safe-state definition actually requires before relying on it, rather than assuming a spec-mandated behavior. | `HARA.md` Residual Risks table |
 | AoU-6 | c-RCP's safety mechanisms are analyzed and tested at c-RCP's own implementation-correctness level; no separate ASIL decomposition argument (ISO 26262-9:2018 Clause 5) has been constructed for H-001 (the sole element-level hazard exceeding the ASIL-B baseline, at ASIL-C). An integrator whose item-level HARA assigns an ASIL to the corresponding vehicle-level hazard must construct their own decomposition or undecomposed-rigor argument at that ASIL — c-RCP's own ASIL-C rating does not do this for them. | `HARA.md` ASIL Determination Note |
 | AoU-7 | c-RCP's own tool confidence evidence for `cfusa` (its static-analysis/lint/traceability toolchain) is a **self-run, non-independent qualification** (`qualify-report.json`, `qualificationMethod: "self"`) — see §3. An integrator targeting an ASIL where ISO 26262-8:2018 Clause 11 would require a higher tool confidence level than self-qualification provides must independently qualify `cfusa` (or substitute their own toolchain) to that level; c-RCP's CI evidence does not satisfy that requirement on its own. | §3 below; `qualify-report.json` |
+| AoU-8 | c-RCP's ASIL-B-rated E2E safe-point mechanism (`e2e.c`) allocates memory, on its actual per-request safety-relevant path, through a **single process-wide, unpartitioned allocator-hook table** (`rcp_alloc_set_hooks()`, `alloc.h`/`alloc.c`) that any QM-rated caller in the same process — including c-RCP's own QM-rated features — can redirect with no access control; the ASIL-B watchdog mechanism (`watchdog.c`) has the same dependency in a narrower form, once per keeper construction/destruction rather than per tick, since c-RCP-17 (issue #521) converted its per-stream/callback storage to fixed capacity. An integrator who calls `rcp_alloc_set_hooks()` anywhere in their integration must independently ensure the installed hooks are trustworthy to the ASIL of the highest-rated call site they will service; c-RCP does not, and structurally cannot on its own, enforce a QM/ASIL partition over this shared allocator. | `FREEDOM_FROM_INTERFERENCE.md` §2 |
 
 ## 3. Tool confidence level (TCL) — `cfusa`
 

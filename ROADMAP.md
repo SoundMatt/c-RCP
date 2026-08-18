@@ -19106,6 +19106,62 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.429.0 -- 2026-08-18 (c-RCP-16: SEOOC evidence package items 3-5
+-- real MC/DC, freedom-from-interference, AUDIT_PACK reframe)
+
+Continues issue #518's five-item suggested approach after PR #528
+(items 1-2). Closes items 3-5.
+
+Item 3: `ci.yml` gains an `mcdc` job measuring genuine LLVM MC/DC
+(condition/decision) coverage via `clang -fcoverage-mcdc` +
+`llvm-cov export`'s own `totals.mcdc` block, distinct from the
+branch-coverage proxy `cfusa coverage` otherwise substitutes.
+Deliberately bypasses `cfusa coverage --mcdc-file`, whose parser
+expects a JSON key shape (`covered_true_count`/`covered_false_count`)
+real `llvm-cov export` never emits at any LLVM version -- filed
+upstream as SoundMatt/c-FuSa#129 rather than blocking on it. Verified
+locally: 64.4% MC/DC (437/679) vs 83.7% branch coverage over the same
+binaries. Informational, non-gating, per the issue's own sequencing.
+
+Item 4: new `FREEDOM_FROM_INTERFERENCE.md` (ISO 26262-6 Clause 7 / ISO
+26262-9 Clause 6). Corrects issue #518's stale `tc18`-vs-`legacy-
+compat` framing (removed at v0.91.0) against the real current
+`.fusa-reqs.json` scopes. Identifies `e2e.c`'s ASIL-B CRC32 safe-point
+mechanism as allocating through `alloc.c`'s single, unpartitioned,
+QM-rated `rcp_alloc_set_hooks()` table on its per-request
+safety-relevant path; `watchdog.c` has the same dependency in a
+narrower, once-per-keeper form -- recorded as new AoU-8 in
+`SEOOC_BOUNDARY.md`, not closed (a real QM/ASIL allocator partition is
+outside a documentation pass). Rebasing past PR #538 (below), which
+converted `watchdog.c`/`deadline.c`'s per-stream/callback storage to
+fixed capacity under c-RCP-17, changed this finding's shape for that
+module -- re-verified and rewritten against the merged tree
+post-rebase. Also surfaces a `.fusa-reqs.json` `tc18-gap`
+scope/text-staleness data-hygiene finding as a separate follow-up
+item.
+
+Item 5: `AUDIT_PACK.md` §2 retitled/reframed as SEOOC evidence-package
+material (without asserting ASIL-D), cross-referencing
+`SEOOC_BOUNDARY.md` §2a; §1/§3/§4/§6/§7 corrected from stale
+854-requirement/"legacy-compat" figures to the current 1095/four-scope
+breakdown.
+
+One real source fix, surfaced by the `mcdc` job's own first CI run:
+`src/mem_bounded.h`'s `rcp_strncpy_bounded()` called POSIX/XSI
+`strnlen()`, undeclared under this project's own strict `-std=c99` --
+gcc-12/clang-14 only warned and linked anyway; clang 18 (needed for
+`-fcoverage-mcdc`) hard-errors by default. Replaced with a hand-rolled
+`rcp_strnlen_bounded()`, no libc dependency, identical semantics --
+re-verified: 67/67 tests and identical MC/DC totals (437/679, 64.4%)
+before and after.
+
+Full 67-test suite + ASan/UBSan clean. `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100 --sec-tested 100`: unchanged 100%/100%.
+New `mcdc` job verified end-to-end locally (build, profiled run,
+merge, export, totals) before commit, not trusted un-run -- its first
+real CI run caught the `strnlen()` gap a different local toolchain
+could not have surfaced.
+
 ### v0.428.0 -- 2026-08-18 (c-RCP-17 Phase (b) continued: powerstate.c
 endpoint table + callback list, admin.c's three growable arrays and
 per-call metrics scratch buffer, all fixed-capacity)

@@ -22,15 +22,35 @@ TC18 protocol and its own measured evidence.
 | Cybersecurity Architecture | `CYBERSECURITY.md` | Complete — re-derived, Phase 22 |
 | Formal Verification | `FORMAL_VERIFICATION.md` + `tla/*.tla` | Complete — re-derived, Phase 22 |
 | Portability Audit | `PORTABILITY.md` | Complete (unaffected by the protocol replacement — KEEP AS-IS per `ROADMAP.md`'s Satellite Package Disposition table) |
-| Safety Requirements | `.fusa-reqs.json` | 854 requirements; 779 `scope: "tc18"` (this project's ISO 26262 safety-case basis), 75 `scope: "legacy-compat"` (retired pre-TC18 surface, `level`/`asil` demoted to `QM`) — see the file's own `catalogNote` |
+| Safety Requirements | `.fusa-reqs.json` | 1095 requirements; 947 `scope: "tc18"` (859 ASIL-B / 30 ASIL-A / 58 QM — this project's ISO 26262 safety-case basis), 136 `scope: "tc18-gap"` (normative-clause coverage markers, QM by definition), 6 `scope: "retired"`, 6 `scope: "internal"` — see the file's own `catalogNote` and `FREEDOM_FROM_INTERFERENCE.md` §1 for the current, verified breakdown (supersedes this table's own earlier 854/"legacy-compat" figures, which described a pre-v0.91.0 codebase state) |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
+| Freedom-from-Interference Argument | `FREEDOM_FROM_INTERFERENCE.md` | Added c-RCP-16 item 4 (issue #518) — QM/ASIL-A/B co-existence analysis for the single-binary partition above |
 | Tool Qualification Evidence | `qualify-report.json` (auto-generated, `cfusa qualify`) | CI gate — self-qualified, see §2a |
+| MC/DC Coverage (informational) | `mcdc-summary.json`/`mcdc-export.json` (CI artifact, `ci.yml`'s `mcdc` job) | Added c-RCP-16 item 3 (issue #518) — genuine LLVM condition/decision coverage, non-gating; see §3 |
 
 ---
 
-## 2. ASIL-C Gap Analysis (ISO 26262 §7)
+## 2. ASIL-C Gap Analysis / SEOOC Evidence Posture (ISO 26262 §7)
+
+Framing note (c-RCP-16, issue #518 item 5): this section was originally
+written, and is kept below largely as originally written, as an
+**internal** derogation table — this project's own record of why it
+has not pursued certain ASIL-D-tier rigor items on top of its actual
+ASIL-B/C baseline. Read on its own, that internal framing risks
+under-selling what the table actually is to a different audience: for
+an **integrator** performing their own item-level HARA (ISO
+26262-3:2018 Clause 6) over a vehicle function that uses c-RCP, this
+same table is real evidence toward — without asserting — an ASIL-D
+item-level safety case, because it inventories exactly the rigor items
+(redundant delivery paths, formal deadlock-absence proofs, MC/DC, MISRA
+mandatory/required compliance) ISO 26262-10:2018 Clause 9's SEOOC
+evidence expectations ask a supplied element to have reasoned about,
+whether or not this project's own baseline currently obligates them.
+`SEOOC_BOUNDARY.md` is the dedicated integrator-facing document built
+for that audience (§2a below); this section remains the primary-source
+detail underneath it, cross-referenced rather than duplicated.
 
 c-RCP targets **ASIL-B** as its baseline. Under ISO 26262-3:2018 Table
 4, only **one** hazard — H-001 (see `HARA.md`) — computes above that
@@ -57,7 +77,7 @@ obligates:
 | Replay/staleness detection | The retired CRC-16 sequence-counter/replay-window mechanism has no TC18 counterpart in this codebase (`include/rcp/e2e.h`'s own file header records this explicitly) | **Not implemented in this library** — see `HARA.md` H-004/`tara.md` TS-002. Also an open item, not a derogation. |
 | Formal proofs of absence of deadlock | TLA+ liveness proofs deferred to an ASIL-C/D upgrade path | TLC exhaustive model check on bounded state spaces (`tla/`, `FORMAL_VERIFICATION.md`) covering the lifecycle FSM and the E2E safe-point/watchdog mechanism |
 | MISRA C:2012 mandatory + required compliance | Advisory rules selectively noted | `cfusa lint` clean on mandatory/required rules |
-| 100% MC/DC structural coverage | Branch coverage is captured (`lcov --rc branch_coverage=1`, both `ci.yml`'s `coverage` job and `release.yml`); MC/DC itself is not separately instrumented | See §3 |
+| 100% MC/DC structural coverage | Branch coverage is captured (`lcov --rc branch_coverage=1`, both `ci.yml`'s `coverage` job and `release.yml`); real MC/DC is now measured (informationally, non-gating) by `ci.yml`'s `mcdc` job (c-RCP-16 item 3, issue #518) | See §3 |
 
 Unlike the ASIL-D-requirement rows above (a deliberate, reasoned choice
 to not pursue a higher rigor level for an already-implemented
@@ -118,9 +138,36 @@ regeneration — reported there rather than hand-copied into this
 document, so this document cannot go stale relative to the actual
 measured number the way copying a snapshot would.
 
-MC/DC (Modified Condition/Decision Coverage) is not separately
-instrumented — DO-178C DAL-B applicability (§4) notes this as an open
-item, not resolved by branch coverage alone.
+**MC/DC (Modified Condition/Decision Coverage), added c-RCP-16 item 3
+(issue #518).** `ci.yml`'s `mcdc` job now measures real, genuine MC/DC
+via LLVM's own source-based coverage instrumentation
+(`clang -fcoverage-mcdc`), distinct from the branch-coverage proxy
+`cfusa coverage --dal DAL-A`/`--asil ASIL-D` would otherwise silently
+substitute (`cfusa coverage --help`'s own words: "NOT verified MC/DC
+evidence"). It does **not** route through `cfusa coverage
+--mcdc-file` — that flag's parser expects literal
+`"covered_true_count"`/`"covered_false_count"` JSON keys that real
+`llvm-cov export` never emits at any LLVM version (confirmed against
+upstream LLVM's `CoverageExporterJson.cpp`, which emits positional
+arrays instead — filed and tracked as SoundMatt/c-FuSa#129). The `mcdc`
+job reads `llvm-cov export`'s own `totals.mcdc` block directly instead,
+so the number is genuine MC/DC evidence today, not blocked on that
+upstream fix. Verified end-to-end locally (Apple Clang 21, same flags/mechanism the
+`ci.yml` job uses with `clang-18` on Ubuntu — the exact percentage is
+expected to vary marginally by LLVM version and is CI's own
+`mcdc-summary.json` artifact's job to report on each run, not this
+document's) against the current 67-test suite (`src/*.c` only,
+matching the `coverage` job's own exclusion of
+`tests/`/`unity/`/`_deps/`): **64.4% MC/DC condition-pair coverage
+(437/679)**, against 83.7% branch coverage over the same instrumented
+binaries — the two numbers diverging by ~19 points is itself the
+concrete demonstration of why a branch-coverage proxy is not a
+substitute for real MC/DC evidence at ASIL-C/D (ISO 26262-6:2018
+Table 12). Per this issue's own suggested sequencing, the job is
+**informational only** — no step in it fails the build; whether/when
+to introduce a hard MC/DC threshold is deliberately left as a future
+decision, matching how `cfusa trace --req-coverage` was rolled out
+informationally before becoming a hard gate between v0.2.0 and v0.53.0.
 
 **Platform-conditional carve-out (issue #520 category 3).** `ci.yml`'s
 `coverage` job runs on `ubuntu-22.04` only. Three first-party files
@@ -164,11 +211,13 @@ If c-RCP is used in an airborne system under DO-178C DAL-B:
 
 - Source code traceability to LLR: via `//cfusa:req` annotations —
   `.fusa-reqs.json`'s `scope: "tc18"` subset is this project's actual
-  LLR basis; `scope: "legacy-compat"` entries are informational only
-  (see §1)
+  LLR basis; `scope: "tc18-gap"`/`"retired"`/`"internal"` entries are
+  informational only (see §1)
 - Tool qualification: `cfusa` is a Tool Qualification Level analysis
   tool — see `qualify-report.json`
-- Decision coverage: MC/DC required at DAL-B — see the open item in §3
+- Decision coverage: MC/DC required at DAL-B — real, non-gating MC/DC
+  measurement now exists (§3's `mcdc` job); no hard threshold yet, see
+  §3 for the current measured percentage
 - Structural coverage artifacts: `coverage-report.json`, regenerated
   every tagged release
 - Gap report: `do178-gap-report.json` (auto-generated, `cfusa do178 --dal b`)
@@ -205,15 +254,20 @@ All of the following gates run on every tagged release
 ## 6. Traceability Matrix
 
 Requirements → implementation tracing is maintained in `.fusa-reqs.json`
-(854 requirements: 779 `scope: "tc18"` covering the register-map,
-lifecycle FSM, E2E safe points, every endpoint type's request/response
-shape, discovery, power-mode transitions, and every ADAPT-class
-satellite shipped through v0.84.0; 75 `scope: "legacy-compat"`
-describing the retired pre-TC18 Zone/Command surface, kept — not
-deleted — because `src/rcp.c`/`include/rcp/rcp.h` and
-`tests/legacy_mock.*` still carry `//cfusa:req` tags naming them, per
-`ROADMAP.md`'s v0.84.0 milestone confirming that surface as the last
-consumer of those retired types anywhere in `src/`). `cfusa trace
+(1095 requirements at HEAD: 947 `scope: "tc18"` covering the
+register-map, lifecycle FSM, E2E safe points, every endpoint type's
+request/response shape, discovery, power-mode transitions, and every
+ADAPT-class satellite; 136 `scope: "tc18-gap"` marking TC18 normative
+clauses this implementation does or doesn't fully meet, QM by
+definition; 6 `scope: "retired"` — dead requirement text kept only
+because a surviving `//cfusa:req` tag still names the ID, see
+`FREEDOM_FROM_INTERFERENCE.md` §3; 6 `scope: "internal"` — the
+allocator-hook indirection layer. This table's earlier 854/779/75
+"legacy-compat" figures described a pre-v0.91.0 codebase state — the
+pre-TC18 Zone/Command surface and `tests/legacy_mock.*` they referred
+to were fully removed at v0.91.0 per `CHANGELOG.md`'s Deprecation &
+Removal Log; see `FREEDOM_FROM_INTERFERENCE.md` §1 for the current
+verified breakdown). `cfusa trace
 --req-coverage 100` validates both metrics at 100% in CI: Metric 2
 (function-annotation density) has been a hard gate since v0.1.0; Metric
 1 (per-requirement traceability) became a hard gate at v0.53.0 once
@@ -233,9 +287,12 @@ For any change to a safety-relevant source file:
 2. Review all impacted requirements in the SCI report (`sci.json`)
 3. Re-run regression tests for all affected modules (`ctest`)
 4. Update `.fusa-reqs.json` if the change introduces new requirements —
-   set `scope: "tc18"` for anything describing shipped TC18 behavior;
-   `scope: "legacy-compat"` is reserved for the retired pre-TC18
-   surface and should not gain new entries
+   set `scope: "tc18"` for anything describing shipped, fully-conformant
+   TC18 behavior; `scope: "tc18-gap"` for a normative clause not yet
+   (or only partially) met, with the entry's own text kept current as
+   the implementation changes (see `FREEDOM_FROM_INTERFERENCE.md` §4
+   for what happens when it isn't); `scope: "retired"`/`"internal"` are
+   not intended to gain new entries outside their existing narrow use
 5. Re-generate the audit pack with `cfusa audit-pack`
 6. Obtain safety team review approval before merging
 
