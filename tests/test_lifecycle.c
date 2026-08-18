@@ -20,6 +20,14 @@
 //cfusa:test REQ-LIFECYCLE-019
 //cfusa:test REQ-LIFECYCLE-020
 //cfusa:test REQ-LIFECYCLE-021
+// Security-relevant subset (CYBERSECURITY.md §1.5, Layer 5 —
+// Register-Map Write Authorization): FUNCTIONAL_W_STAR field-locking
+// once RCP_CONFIGURED, paired with regmap.c's writer-authority check.
+// See CYBERSECURITY.md; formally verified via
+// tla/LifecycleStateMachine.tla's FieldLockMonotonicWhileConfigured.
+//cfusa:sec-test REQ-LIFECYCLE-018
+//cfusa:sec-test REQ-LIFECYCLE-019
+//cfusa:sec-test REQ-LIFECYCLE-020
 //cfusa:test REQ-LIFECYCLE-039
 //cfusa:test REQ-WIREERR-004
 //cfusa:test REQ-RMAP-025

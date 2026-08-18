@@ -30,6 +30,24 @@
 //cfusa:test REQ-E2E-027
 //cfusa:test REQ-WIREERR-003
 //cfusa:test REQ-E2E-046
+// Security-relevant subset (CYBERSECURITY.md §1.3, Layer 3 — E2E Safe
+// Points and Safety-Request Execution Gating): CRC32 frame integrity,
+// safety-tagged execution gating, and per-stream watchdog behavior.
+// See CYBERSECURITY.md and tara.md TS-002 (replay is explicitly NOT
+// covered here -- no requirement in this subset claims replay
+// mitigation).
+//cfusa:sec-test REQ-E2E-011
+//cfusa:sec-test REQ-E2E-012
+//cfusa:sec-test REQ-E2E-014
+//cfusa:sec-test REQ-E2E-015
+//cfusa:sec-test REQ-E2E-020
+//cfusa:sec-test REQ-E2E-021
+//cfusa:sec-test REQ-E2E-022
+//cfusa:sec-test REQ-E2E-023
+//cfusa:sec-test REQ-E2E-024
+//cfusa:sec-test REQ-E2E-025
+//cfusa:sec-test REQ-E2E-026
+//cfusa:sec-test REQ-E2E-027
 #include "unity.h"
 
 #include "../src/mem_bounded.h"

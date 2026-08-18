@@ -354,6 +354,7 @@ static void test_set_trigger_applies_when_authorized(void)
 /* ── The EP_func register block ────────────────────────────────────────────── */
 
 //cfusa:test REQ-UART-036
+//cfusa:test REQ-UART-038
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;

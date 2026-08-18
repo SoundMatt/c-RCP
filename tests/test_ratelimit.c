@@ -5,6 +5,12 @@
 //cfusa:test REQ-RL-004
 //cfusa:test REQ-RL-005
 //cfusa:test REQ-RL-006
+// Security-relevant subset (CYBERSECURITY.md §1.6, Layer 6 — Rate
+// Limiting): per-(stream_id, byte_bus_id) token-bucket admission
+// control mitigating request-flood DoS, with safety-tagged requests
+// exempt by default. See CYBERSECURITY.md §3 (Request-flood DoS row).
+//cfusa:sec-test REQ-RL-003
+//cfusa:sec-test REQ-RL-004
 //cfusa:test REQ-RL-007
 //cfusa:test REQ-RL-008
 //cfusa:test REQ-RL-009

@@ -7,6 +7,18 @@
 //cfusa:test REQ-AUTH-006
 //cfusa:test REQ-AUTH-007
 //cfusa:test REQ-AUTH-008
+// Security-relevant subset (CYBERSECURITY.md §1.2, Layer 2 — Request
+// Authorization): REQ-AUTH-001..008 gate every request against
+// rcp_authz_policy_permit() before it reaches its endpoint-specific
+// encode/send call. See CYBERSECURITY.md and tara.md TS-001.
+//cfusa:sec-test REQ-AUTH-001
+//cfusa:sec-test REQ-AUTH-002
+//cfusa:sec-test REQ-AUTH-003
+//cfusa:sec-test REQ-AUTH-004
+//cfusa:sec-test REQ-AUTH-005
+//cfusa:sec-test REQ-AUTH-006
+//cfusa:sec-test REQ-AUTH-007
+//cfusa:sec-test REQ-AUTH-008
 #include "unity.h"
 
 #include <rcp/authz.h>
