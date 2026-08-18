@@ -1889,9 +1889,16 @@ void rcp_regmap_svr_ep_cfg_init(rcp_regmap_svr_ep_cfg_t *cfg)
 
 /* ── Per-endpoint-type named-signal index ──────────────────────────────────── */
 
-//cfusa:req REQ-RMAP-014
-//cfusa:req REQ-RMAP-015
-const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig)
+/* The GPIO0..GPIO31 third of rcp_regmap_named_signal_string()'s own
+ * name table, split into its own function purely to keep that function
+ * under this project's own max_function_lines convention (CFUSA-L001) --
+ * no behavior change, same case-by-case string literals. Returns NULL
+ * (not "unknown") for any non-GPIO signal, so the caller can tell "not a
+ * GPIO signal" apart from "GPIO signal, but genuinely unrecognized" (the
+ * latter can't happen here -- GPIO0..GPIO31 is this switch's own
+ * complete range -- but the NULL/non-NULL contract stays honest either
+ * way, rather than baking in an assumption about the enum's completeness). */
+static const char *gpio_named_signal_string(rcp_regmap_named_signal_t sig)
 {
     switch (sig) {
     case RCP_REGMAP_SIGNAL_GPIO0:  return "GPIO0";
@@ -1926,6 +1933,18 @@ const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig)
     case RCP_REGMAP_SIGNAL_GPIO29: return "GPIO29";
     case RCP_REGMAP_SIGNAL_GPIO30: return "GPIO30";
     case RCP_REGMAP_SIGNAL_GPIO31: return "GPIO31";
+    default: return NULL;
+    }
+}
+
+//cfusa:req REQ-RMAP-014
+//cfusa:req REQ-RMAP-015
+const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig)
+{
+    const char *gpio_name = gpio_named_signal_string(sig);
+    if (gpio_name) return gpio_name;
+
+    switch (sig) {
     case RCP_REGMAP_SIGNAL_SPI_CLK:  return "SPI_CLK";
     case RCP_REGMAP_SIGNAL_SPI_PICO: return "SPI_PICO";
     case RCP_REGMAP_SIGNAL_SPI_POCI: return "SPI_POCI";

@@ -6,6 +6,6 @@
 #ifndef RCP_VERSION_H
 #define RCP_VERSION_H
 
-#define RCP_VERSION "0.425.0"
+#define RCP_VERSION "0.426.0"
 
 #endif /* RCP_VERSION_H */

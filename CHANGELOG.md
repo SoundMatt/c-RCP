@@ -355,6 +355,73 @@ already-documented fact, not a regression); `cfusa trace
 `ROADMAP.md`'s matching entry for the full accounting. Issue #522
 closed as fully resolved.
 
+### v0.426.0 -- 2026-08-18 (c-RCP-21 L001 sub-effort: split 3 over-length `src/` functions, all real `src/` candidates closed)
+
+Fourth sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532) and CY001 (PRs #537,
+#541). Resolves the 3 real `src/` **L001** (MISRA R15.5,
+function-length) candidates this issue's own analysis identified;
+the other 71 `tests/` findings stay explicitly out of scope (see
+issue #523's own "Not in scope" note -- this project's
+long-sequential-assertion test convention, not a code-quality gap).
+
+Each split is a pure extraction with no behavior change, same
+control flow and same string/error-code literals, just moved into a
+named `static` helper:
+
+- **`src/lifecycle.c`** -- `rcp_lifecycle_check_rcp_cfg()` (52 lines)
+  split into itself (endpoint-association bullet only) plus a new
+  `request_streams_consistent()` helper (the response-stream-index
+  and orphaned-stream-slot bullets).
+- **`src/config.c`** -- `rcp_config_parse_json()` (80 lines) split
+  into itself (the `while` loop's own iteration control) plus a new
+  `parse_config_object()` helper (the three-way endpoint/pin/stream
+  object-kind dispatch previously inline in the loop body). Side
+  benefit: cyclomatic complexity (`COMP001`) also drops, a genuine
+  reduction from de-nesting the dispatch, not a text-matching
+  artifact. Two of the three `goto fail;` sites this function
+  previously had become `return false;` in the new helper (a real,
+  substantive `CFUSA-L002` improvement -- 2 fewer actual `goto`
+  statements in this file, not a detector-formatting trick).
+- **`src/regmap.c`** -- `rcp_regmap_named_signal_string()` (65 lines)
+  split into itself (SPI/I2C/UART/LIN/PWM/ADC/DAC/CAN/ISELED/MDIO
+  signals) plus a new `gpio_named_signal_string()` helper (the
+  GPIO0..GPIO31 third of the name table, returning `NULL` rather
+  than `"unknown"` for a non-GPIO signal so the caller can fall
+  through to its own switch).
+
+`cfusa check` diff against baseline is exactly `CFUSA-L001: 74 -> 71`
+(all 3 real `src/` candidates now split; the 71 `tests/` findings
+untouched, explicitly out of scope), `CFUSA-L002: 3 -> 1` (2 real
+`goto` eliminations, `config.c`), `COMP001: 11 -> 10` (real
+complexity reduction, `config.c`). Every other rule's count
+byte-identical.
+
+Mutation-tested all three: `lifecycle.c`'s new helper's call site
+disabled -- 1 targeted `rcp_lifecycle` failure; `config.c`'s new
+helper's endpoint-append branch suppressed -- 3 targeted `rcp_config`
+failures; `regmap.c`'s new helper's return value discarded (forcing
+every GPIO signal through the outer switch's own `"unknown"` default)
+-- 1 targeted `rcp_regmap` failure (`test_named_signal_string_unique`,
+since all 32 GPIO signals then collapse to the same string). All
+three reverted before commit. (A first single-case-content mutation
+on `regmap.c`'s GPIO table passed uncaught -- confirmed as a
+pre-existing `test_regmap.c` coverage gap present identically before
+this split, not a regression it introduces: the existing tests check
+"non-null, non-empty, pairwise-unique," never a specific enum-to-
+string mapping's literal content. Out of scope for this L001-only
+issue to backfill.)
+
+Full 67/67 test suite + from-scratch ASan/UBSan clean. `cfusa check`:
+0 errors. `cfusa trace --req-coverage 100 --sec-tested 100`:
+unchanged, 1095/1095 / 512/512.
+
+**Remaining for `[c-RCP-21]`** (issue #523 stays open): L008 (149
+findings, documented as mostly-legitimate idiomatic C, lowest
+priority) and A003 (43 findings, recommend reporting the detector's
+apparent false-positive rate upstream to c-FuSa rather than
+bulk-"fixing" already-correct `size_t`-vs-`size_t` comparisons).
+
 ### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half: memcpy/memmove/strncpy explicit-size-bounded wrappers, 66/66 `tests/` sites -- CY001 fully closed)
 
 Third sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle

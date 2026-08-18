@@ -337,6 +337,68 @@ static bool parse_stream_entry(const char *open, const char *close, rcp_config_s
     return true;
 }
 
+/* One iteration of rcp_config_parse_json()'s own top-level object scan:
+ * classifies the object spanning [open, close] by which of the three
+ * repeated-entry-kind fields it contains, parses it with the matching
+ * per-kind parser, and appends it to the matching growable array. Any
+ * other object kind (the "server" section's own span, the manifest's
+ * outer wrapper) is not one of this schema's three repeated entry kinds
+ * -- skipped, not an error (see file header). Returns false on a
+ * per-kind parse or out-of-memory failure; rcp_config_parse_json()'s own
+ * `fail:` cleanup frees whatever the three arrays hold so far regardless
+ * of how much parsing succeeded before this call returned false. Split
+ * out of rcp_config_parse_json() itself purely to keep that function
+ * under this project's own max_function_lines convention (CFUSA-L001) --
+ * no behavior change, same fields read/appended in the same order. */
+static bool parse_config_object(const char *open, const char *close,
+                                 rcp_config_hw_pin_t **pins, size_t *pins_len, size_t *pins_cap,
+                                 rcp_config_endpoint_t **endpoints, size_t *eps_len, size_t *eps_cap,
+                                 rcp_config_stream_t **streams, size_t *strs_len, size_t *strs_cap,
+                                 char *err_msg, size_t err_msg_cap)
+{
+    if (find_in_range(open, close + 1, "\"byte_bus_id\"") ||
+        find_in_range(open, close + 1, "\"ep_type\"")) {
+        /* "ep_type" alone (byte_bus_id missing/malformed) still routes
+         * here so an endpoint entry missing its byte_bus_id field is
+         * rejected by parse_endpoint_entry() below (REQ-CFG-004), rather
+         * than silently skipped as an unrecognized object -- the same
+         * "either required field routes it, so the real validator gets a
+         * chance to reject" precedent the stream branch below already
+         * establishes for "configured". */
+        rcp_config_endpoint_t entry;
+        if (!parse_endpoint_entry(open, close, &entry, err_msg, err_msg_cap)) return false;
+        if (!append_endpoint(endpoints, eps_len, eps_cap, entry)) {
+            set_err(err_msg, err_msg_cap, "out of memory", NULL);
+            return false;
+        }
+    } else if (find_in_range(open, close + 1, "\"hw_ep_nr\"") ||
+               find_in_range(open, close + 1, "\"hw_ep_pin_nr\"")) {
+        /* "hw_ep_pin_nr" alone (hw_ep_nr missing/malformed) still routes
+         * here so a hw_pin_map entry missing its hw_ep_nr field is
+         * rejected by parse_pin_entry() below (REQ-CFG-001), same
+         * reasoning as the endpoint branch immediately above. */
+        rcp_config_hw_pin_t entry;
+        if (!parse_pin_entry(open, close, &entry, err_msg, err_msg_cap)) return false;
+        if (!append_pin(pins, pins_len, pins_cap, entry)) {
+            set_err(err_msg, err_msg_cap, "out of memory", NULL);
+            return false;
+        }
+    } else if (find_in_range(open, close + 1, "\"rx_stream_id\"") ||
+               find_in_range(open, close + 1, "\"configured\"")) {
+        /* "configured" alone (rx_stream_id missing/malformed) still
+         * routes here so a stream entry missing its one required field is
+         * rejected by parse_stream_entry() below, rather than silently
+         * skipped as an unrecognized object. */
+        rcp_config_stream_t entry;
+        if (!parse_stream_entry(open, close, &entry, err_msg, err_msg_cap)) return false;
+        if (!append_stream(streams, strs_len, strs_cap, entry)) {
+            set_err(err_msg, err_msg_cap, "out of memory", NULL);
+            return false;
+        }
+    }
+    return true;
+}
+
 //cfusa:req REQ-CFG-007
 int rcp_config_parse_json(const char *json, rcp_config_manifest_t *out, char *err_msg, size_t err_msg_cap)
 {
@@ -358,49 +420,11 @@ int rcp_config_parse_json(const char *json, rcp_config_manifest_t *out, char *er
         close = strchr(open, '}');
         if (!close) break;
 
-        if (find_in_range(open, close + 1, "\"byte_bus_id\"") ||
-            find_in_range(open, close + 1, "\"ep_type\"")) {
-            /* "ep_type" alone (byte_bus_id missing/malformed) still routes
-             * here so an endpoint entry missing its byte_bus_id field is
-             * rejected by parse_endpoint_entry() below (REQ-CFG-004),
-             * rather than silently skipped as an unrecognized object --
-             * the same "either required field routes it, so the real
-             * validator gets a chance to reject" precedent this loop's own
-             * stream branch already established below for "configured". */
-            rcp_config_endpoint_t entry;
-            if (!parse_endpoint_entry(open, close, &entry, err_msg, err_msg_cap)) goto fail;
-            if (!append_endpoint(&endpoints, &eps_len, &eps_cap, entry)) {
-                set_err(err_msg, err_msg_cap, "out of memory", NULL);
-                goto fail;
-            }
-        } else if (find_in_range(open, close + 1, "\"hw_ep_nr\"") ||
-                   find_in_range(open, close + 1, "\"hw_ep_pin_nr\"")) {
-            /* "hw_ep_pin_nr" alone (hw_ep_nr missing/malformed) still
-             * routes here so a hw_pin_map entry missing its hw_ep_nr field
-             * is rejected by parse_pin_entry() below (REQ-CFG-001), same
-             * reasoning as the endpoint branch immediately above. */
-            rcp_config_hw_pin_t entry;
-            if (!parse_pin_entry(open, close, &entry, err_msg, err_msg_cap)) goto fail;
-            if (!append_pin(&pins, &pins_len, &pins_cap, entry)) {
-                set_err(err_msg, err_msg_cap, "out of memory", NULL);
-                goto fail;
-            }
-        } else if (find_in_range(open, close + 1, "\"rx_stream_id\"") ||
-                   find_in_range(open, close + 1, "\"configured\"")) {
-            /* "configured" alone (rx_stream_id missing/malformed) still
-             * routes here so a stream entry missing its one required field
-             * is rejected by parse_stream_entry() below, rather than
-             * silently skipped as an unrecognized object. */
-            rcp_config_stream_t entry;
-            if (!parse_stream_entry(open, close, &entry, err_msg, err_msg_cap)) goto fail;
-            if (!append_stream(&streams, &strs_len, &strs_cap, entry)) {
-                set_err(err_msg, err_msg_cap, "out of memory", NULL);
-                goto fail;
-            }
-        }
-        /* Any other object (including the "server" section's own span, and
-         * the manifest's outer wrapper) is not one of this schema's three
-         * repeated entry kinds -- skipped, not an error (see file header). */
+        if (!parse_config_object(open, close, &pins, &pins_len, &pins_cap,
+                                  &endpoints, &eps_len, &eps_cap,
+                                  &streams, &strs_len, &strs_cap,
+                                  err_msg, err_msg_cap))
+            goto fail;
 
         pos = (size_t)(close - json) + 1;
     }
