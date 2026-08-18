@@ -34,6 +34,113 @@ the rationale.
 
 ## Releases
 
+### v0.430.0 -- 2026-08-18 (c-RCP-17 round 3: respqueue.c/loan.c fixed-capacity redesigns, ep_can.c fragment-plan/scratch-buffer conversion, Phase (c) dynamic-allocation posture write-up)
+
+Round 3 on issue #521, picking up exactly where PR #547's status
+comment left off: `respqueue.c`/`loan.c`'s real design decisions,
+the fragment-plan segment arrays, and Phase (c) documentation.
+
+**`respqueue.c`/`respqueue.h`: `entries[]`/`entries_seq[]` -> fixed
+arrays, `RCP_RESPQUEUE_MAX_ENTRIES` made universal.** The prior
+revision's `RCP_RESPQUEUE_MAX_ENTRIES` (64) slot-count bound applied
+only as a fallback when `capacity_octets == 0` -- once a real byte
+budget was configured, `entries_len` could legitimately exceed 64,
+which meant the realloc()-grown array could not simply become a fixed
+64-slot array without a real behavior change. Resolved by making the
+bound universal: the eviction loop in `rcp_respqueue_push_seq()` now
+triggers on EITHER the byte-budget condition (unchanged) OR
+`entries_len == RCP_RESPQUEUE_MAX_ENTRIES` (new), so `entries_len` can
+never exceed 64 under any configuration. A caller configuring a
+generous `capacity_octets` with many small messages now finds the slot
+count an additional binding constraint before its full byte budget is
+exhausted -- a deliberate, documented trade accepted to eliminate this
+struct's own heap growth entirely. Per-entry `rcp_bytes_t` payload
+copies remain individually heap-allocated (frame_len is
+caller/message-dependent, not a compile-time constant) -- only the
+bookkeeping arrays are now fixed-capacity.
+
+**`loan.c`/`loan.h`: pool free-list `entries[]` -> fixed array,
+new `RCP_LOAN_POOL_MAX_ENTRIES` (64).** `pool_append()`'s
+realloc()-growing free-list bookkeeping array is now a fixed-capacity
+array embedded in `rcp_loan_pool_t`; once full, a further
+`rcp_loan_return()` degrades to freeing the buffer outright instead of
+pooling it (an already-existing, already-tested failure path -- no new
+one). Each pooled buffer's own DATA bytes and the small per-acquire
+`rcp_loan_t`/`loan_release_ctx_t` control blocks remain heap-based:
+the module's entire purpose (`loan.h`'s own file header) is caching
+reuse of caller-arbitrary-sized buffers, a shape Phase (b)'s
+"mechanical, behavior-preserving" scope does not cover without a
+breaking pool-API redesign.
+
+**`ep_can.c`/`ep_can.h`: `build_payload()`'s scratch buffer and the
+fragment-plan segment array -> fixed stack arrays.** Both were
+already bounded by real compile-time protocol constants
+(`RCP_EP_CAN_XL_MAX_ENCODED_LEN` = 2058 octets for the combined
+prefix-then-data payload) -- exactly the "already validated against an
+existing MAX_PAYLOAD-style constant before allocating" case issue #521
+itself named as near-mechanical. New `RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`
+(256) bounds the segment-plan array; `rcp_ep_can_frame_response_
+fragment_count()` now rejects (0) rather than silently overrun a
+`max_fragment_payload` small enough to need more than 256 segments
+(the worst case, a full 2058-octet XL payload at `max_fragment_payload`
+= 8, needs exactly 258 -- one more than the new ceiling, confirmed by
+a new boundary test). `ep_can.c` now has zero remaining dynamic
+allocation of its own.
+
+**`AUDIT_PACK.md`: Phase (c) write-up.** New "Dynamic Allocation
+Posture (issue #521)" subsection under §2 records what remains
+genuinely dynamic and why, in five categories: (1) the pervasive
+`rcp_bytes_t`-returning public encode/decode API surface across every
+`ep_*.c`/`acf.c`/`avtp.c`/`e2e.c` module (input-size-proportional
+output, no small fixed ceiling in every case -- `fragment.c`'s
+reassembly buffer is the same shape); (2) `ep_iseled.c`'s own
+fragment-plan array, deliberately NOT converted like `ep_can.c`'s
+because ISELED response length is bounded only by a 16-bit `read_size`
+register (up to 65535) with no small compile-time ceiling to size a
+fixed array against; (3) `loan.c`'s pooled buffers and per-acquire
+control blocks; (4) `relay.c`'s message metadata (no TC18 wire bound
+to cite); (5) `mdns.c`'s config-time string duplication and
+`platform.c`'s thread-thunk allocation, both one-time setup-path
+allocations, not per-message hot-path ones. All five categories are
+already routed through the `alloc.h` seam (Phase (a)), so an
+integrator can bound any of them today via `rcp_malloc`/`rcp_calloc`/
+`rcp_realloc` hooks without a library change.
+
+Mutation-tested: `respqueue.c`'s universal eviction trigger (removed,
+confirmed a SIGSEGV once `entries_len` exceeded the fixed array --
+proving the check load-bearing, not a no-op -- reapplied);
+`loan.c`'s free-list capacity check (widened to an off-by-one,
+confirmed a SIGBUS/crash, reapplied); `ep_can.c`'s new segment-count
+ceiling (removed, confirmed the new boundary test fails with a real
+258-segment count instead of the expected 0, reapplied). Two
+`test_ep_can.c` tests updated for the new fixed-capacity call-counting
+offsets (the old "segs allocation fails" test no longer applies --
+there is no longer a segs allocation to fail -- removed; the
+"frees prior frames" test's fault-injection call count shifted from
+4 to 2, since the two heap allocations that used to precede the
+per-segment encode calls are gone). New `test_respqueue.c` test
+rewritten for the new universal-bound semantics (the old test asserted
+the now-superseded fallback-only behavior). New `test_loan.c` test
+replaces an allocation-hook-based free-list-full simulation with a
+deterministic fill-to-capacity-then-overflow scenario (the hook it
+used no longer applies, since the free list is no longer
+realloc()-grown). New `test_ep_can.c` boundary test for the segment
+ceiling.
+
+Full 67-test suite: 100% passing. ASan/UBSan (CI's exact flags):
+clean. Pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (1095/1095 reqs,
+512/512 functions), unchanged from baseline.
+
+**Remaining for issue #521**: `ep_iseled.c`'s fragment-plan array and
+`respqueue.c`'s entries themselves stay genuinely dynamic per the
+Phase (c) write-up above (§AUDIT_PACK.md), not because of remaining
+mechanical work -- see that section for the specific reasoning per
+category. No further "convert this to fixed-capacity" work remains
+identified against this issue's own phased scope.
+
+[c-RCP-17]
+
 ### v0.429.0 -- 2026-08-18 (c-RCP-16: SEOOC evidence package items 3-5 -- real MC/DC, freedom-from-interference, AUDIT_PACK reframe)
 
 Continues issue #518's five-item suggested approach after PR #528

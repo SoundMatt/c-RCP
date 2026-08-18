@@ -868,6 +868,23 @@ static void test_fragment_count_one_when_fits_in_one_fragment(void)
     TEST_ASSERT_EQUAL_UINT(1, count);
 }
 
+/* Issue #521: rcp_ep_can_encode_frame_response_fragmented()'s own
+ * fragment-plan array is a fixed RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS-entry
+ * stack array, not heap-allocated -- a max_fragment_payload small
+ * enough to need more segments than that must be rejected (0) rather
+ * than silently truncated or overrun. Worst-case combined payload
+ * (RCP_EP_CAN_XL_MAX_ENCODED_LEN = 2058 octets) at max_fragment_payload
+ * = 8 needs ceil(2058/8) = 258 segments, one more than the 256-entry
+ * ceiling. */
+static void test_fragment_count_zero_when_segment_count_exceeds_max_fragment_segments(void)
+{
+    rcp_ep_can_xl_header_t xl_hdr = {0};
+    size_t                 count  = rcp_ep_can_frame_response_fragment_count(
+        RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr, RCP_EP_CAN_XL_MAX_DATA_LEN, 8);
+
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
 static void test_fragment_count_zero_for_bad_preconditions(void)
 {
     /* Invalid frame_format -> encode_preconditions_ok() fails -> 0. */
@@ -1046,12 +1063,14 @@ static void test_fragment_timed_response_round_trip(void)
 }
 
 /* ── rcp_ep_can_encode_frame_response_fragmented()'s allocation-failure
- * cleanup paths (issue #520 category 2). It makes an ordered sequence of
- * rcp_malloc() calls -- build_payload()'s combined buffer, then the segs
- * plan array, then one more per segment inside rcp_acf_encode_gbb()/
- * _abb() -- so a call-counting fault-injection hook (alloc.h's own
- * harness, same pattern as shmem.c's counting_calloc) can fail exactly
- * the Nth one and leave the rest to the real allocator. */
+ * cleanup path (issue #520 category 2, updated for issue #521). As of
+ * issue #521, build_payload()'s combined buffer and the segs plan array
+ * are both fixed-capacity stack arrays, not heap-allocated (see
+ * RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS's own doc comment, ep_can.h) -- the
+ * only remaining rcp_malloc() calls in this path are one per segment
+ * inside rcp_acf_encode_gbb()/_abb(), so a call-counting fault-injection
+ * hook (alloc.h's own harness, same pattern as shmem.c's
+ * counting_calloc) can fail exactly the Nth segment's own encode. */
 
 static int g_can_malloc_call_count;
 static int g_can_malloc_fail_at_call;
@@ -1072,22 +1091,6 @@ static void reset_counting_malloc(int fail_at_call)
     rcp_alloc_set_hooks(&hooks);
 }
 
-static void test_fragmented_encode_returns_zero_when_segs_allocation_fails(void)
-{
-    uint8_t     rx[8];
-    size_t      i;
-    rcp_bytes_t frames[4];
-    size_t      count;
-
-    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)i;
-
-    reset_counting_malloc(2); /* build_payload's combined = call 1, segs = call 2 */
-
-    count = rcp_ep_can_encode_frame_response_fragmented(
-        7, RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, rx, sizeof(rx), 1, false, 0, 5, frames);
-    TEST_ASSERT_EQUAL_UINT(0, count);
-}
-
 /* Fails the *second* segment's own rcp_acf_encode_gbb()/rcp_malloc() call
  * (not the first), so the failure path's own "free every frame already
  * encoded before this one" loop runs with real content (i == 1, not the
@@ -1102,9 +1105,10 @@ static void test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails
 
     for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)i;
 
-    /* combined = call 1, segs = call 2, segment[0] encode = call 3,
-     * segment[1] encode = call 4. */
-    reset_counting_malloc(4);
+    /* segment[0] encode = call 1, segment[1] encode = call 2 -- issue
+     * #521 removed the two heap allocations (combined, segs) that used
+     * to precede these. */
+    reset_counting_malloc(2);
 
     count = rcp_ep_can_encode_frame_response_fragmented(
         7, RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, rx, sizeof(rx), 1, true, 42, 5, frames);
@@ -1384,9 +1388,9 @@ int main(void)
 
     RUN_TEST(test_fragment_count_one_when_fits_in_one_fragment);
     RUN_TEST(test_fragment_count_zero_for_bad_preconditions);
+    RUN_TEST(test_fragment_count_zero_when_segment_count_exceeds_max_fragment_segments);
     RUN_TEST(test_fragment_worst_case_can_xl_response_round_trip);
     RUN_TEST(test_fragment_timed_response_round_trip);
-    RUN_TEST(test_fragmented_encode_returns_zero_when_segs_allocation_fails);
     RUN_TEST(test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails);
     RUN_TEST(test_fragment_response_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_encode_rejects_bad_preconditions);

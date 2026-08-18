@@ -2,7 +2,6 @@
 #include "rcp/loan.h"
 #include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -37,9 +36,13 @@ typedef struct {
 
 struct rcp_loan_pool {
     rcp_mutex_t    mu; /* protects entries[] */
-    pool_entry_t  *entries;
-    size_t         entries_len;
-    size_t         entries_cap;
+    pool_entry_t   entries[RCP_LOAN_POOL_MAX_ENTRIES]; /* fixed-capacity
+                                     free list (issue #521) -- see
+                                     RCP_LOAN_POOL_MAX_ENTRIES's own doc
+                                     comment (loan.h) for the "free list
+                                     full" degradation behavior. */
+    size_t         entries_len;  /* Always <= RCP_LOAN_POOL_MAX_ENTRIES,
+                                     by construction. */
 };
 
 typedef struct {
@@ -59,16 +62,13 @@ rcp_loan_pool_t *rcp_loan_pool_new(void)
 
 static bool pool_append(rcp_loan_pool_t *pool, uint8_t *data, size_t cap)
 {
-    if (pool->entries_len == pool->entries_cap) {
-        size_t new_cap = (pool->entries_cap == 0) ? 4 : pool->entries_cap * 2;
-        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*pool->entries));
-        pool_entry_t *grown = alloc_bytes == 0
-            ? NULL
-            : (pool_entry_t *)rcp_realloc(pool->entries, alloc_bytes);
-        if (!grown) return false;
-        pool->entries     = grown;
-        pool->entries_cap = new_cap;
-    }
+    /* Issue #521: entries[] is a fixed-capacity array embedded in *pool,
+     * not realloc()-grown heap storage -- once RCP_LOAN_POOL_MAX_ENTRIES
+     * returned buffers are already free-listed, this returns false
+     * exactly as an allocation failure would have, and the caller
+     * (loan_release_to_pool() below) already frees `data` outright in
+     * that case rather than leaking it. */
+    if (pool->entries_len == RCP_LOAN_POOL_MAX_ENTRIES) return false;
     pool->entries[pool->entries_len].data = data;
     pool->entries[pool->entries_len].cap  = cap;
     pool->entries_len++;
@@ -160,8 +160,8 @@ void rcp_loan_pool_destroy(rcp_loan_pool_t *pool)
         rcp_free(pool->entries[i].data);
         pool->entries[i].data = NULL;
     }
-    rcp_free(pool->entries);
-    pool->entries = NULL;
+    /* entries[] is a fixed-capacity array embedded in *pool (issue
+     * #521) -- no array storage of its own to free. */
     rcp_mutex_destroy(&pool->mu);
     rcp_free(pool);
     pool = NULL;

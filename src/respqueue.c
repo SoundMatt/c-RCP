@@ -1,10 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/respqueue.h"
-#include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
-
-#include <stdlib.h>
 #include <string.h>
 
 //cfusa:req REQ-RMAP-059
@@ -25,12 +21,9 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q)
     for (i = 0; i < q->entries_len; i++) {
         rcp_bytes_free(&q->entries[i]);
     }
-    rcp_free(q->entries);
-    rcp_free(q->entries_seq);
-    q->entries           = NULL;
-    q->entries_seq       = NULL;
+    /* entries[]/entries_seq[] are fixed-capacity arrays embedded in *q
+     * (issue #521) -- no array storage of their own to free. */
     q->entries_len       = 0;
-    q->entries_cap       = 0;
     q->octets            = 0;
     q->next_sequence_num = 0;
     q->overflow          = false;
@@ -54,9 +47,7 @@ bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_l
 bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len,
                              uint8_t sequence_num)
 {
-    rcp_bytes_t *grown_entries;
-    uint8_t     *grown_seq;
-    rcp_bytes_t  copy;
+    rcp_bytes_t copy;
 
     /* REQ-RMAP-061: per-message Max_AVTPDUsize ceiling. UNCHANGED by
      * GitHub #423/#446 -- still checked first, still rejects (queue
@@ -77,52 +68,28 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
     if (frame_len != 0 && copy.data == NULL) return false; /* alloc failure: q untouched */
 
     /* TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423, corrected by
-     * GitHub #446): eviction now triggers on the REAL "queue is
-     * completely full" condition, capacity_octets (TC18's own
-     * queue_size register, §12.7.9) -- not merely an artificial
-     * slot-count bound. RCP_RESPQUEUE_MAX_ENTRIES is retained only as a
-     * secondary, defensive fallback for the capacity_octets == 0
-     * (unbounded) case, where there is no byte budget to evict against
-     * at all. */
-    if (q->capacity_octets != 0) {
-        /* Evict lowest-sequence_num entries, one at a time, until
-         * frame_len fits within the remaining budget -- a single
-         * eviction frees only its own evicted entry's own byte length,
-         * which may be smaller than frame_len, so one eviction is not
-         * always enough; this may evict several entries, or none at
-         * all if frame_len already fits. The `frame_len >
-         * q->capacity_octets` case was already rejected above, so once
-         * q->entries_len reaches 0 (octets == 0), frame_len <=
-         * capacity_octets - 0 trivially holds and this loop always
-         * terminates without running off the front of an empty queue. */
-        while (frame_len > q->capacity_octets - q->octets) {
-            size_t lowest_idx = 0;
-            size_t i;
-
-            for (i = 1; i < q->entries_len; i++) {
-                if (q->entries_seq[i] < q->entries_seq[lowest_idx]) {
-                    lowest_idx = i;
-                }
-            }
-
-            q->octets -= q->entries[lowest_idx].len;
-            rcp_bytes_free(&q->entries[lowest_idx]);
-
-            /* Close the gap left by the evicted slot, preserving FIFO
-             * order for the remaining entries -- mirrors
-             * rcp_respqueue_pop()'s own shift-down convention below. */
-            for (i = lowest_idx + 1; i < q->entries_len; i++) {
-                q->entries[i - 1]     = q->entries[i];
-                q->entries_seq[i - 1] = q->entries_seq[i];
-            }
-            q->entries_len--;
-            q->overflow = true;
-        }
-    } else if (q->entries_len == RCP_RESPQUEUE_MAX_ENTRIES) {
-        /* capacity_octets == 0 (unbounded): fall back to the
-         * RCP_RESPQUEUE_MAX_ENTRIES slot-count bound as the "completely
-         * full" trigger instead -- a single eviction always suffices
-         * here, since this bound is a slot count, not a byte budget. */
+     * GitHub #446, made universal by issue #521): evict lowest-
+     * sequence_num entries, one at a time, for as long as EITHER (a)
+     * capacity_octets is nonzero (TC18's own "queue is completely full"
+     * condition, §12.7.9) and frame_len still doesn't fit the remaining
+     * byte budget, OR (b) q->entries_len has reached
+     * RCP_RESPQUEUE_MAX_ENTRIES, q's own fixed-capacity slot-count
+     * ceiling -- enforced unconditionally now that entries[]/
+     * entries_seq[] are fixed-size arrays embedded in *q rather than
+     * realloc()-grown heap storage, so entries_len can never exceed it
+     * regardless of capacity_octets. A single eviction frees only its
+     * own evicted entry's own byte length, which may be smaller than
+     * frame_len, so condition (a) alone is not always satisfied by one
+     * eviction; this may evict several entries, or none at all if
+     * frame_len already fits and there is a free slot. The `frame_len >
+     * q->capacity_octets` case was already rejected above, so once
+     * q->entries_len reaches 0 (octets == 0), frame_len <=
+     * capacity_octets - 0 trivially holds and condition (a) cannot
+     * still be true; RCP_RESPQUEUE_MAX_ENTRIES >= 1 so condition (b)
+     * also always clears after enough evictions -- this loop always
+     * terminates without running off the front of an empty queue. */
+    while ((q->capacity_octets != 0 && frame_len > q->capacity_octets - q->octets) ||
+           q->entries_len == RCP_RESPQUEUE_MAX_ENTRIES) {
         size_t lowest_idx = 0;
         size_t i;
 
@@ -135,39 +102,15 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
         q->octets -= q->entries[lowest_idx].len;
         rcp_bytes_free(&q->entries[lowest_idx]);
 
+        /* Close the gap left by the evicted slot, preserving FIFO
+         * order for the remaining entries -- mirrors
+         * rcp_respqueue_pop()'s own shift-down convention below. */
         for (i = lowest_idx + 1; i < q->entries_len; i++) {
             q->entries[i - 1]     = q->entries[i];
             q->entries_seq[i - 1] = q->entries_seq[i];
         }
         q->entries_len--;
         q->overflow = true;
-    }
-
-    if (q->entries_len == q->entries_cap) {
-        size_t new_cap = (q->entries_cap == 0) ? 4 : q->entries_cap * 2;
-        size_t entries_bytes = rcp_alloc_checked_size(new_cap, sizeof(*q->entries));
-        size_t seq_bytes;
-
-        grown_entries = entries_bytes == 0
-            ? NULL
-            : (rcp_bytes_t *)rcp_realloc(q->entries, entries_bytes);
-        if (!grown_entries) {
-            rcp_bytes_free(&copy);
-            return false;
-        }
-        q->entries = grown_entries;
-
-        seq_bytes = rcp_alloc_checked_size(new_cap, sizeof(*q->entries_seq));
-        grown_seq = seq_bytes == 0
-            ? NULL
-            : (uint8_t *)rcp_realloc(q->entries_seq, seq_bytes);
-        if (!grown_seq) {
-            rcp_bytes_free(&copy);
-            return false;
-        }
-        q->entries_seq = grown_seq;
-
-        q->entries_cap = new_cap;
     }
 
     q->entries[q->entries_len]     = copy;

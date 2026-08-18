@@ -87,6 +87,115 @@ closed — recorded honestly here rather than folded into the same
 "derogation" framing as the others, which would misrepresent an absent
 control as a considered rigor trade-off.
 
+### Dynamic Allocation Posture (issue #521)
+
+MISRA C:2012 Rule 21.3 ("The memory allocation and deallocation
+functions of `<stdlib.h>` shall not be used") and the equivalent ISO
+26262-6 guidance against dynamic allocation on ASIL-D software are
+**advisory-tier** items this project's own baseline (ASIL-B, one
+hazard at ASIL-C) does not obligate — see the MISRA row above. Issue
+#521 tracks moving *toward* the stricter posture anyway, as one of this
+project's own stated stretch items. Progress so far, in the same
+phased order the issue itself defines:
+
+- **Phase (a) — abstraction-bypass gap, CLOSED.** Every dynamic
+  allocation call site in `src/` (256 of them, up from the 8 that
+  already used it) routes through `alloc.h`'s `rcp_malloc`/`rcp_calloc`/
+  `rcp_realloc`/`rcp_free` seam. Every remaining site described below is
+  therefore already interceptable/boundable by an integrator's own
+  monitoring or fault-injection hook, regardless of which category it
+  falls into.
+- **Phase (b) — convert boundable cases to fixed-capacity storage,
+  IN PROGRESS.** Converted so far: `l2.c`/`udp.c` receive buffers,
+  `watchdog.c`/`deadline.c` stream tables and callback lists,
+  `powerstate.c`/`admin.c` endpoint/subscriber/counter tables,
+  `respqueue.c`'s `entries[]`/`entries_seq[]` free/FIFO-order
+  bookkeeping (`RCP_RESPQUEUE_MAX_ENTRIES`, now a universal bound, not
+  only a `capacity_octets == 0` fallback), `loan.c`'s pool free-list
+  bookkeeping (`RCP_LOAN_POOL_MAX_ENTRIES`), and `ep_can.c`'s
+  prefix-then-data scratch buffer and fragment-plan segment array
+  (`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`) — every one of these was a case
+  where the array's true worst-case size was already a small,
+  real compile-time protocol constant, so a fixed embedded array is a
+  behavior-preserving (mutation-tested) drop-in.
+- **Phase (c) — document/justify what remains genuinely dynamic.**
+  What is left, after (a) and (b), falls into a small number of
+  distinct shapes, none of which is a small-fixed-array oversight —
+  each would require either an unbounded compile-time reservation (not
+  actually safer) or a breaking public-API redesign to eliminate:
+
+  1. **Variable-length owned output buffers (`rcp_bytes_t`).** The
+     dozens of `rcp_*_encode_*()`/`_decode_*()` functions across every
+     `ep_*.c` endpoint module, `acf.c`, `avtp.c`, and `e2e.c` return a
+     caller-owned `rcp_bytes_t` (`rcp.h`) sized to that specific call's
+     own input (a payload, a data buffer, a symbol count) — not to a
+     small fixed protocol maximum in every case (e.g.
+     `rcp_ep_iseled_encode_bitframe()`/`_decode_bitframe()`,
+     `include/rcp/ep_iseled.h`, scale directly with a caller-supplied
+     `data_len`/`symbol_count` with no small compile-time ceiling of
+     their own — ISELED chain length is a deployment property, not a
+     TC18 wire constant). `rcp_bytes_t` being heap-based is this
+     codebase's single foundational "variable-length owned buffer"
+     convention, used by essentially every public encode API; replacing
+     it everywhere would mean redesigning that entire public surface to
+     a caller-supplied-buffer-and-capacity shape, a breaking API change
+     far outside this issue's own "convert boundable cases" phase (b)
+     scope. `fragment.c`'s reassembly buffer (grows to a
+     caller-configured `max_total_len`, `include/rcp/fragment.h`'s own
+     file header) is the same shape: the reassembled message's true
+     size is a deployment-configured ceiling, not a protocol constant.
+  2. **`ep_iseled.c`'s own fragment-plan array**
+     (`rcp_ep_iseled_encode_response_fragmented()`) is deliberately NOT
+     converted to a fixed array the way `ep_can.c`'s equivalent was:
+     unlike CAN XL's hard `RCP_EP_CAN_XL_MAX_ENCODED_LEN` (2058-octet)
+     ceiling, the ISELED response length this function fragments is
+     bounded only by `read_size` (a full 16-bit register, up to 65535)
+     and the caller's own `rx_len` — no small compile-time constant
+     exists to size a fixed array against without either rejecting
+     legitimate large ISELED reads or reserving an array too large to
+     put on a call stack safely. This is the same "no small ceiling
+     exists" reasoning as category 1, applied to one more call site.
+  3. **`loan.c`'s pooled buffers and per-acquire control blocks.** The
+     free-list bookkeeping array is now fixed-capacity (Phase (b)
+     above), but each pooled buffer's own DATA bytes, and the small
+     `rcp_loan_t`/`loan_release_ctx_t` control structs
+     `rcp_loan_pool_acquire()` allocates per call, remain heap-based —
+     the module's entire documented purpose (`loan.h`'s own file
+     header) is caching reuse of buffers whose size is a caller-chosen,
+     runtime `size` argument, not a compile-time constant; eliminating
+     that would mean redesigning the pool into fixed-size-slab
+     semantics (reject any `size` above one fixed slot size), a
+     different, breaking API contract this issue's phase (b) — mechanical,
+     behavior-preserving conversion — does not license.
+  4. **`relay.c`'s message metadata** (`relay_meta_entry_t` key/value
+     string copies and the growable `meta[]` array). This is
+     RELAY-envelope glue this library defines for its own integration
+     surface, not a TC18 wire structure — TC18 gives no bound to cite
+     for how many metadata entries or how long a key/value string a
+     RELAY message may carry, so there is no non-arbitrary compile-time
+     ceiling to pick here the way `RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS`
+     above could cite a real protocol constant underneath its own
+     realistic bound.
+  5. **`mdns.c`'s config-time string duplication** and **`platform.c`'s
+     thread-thunk allocation** are both one-time, setup-path allocations
+     (service/hostname/thread-argument strings whose length is
+     deployment configuration, not a per-message hot path) — the same
+     "one-time control block, not a repeated per-message allocation"
+     shape ISO 26262-6's dynamic-allocation concern (mission-length
+     heap fragmentation from repeated alloc/free cycles) is centrally
+     about, and is a materially different risk profile than the
+     per-message paths Phase (b) targeted first.
+
+  None of category 1–5 is a case this issue's own phase (b) scope
+  ("convert boundable cases") actually covers — each is either
+  unbounded by any small real constant, or would require a breaking
+  public API redesign to bound. All of them are already on the
+  `alloc.h` seam (Phase (a)), so an integrator wanting stricter,
+  ASIL-D-tier control over any of them today can install
+  `rcp_malloc`/`rcp_calloc`/`rcp_realloc` hooks that route to a
+  static/pool allocator of their own choosing without this library
+  changing at all.
+
 ---
 
 ## 2a. SEOOC Framing & Tool Confidence Level
