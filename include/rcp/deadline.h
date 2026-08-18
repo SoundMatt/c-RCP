@@ -79,6 +79,18 @@ typedef struct {
 /* { default_deadline_ms = 50, poll_interval_ms = 5 }. */
 rcp_deadline_config_t rcp_deadline_default_config(void);
 
+/* [c-RCP-17] Fixed capacities for rcp_deadline_monitor_t's internal
+ * stream table and callback list -- this module's own chosen capacities,
+ * not spec-derived (TC18 does not bound how many request streams or
+ * subscribers one Monitor may hold), matching watchdog.h's identical
+ * RCP_WATCHDOG_MAX_STREAMS/RCP_WATCHDOG_MAX_CALLBACKS precedent for the
+ * same reasons. Backs compile-time-sized embedded arrays, not heap
+ * allocations -- see rcp_deadline_monitor_new()'s and
+ * rcp_deadline_monitor_subscribe()'s own doc comments for the resulting
+ * capacity-exceeded failure modes. */
+#define RCP_DEADLINE_MAX_STREAMS   ((size_t)16u)
+#define RCP_DEADLINE_MAX_CALLBACKS ((size_t)16u)
+
 /* User-supplied callback fired on every liveness transition, across all
  * streams. user_data is the opaque pointer passed to
  * rcp_deadline_monitor_subscribe(). */
@@ -90,7 +102,9 @@ typedef struct rcp_deadline_monitor rcp_deadline_monitor_t;
  * its background deadline-check thread immediately, treating construction
  * time as every stream's initial (heartbeat-less) reference point.
  * streams/n_streams may describe zero streams. Returns NULL on allocation
- * failure. */
+ * failure, or if n_streams exceeds RCP_DEADLINE_MAX_STREAMS (the stream
+ * table is a fixed-capacity embedded array -- see that constant's own doc
+ * comment). */
 rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
                                                   const rcp_deadline_stream_cfg_t *streams,
                                                   size_t n_streams);
@@ -115,8 +129,9 @@ bool rcp_deadline_monitor_alive(rcp_deadline_monitor_t *m, uint64_t stream_id);
 
 /* Registers cb to be invoked on every liveness transition, across all
  * streams. Not thread-safe with close()/destroy(); register before
- * handing m to other threads. Returns false on allocation failure (cb not
- * added). */
+ * handing m to other threads. Returns false if m already holds
+ * RCP_DEADLINE_MAX_CALLBACKS subscribers (cb not added; the callback list
+ * is a fixed-capacity embedded array). */
 bool rcp_deadline_monitor_subscribe(rcp_deadline_monitor_t *m, rcp_deadline_liveness_fn cb, void *user_data);
 
 /* Stops the background deadline-check thread. Idempotent; safe to call

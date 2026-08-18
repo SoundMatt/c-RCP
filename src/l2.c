@@ -118,6 +118,19 @@ typedef struct rcp_l2_avtp_transport {
 
     rcp_mutex_t mu; /* protects closed */
     bool        closed;
+
+    /* [c-RCP-17] recv() scratch buffer, embedded here instead of malloc()'d
+     * per call: RCP_L2_MAX_FRAME is a compile-time constant, so sizing this
+     * once at construction (as part of this struct's own single, already-
+     * existing rcp_calloc() below) replaces a per-recv-call heap
+     * allocation with a deterministic, bounded, one-time-per-instance one.
+     * Not a general-purpose fixed-capacity pool -- this is scratch space
+     * private to l2_avtp_recv(), never returned or aliased past that call.
+     * Safe only because recv() is not reentrant on a single transport
+     * instance (same implicit precondition as the select()/recvfrom() loop
+     * already touching l->fd without a lock -- two threads calling recv()
+     * concurrently on the same *l would already race on the fd today). */
+    uint8_t recv_scratch[RCP_L2_MAX_FRAME];
 } rcp_l2_avtp_transport_t;
 
 //cfusa:req REQ-L2-006
@@ -154,11 +167,8 @@ static int l2_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_t
 static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                          uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
-    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)self;
-    uint8_t                   *tmp;
-
-    tmp = (uint8_t *)rcp_malloc(RCP_L2_MAX_FRAME);
-    if (!tmp) return RCP_ERR_BUSY;
+    rcp_l2_avtp_transport_t *l   = (rcp_l2_avtp_transport_t *)self;
+    uint8_t                   *tmp = l->recv_scratch;
 
     for (;;) {
         bool         closed_now;
@@ -171,13 +181,9 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         rcp_mutex_unlock(&l->mu);
 
         if (closed_now) {
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_ERR_TIMEOUT;
         }
 
@@ -236,14 +242,10 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * "nothing left in the kernel's own receive queue to
                  * retry against once recvfrom() already consumed it"
                  * reasoning as udp.c's own oversized-datagram handling. */
-                rcp_free(tmp);
-                tmp = NULL;
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back

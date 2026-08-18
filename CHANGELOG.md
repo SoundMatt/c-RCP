@@ -34,6 +34,105 @@ the rationale.
 
 ## Releases
 
+### v0.427.0 -- 2026-08-18 (c-RCP-17 Phase (b), partial: fixed-capacity conversions for `l2.c`/`udp.c` recv scratch buffers and `watchdog.c`/`deadline.c` stream tables + callback lists)
+
+Continues c-RCP-17 (issue #521) past Phase (a) (PR #527, v0.412.0):
+routing every raw libc call site through `alloc.h`'s seam did not by
+itself remove dynamic allocation as a category. This release picks up
+Phase (b) -- converting boundable cases to static/compile-time-sized
+storage -- for the subset the issue's own investigation already
+identified as genuinely mechanical, plus the stream-table/callback-list
+category it flagged as needing a real (but small, self-contained)
+capacity decision.
+
+**`l2.c`/`udp.c` recv() scratch buffers -- fully eliminated.**
+`RCP_L2_MAX_FRAME`/`RCP_UDP_AVTP_MAX_FRAME` are compile-time constants,
+so the per-`recv()`-call `rcp_malloc()`/`rcp_free()` pair each transport
+used purely as private, never-escaping scratch space is now an embedded
+`uint8_t recv_scratch[...]` member of the transport struct itself --
+sized once by that struct's own single, already-existing
+`rcp_calloc()` at construction time, not allocated on every receive.
+Zero API change, zero behavior change -- this is a storage-location
+swap with the read/write pattern otherwise untouched, so the existing
+`test_l2.c`/`test_udp.c` recv-path tests (including the loopback
+frame round-trips) passing unchanged is the correct behavior-preserving
+evidence here, not a targeted mutation (there is no new branch or
+conditional to mutate). The ASan/UBSan build (below) is the check that
+actually matters for *this* change: a wrong embedded-array size or an
+off-by-one against the frame's max length would show up as a stack
+buffer overflow there, not as a functional test failure.
+
+**`watchdog.c`/`deadline.c` stream tables and callback lists -- fixed
+capacity.** Both modules previously sized their `states[]` table off a
+caller-supplied `n_streams` via `rcp_calloc()`, and grew their
+`callbacks[]`/`callback_ctx[]` arrays via a doubling `rcp_realloc()`
+scheme. Both are now fixed-size embedded arrays,
+`RCP_WATCHDOG_MAX_STREAMS`/`RCP_WATCHDOG_MAX_CALLBACKS`/
+`RCP_DEADLINE_MAX_STREAMS`/`RCP_DEADLINE_MAX_CALLBACKS` (16 each) --
+this module's own chosen capacity, not spec-derived (TC18 does not
+bound per-Keeper/Monitor stream or subscriber counts), reusing
+`e2e.h`'s existing `RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS` precedent
+and rationale (`RCP_MOCK_MAX_ENDPOINTS`' scale) rather than inventing
+an unrelated number. Minimal, additive API surface change:
+`rcp_watchdog_keeper_new()`/`rcp_deadline_monitor_new()` now also
+return `NULL` if `n_streams` exceeds the cap (previously only on
+allocation failure -- same failure channel, new trigger), and
+`rcp_*_subscribe()` now also return `false` once at capacity (same
+existing "allocation failure" failure channel every caller already had
+to check). No existing caller in this repo's own test suite or
+satellite packages exceeds either cap. New tests cover both boundaries
+(`RCP_*_MAX_STREAMS` succeeds, `+1` returns `NULL`; `RCP_*_MAX_CALLBACKS`
+succeeds, the next `subscribe()` fails) for both modules.
+Mutation-tested (temporarily widened the guard past the real constant;
+confirmed the new over-capacity test fails; reverted).
+
+**Deliberately not attempted this release** (left for a future c-RCP-17
+pass, per the issue's own phasing):
+- The three "ACF scratch buffer" sites the issue's investigation named
+  as near-mechanical (`request_triggered.c:95`, `e2e.c:234`,
+  `ep_can.c`'s `build_payload()`) turn out, on closer reading, **not**
+  to be confined scratch space at all -- each allocates a buffer that
+  becomes the caller-owned `.data` of a returned `rcp_bytes_t` (or a
+  raw pointer with the same "caller frees" contract), the same pattern
+  every `rcp_*_encode_*()` function in this codebase's wire-encoding
+  surface uses. Converting these to fixed/static storage would mean
+  changing the public calling convention of that entire family of
+  functions (caller-supplied buffer + capacity instead of a
+  heap-owned return value) -- a real, cross-cutting API redesign
+  touching dozens of public functions and every consumer of them, not
+  a mechanical per-site swap. This corrects the issue's own scoping;
+  worth stating plainly so a future pass doesn't re-attempt it as
+  "quick."
+- `watchdog.c`/`deadline.c`'s sibling `powerstate.c` (endpoint table +
+  callback list, same shape) and `admin.c` (three independently-
+  growable arrays plus a string-building scratch buffer) were left for
+  a follow-on pass -- same fixed-capacity pattern applies, not
+  attempted here purely for scope/time, not blocked on anything.
+- `respqueue.c` (byte-budget-vs-fixed-slot-count admission logic) and
+  `loan.c` (realloc-growing pool) still need the real redesign
+  decisions the issue's own filing already flagged; not mechanical.
+- Fragment-plan segment arrays, and Phase (c)'s "document what stays
+  dynamic" pass (`fragment.c`, `relay.c`, `mdns.c`, `platform.c`): not
+  reached this release.
+
+Full 67-binary test suite (6 new boundary-test functions added inside
+the existing `test_watchdog`/`test_deadline` binaries, not new
+binaries): 100% passing. ASan/UBSan build (CI's exact flags): clean.
+Pinned `cfusa` (v0.5.54): `check` -- 0 errors; `trace --req-coverage
+100 --sec-tested 100` -- 100%/100%, unchanged from baseline.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and `.fusa.json`'s
+`"version"` to `0.427.0` to match `CMakeLists.txt`, per the
+`version-sources-agree` gate (c-RCP-09, PR #529).
+
+Rebased onto main twice past PRs #528-#545 landing during this
+branch's own review cycle; version bumped from this branch's original
+`0.419.0` slot to `0.427.0` to land after all of them.
+
+Issue #521 stays open; a future pass can continue with
+`powerstate.c`/`admin.c`'s same fixed-capacity pattern, then the
+harder `respqueue.c`/`loan.c` redesigns and Phase (c) documentation.
+
 ### v0.425.0 -- 2026-08-18 (c-RCP-19: mock.c TSCF/fragment E2E dispatch fault-injection coverage)
 
 Continues issue #520's category 2 backlog after the `adapt.c`/`ep_can.c`/

@@ -2,7 +2,6 @@
 #include "rcp/watchdog.h"
 #include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <rcp/clock.h>
@@ -27,12 +26,15 @@ typedef struct {
 struct rcp_watchdog_keeper {
     rcp_watchdog_config_t  cfg;
     rcp_mutex_t             mu; /* protects states[], callbacks[], closed */
-    stream_state_t         *states;
+    /* [c-RCP-17] Fixed-capacity embedded arrays, not heap-allocated: see
+     * RCP_WATCHDOG_MAX_STREAMS/RCP_WATCHDOG_MAX_CALLBACKS's own doc
+     * comment (watchdog.h) for the rationale and the resulting
+     * capacity-exceeded failure modes. */
+    stream_state_t         states[RCP_WATCHDOG_MAX_STREAMS];
     size_t                  n_states;
-    rcp_watchdog_event_fn  *callbacks;
-    void                  **callback_ctx;
+    rcp_watchdog_event_fn   callbacks[RCP_WATCHDOG_MAX_CALLBACKS];
+    void                   *callback_ctx[RCP_WATCHDOG_MAX_CALLBACKS];
     size_t                  n_callbacks;
-    size_t                  callbacks_cap;
     bool                    closed;
     rcp_thread_t            run_thread;
     bool                    have_run_thread;
@@ -49,24 +51,7 @@ static stream_state_t *find_state(rcp_watchdog_keeper_t *k, uint64_t stream_id)
 
 static bool callbacks_append(rcp_watchdog_keeper_t *k, rcp_watchdog_event_fn cb, void *user_data)
 {
-    if (k->n_callbacks == k->callbacks_cap) {
-        size_t new_cap = (k->callbacks_cap == 0) ? 4 : k->callbacks_cap * 2;
-        size_t cb_bytes = rcp_alloc_checked_size(new_cap, sizeof(rcp_watchdog_event_fn));
-        rcp_watchdog_event_fn *grown_cb  = cb_bytes == 0
-            ? NULL
-            : (rcp_watchdog_event_fn *)rcp_realloc(k->callbacks, cb_bytes);
-        void                  **grown_ctx;
-        size_t ctx_bytes;
-        if (!grown_cb) return false;
-        k->callbacks     = grown_cb;
-        ctx_bytes = rcp_alloc_checked_size(new_cap, sizeof(*k->callback_ctx));
-        grown_ctx = ctx_bytes == 0
-            ? NULL
-            : (void **)rcp_realloc(k->callback_ctx, ctx_bytes);
-        if (!grown_ctx) return false;
-        k->callback_ctx  = grown_ctx;
-        k->callbacks_cap = new_cap;
-    }
+    if (k->n_callbacks == RCP_WATCHDOG_MAX_CALLBACKS) return false;
     k->callbacks[k->n_callbacks]    = cb;
     k->callback_ctx[k->n_callbacks] = user_data;
     k->n_callbacks++;
@@ -163,24 +148,20 @@ rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
                                                 const rcp_watchdog_stream_cfg_t *streams,
                                                 size_t n_streams)
 {
-    rcp_watchdog_keeper_t *k = (rcp_watchdog_keeper_t *)rcp_calloc(1, sizeof(*k));
+    rcp_watchdog_keeper_t *k;
     uint64_t now_ms;
     size_t i;
 
+    /* [c-RCP-17] states[] is now a fixed RCP_WATCHDOG_MAX_STREAMS-capacity
+     * embedded array (watchdog.h doc comment) -- reject before allocating
+     * k at all rather than allocate-then-unwind. */
+    if (n_streams > RCP_WATCHDOG_MAX_STREAMS) return NULL;
+
+    k = (rcp_watchdog_keeper_t *)rcp_calloc(1, sizeof(*k));
     if (!k) return NULL;
     k->cfg = cfg;
     rcp_mutex_init(&k->mu);
 
-    if (n_streams > 0) {
-        stream_state_t *states = (stream_state_t *)rcp_calloc(n_streams, sizeof(*states));
-        k->states = states;
-        if (!k->states) {
-            rcp_mutex_destroy(&k->mu);
-            rcp_free(k);
-            k = NULL;
-            return NULL;
-        }
-    }
     now_ms = rcp_monotonic_ms();
     for (i = 0; i < n_streams; i++) {
         k->states[i].cfg          = streams[i];
@@ -261,12 +242,6 @@ void rcp_watchdog_keeper_destroy(rcp_watchdog_keeper_t *k)
     if (!k) return;
     rcp_watchdog_keeper_close(k);
 
-    rcp_free(k->states);
-    k->states = NULL;
-    rcp_free(k->callbacks);
-    k->callbacks = NULL;
-    rcp_free(k->callback_ctx);
-    k->callback_ctx = NULL;
     rcp_mutex_destroy(&k->mu);
     rcp_free(k);
     k = NULL;

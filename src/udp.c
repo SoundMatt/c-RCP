@@ -118,6 +118,17 @@ typedef struct rcp_udp_avtp_transport {
     uint32_t            send_seq;
     uint32_t            recv_seq;
     bool                has_recv_seq;
+
+    /* [c-RCP-17] recv() scratch buffer, embedded here instead of malloc()'d
+     * per call -- see l2.c's identical rationale on its own recv_scratch
+     * member: RCP_UDP_AVTP_MAX_FRAME is a compile-time constant, so this
+     * is sized once as part of this struct's own single, already-existing
+     * rcp_calloc() below, not allocated per recv() call. Private scratch
+     * space, never returned or aliased past a single recv() call; safe
+     * only because recv() is not reentrant on one transport instance
+     * (same implicit precondition as the select()/recvfrom() loop already
+     * touching u->fd without a lock). */
+    uint8_t recv_scratch[RCP_UDP_AVTP_MAX_FRAME];
 } rcp_udp_avtp_transport_t;
 
 //cfusa:req REQ-UDP-004
@@ -177,11 +188,8 @@ static int udp_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_
 static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                           uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
-    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)self;
-    uint8_t *tmp;
-
-    tmp = (uint8_t *)rcp_malloc(RCP_UDP_AVTP_MAX_FRAME);
-    if (!tmp) return RCP_ERR_BUSY;
+    rcp_udp_avtp_transport_t *u   = (rcp_udp_avtp_transport_t *)self;
+    uint8_t                    *tmp = u->recv_scratch;
 
     for (;;) {
         bool closed_now;
@@ -194,13 +202,9 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         rcp_mutex_unlock(&u->mu);
 
         if (closed_now) {
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_ERR_TIMEOUT;
         }
 
@@ -257,14 +261,10 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * the moment recvfrom() reads it, so there is nothing left
                  * to leave queued. This matches UDP's own inherent
                  * no-delivery-guarantee contract rather than fighting it. */
-                rcp_free(tmp);
-                tmp = NULL;
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
-            rcp_free(tmp);
-            tmp = NULL;
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back

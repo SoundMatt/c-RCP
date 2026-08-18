@@ -2,7 +2,6 @@
 #include "rcp/deadline.h"
 #include "rcp/alloc.h"
 
-#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <rcp/clock.h>
@@ -29,12 +28,15 @@ typedef struct {
 struct rcp_deadline_monitor {
     rcp_deadline_config_t    cfg;
     rcp_mutex_t               mu; /* protects states[], callbacks[], closed */
-    stream_watch_t           *states;
+    /* [c-RCP-17] Fixed-capacity embedded arrays, not heap-allocated: see
+     * RCP_DEADLINE_MAX_STREAMS/RCP_DEADLINE_MAX_CALLBACKS's own doc
+     * comment (deadline.h) for the rationale and the resulting
+     * capacity-exceeded failure modes. */
+    stream_watch_t            states[RCP_DEADLINE_MAX_STREAMS];
     size_t                    n_states;
-    rcp_deadline_liveness_fn *callbacks;
-    void                    **callback_ctx;
+    rcp_deadline_liveness_fn  callbacks[RCP_DEADLINE_MAX_CALLBACKS];
+    void                     *callback_ctx[RCP_DEADLINE_MAX_CALLBACKS];
     size_t                    n_callbacks;
-    size_t                    callbacks_cap;
     bool                      closed;
     rcp_thread_t              run_thread;
     bool                      have_run_thread;
@@ -51,24 +53,7 @@ static stream_watch_t *find_state(rcp_deadline_monitor_t *m, uint64_t stream_id)
 
 static bool callbacks_append(rcp_deadline_monitor_t *m, rcp_deadline_liveness_fn cb, void *user_data)
 {
-    if (m->n_callbacks == m->callbacks_cap) {
-        size_t new_cap = (m->callbacks_cap == 0) ? 4 : m->callbacks_cap * 2;
-        size_t cb_bytes = rcp_alloc_checked_size(new_cap, sizeof(rcp_deadline_liveness_fn));
-        rcp_deadline_liveness_fn *grown_cb = cb_bytes == 0
-            ? NULL
-            : (rcp_deadline_liveness_fn *)rcp_realloc(m->callbacks, cb_bytes);
-        void                    **grown_ctx;
-        size_t ctx_bytes;
-        if (!grown_cb) return false;
-        m->callbacks = grown_cb;
-        ctx_bytes = rcp_alloc_checked_size(new_cap, sizeof(*m->callback_ctx));
-        grown_ctx = ctx_bytes == 0
-            ? NULL
-            : (void **)rcp_realloc(m->callback_ctx, ctx_bytes);
-        if (!grown_ctx) return false;
-        m->callback_ctx  = grown_ctx;
-        m->callbacks_cap = new_cap;
-    }
+    if (m->n_callbacks == RCP_DEADLINE_MAX_CALLBACKS) return false;
     m->callbacks[m->n_callbacks]    = cb;
     m->callback_ctx[m->n_callbacks] = user_data;
     m->n_callbacks++;
@@ -191,24 +176,20 @@ rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
                                                   const rcp_deadline_stream_cfg_t *streams,
                                                   size_t n_streams)
 {
-    rcp_deadline_monitor_t *m = (rcp_deadline_monitor_t *)rcp_calloc(1, sizeof(*m));
+    rcp_deadline_monitor_t *m;
     uint64_t now_ms;
     size_t i;
 
+    /* [c-RCP-17] states[] is now a fixed RCP_DEADLINE_MAX_STREAMS-capacity
+     * embedded array (deadline.h doc comment) -- reject before allocating
+     * m at all rather than allocate-then-unwind. */
+    if (n_streams > RCP_DEADLINE_MAX_STREAMS) return NULL;
+
+    m = (rcp_deadline_monitor_t *)rcp_calloc(1, sizeof(*m));
     if (!m) return NULL;
     m->cfg = cfg;
     rcp_mutex_init(&m->mu);
 
-    if (n_streams > 0) {
-        stream_watch_t *states = (stream_watch_t *)rcp_calloc(n_streams, sizeof(*states));
-        m->states = states;
-        if (!m->states) {
-            rcp_mutex_destroy(&m->mu);
-            rcp_free(m);
-            m = NULL;
-            return NULL;
-        }
-    }
     now_ms = rcp_monotonic_ms();
     for (i = 0; i < n_streams; i++) {
         m->states[i].stream_id     = streams[i].stream_id;
@@ -270,12 +251,6 @@ void rcp_deadline_monitor_destroy(rcp_deadline_monitor_t *m)
     if (!m) return;
     rcp_deadline_monitor_close(m);
 
-    rcp_free(m->states);
-    m->states = NULL;
-    rcp_free(m->callbacks);
-    m->callbacks = NULL;
-    rcp_free(m->callback_ctx);
-    m->callback_ctx = NULL;
     rcp_mutex_destroy(&m->mu);
     rcp_free(m);
     m = NULL;
