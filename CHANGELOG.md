@@ -34,6 +34,54 @@ the rationale.
 
 ## Releases
 
+### v0.420.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, tests/ half: memcpy/memmove/strncpy explicit-size-bounded wrappers, 66/66 `tests/` sites -- CY001 fully closed)
+
+Third sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532) and CY001's `src/` half
+(PR #537, v0.419.0). Resolves the `tests/` half of **CY001**
+(CERT-C STR31-C, CWE-120): all 66 remaining findings across 10 test
+files (`test_tc18_gaps_e2e.c` 31, `test_conditional_dispatch.c` 9,
+`test_tc18_gaps_ep2.c` 6, `test_e2e.c` 5, `test_mock.c` 5,
+`test_scheduler.c` 4, `test_tc18_gaps_server.c` 2, `test_mdns.c` 2,
+`test_ep_wakeup.c` 1, `test_recorder.c` 1). **`CFUSA-CY001` is now
+fully closed: 140 -> 0 project-wide.**
+
+Same `src/mem_bounded.h` wrapper from the `src/` half (unchanged),
+included from `tests/` via a relative `"../src/mem_bounded.h"` quoted
+include (test executables don't otherwise have `src/` on their
+include path, and adding `target_include_directories(... PRIVATE
+${CMAKE_SOURCE_DIR}/src)` to 10 more `tests/CMakeLists.txt` targets
+was unnecessary churn when the relative include already resolves
+correctly per the C standard's own quoted-include search order).
+Each of the 66 call sites' destination capacity was derived
+individually from its own local array/parameter context (`sizeof()`
+of a local fixed-size buffer, an explicit `cap` parameter the test
+helper already asserts against, or a struct field's own array size)
+-- same disposition standard as the `src/` half, no live defect in
+any of the 66.
+
+`cfusa check` diff against the `src/`-half baseline is exactly
+`CFUSA-CY001: 66 -> 0`; every other rule's count byte-identical
+(including `CFUSA-L008`'s 153, unchanged -- no new `void*` usage was
+introduced, `mem_bounded.h` itself is unmodified).
+
+Mutation-tested: one call site's capacity argument
+(`test_mock.c::echo_handler`'s `g_seen_request` capture) forced to
+`0` -- 2 targeted test failures in `rcp_mock`, proving that site's
+derived capacity is exercised and correct, not decorative. Reverted
+before commit (`git diff` confirms a clean, unmutated diff). Full
+67/67 test suite + from-scratch ASan/UBSan clean. `cfusa check`: 0
+errors. `cfusa trace --req-coverage 100 --sec-tested 100`: unchanged,
+1095/1095 / 512/512.
+
+**Remaining for `[c-RCP-21]`** (issue #523 stays open): L001 (74
+findings, only 3 real `src/` candidates worth a PR --
+`regmap.c`/`config.c`/`lifecycle.c`), L008 (149 findings, documented
+as mostly-legitimate idiomatic C, lowest priority), and A003 (43
+findings, recommend reporting the detector's apparent false-positive
+rate upstream to c-FuSa rather than bulk-"fixing" already-correct
+`size_t`-vs-`size_t` comparisons).
+
 ### v0.419.0 -- 2026-08-17 (c-RCP-21 CY001 sub-effort, src/ half: memcpy/memmove/strncpy explicit-size-bounded wrappers, 74/74 `src/` sites)
 
 Second sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
