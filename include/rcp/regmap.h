@@ -15,6 +15,7 @@
 //cfusa:req REQ-RMAP-014
 //cfusa:req REQ-RMAP-015
 //cfusa:req REQ-RMAP-016
+//cfusa:req REQ-RMAP-082
 //cfusa:req REQ-RMAP-017
 //cfusa:req REQ-RMAP-018
 //cfusa:req REQ-RMAP-019
@@ -55,10 +56,12 @@
 //cfusa:req REQ-RMAP-048
 //cfusa:req REQ-RMAP-049
 //cfusa:req REQ-RMAP-050
+//cfusa:req REQ-RMAP-083
 //cfusa:req REQ-RMAP-051
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-053
 //cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-084
 //cfusa:req REQ-RMAP-055
 //cfusa:req REQ-RMAP-056
 //cfusa:req REQ-RMAP-057
@@ -66,6 +69,7 @@
 //cfusa:req REQ-RMAP-059
 //cfusa:req REQ-RMAP-060
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-085
 //cfusa:req REQ-RMAP-062
 //cfusa:req REQ-RMAP-063
 //cfusa:req REQ-RMAP-064
@@ -2692,9 +2696,10 @@ bool rcp_regmap_ep_id_map_is_ascending(const rcp_regmap_ep_id_map_entry_t *entri
 size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *entries,
                                              size_t capacity);
 
-/* REQ-RMAP-054's other half: TC18 §12.7.8 requires the table's power-on
- * default contents to permit access to EP0 before any configuration is
- * written. Populates *row with that default: request_stream_index = 1
+/* REQ-RMAP-084 (split 2026-08-18 off REQ-RMAP-054's own former "other
+ * half", c-RCP-18-tracker issue #533): TC18 §12.7.8 requires the
+ * table's power-on default contents to permit access to EP0 before any
+ * configuration is written. Populates *row with that default: request_stream_index = 1
  * (the smallest value that is a valid stream index rather than the
  * end-of-table sentinel -- 0 itself cannot be used here, since that is
  * exactly the value rcp_regmap_ep_id_map_effective_count() above

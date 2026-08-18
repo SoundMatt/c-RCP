@@ -30,10 +30,12 @@
 //cfusa:test REQ-RMAP-048
 //cfusa:test REQ-RMAP-049
 //cfusa:test REQ-RMAP-050
+//cfusa:test REQ-RMAP-083
 //cfusa:test REQ-RMAP-051
 //cfusa:test REQ-RMAP-052
 //cfusa:test REQ-RMAP-053
 //cfusa:test REQ-RMAP-054
+//cfusa:test REQ-RMAP-084
 //cfusa:test REQ-RMAP-055
 //cfusa:test REQ-RMAP-056
 //cfusa:test REQ-RMAP-057
@@ -42,6 +44,7 @@
 //cfusa:test REQ-WAKEUP-020
 //cfusa:test REQ-RMAP-060
 //cfusa:test REQ-RMAP-061
+//cfusa:test REQ-RMAP-085
 //cfusa:test REQ-RMAP-062
 //cfusa:test REQ-RMAP-063
 //cfusa:test REQ-RMAP-064
@@ -59,6 +62,7 @@
 //cfusa:test REQ-RMAP-077
 //cfusa:test REQ-RMAP-078
 //cfusa:test REQ-RMAP-079
+//cfusa:test REQ-RMAP-087
 //cfusa:test REQ-RMAP-080
 //cfusa:test REQ-RMAP-081
 
@@ -2576,13 +2580,15 @@ static void test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_
     TEST_ASSERT_EQUAL_UINT8(0x03u, row.ep_type);
 }
 
-/* REQ-RMAP-016/REQ-RMAP-079 (issue #466): ep_used's own row-0-only
+/* REQ-RMAP-016/REQ-RMAP-087 (issue #466; split 2026-08-18 off
+ * REQ-RMAP-079, c-RCP-18-tracker issue #533): ep_used's own row-0-only
  * override -- TC18 Table 31's ep_used row states EP0's bit is "fixed to
  * 1 as EP0 needs to be always implemented", on top of the field's
  * otherwise general R/W* status for EP1..EPn. A write targeting row 0's
  * own ep_used bit must be silently ignored, the same "no effect,
  * confirmed normally" treatment ep_type gets above -- see this
  * function's own doc comment (regmap.h). */
+//cfusa:test REQ-RMAP-087
 static void test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_stays_true(void)
 {
     rcp_regmap_ep_generic_cfg_t row;
@@ -2603,9 +2609,11 @@ static void test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_sta
     TEST_ASSERT_EQUAL_UINT32(1u, row.ep_delay_time);
 }
 
-/* Same override, exercised through a real 2-row EP_GENERIC_config table
- * so the "row 0 only" scoping (not "every row", not "no rows") is
- * checked directly rather than inferred from a single-row table. */
+/* REQ-RMAP-087: same override, exercised through a real 2-row
+ * EP_GENERIC_config table so the "row 0 only" scoping (not "every
+ * row", not "no rows") is checked directly rather than inferred from a
+ * single-row table. */
+//cfusa:test REQ-RMAP-087
 static void test_ep_generic_cfg_apply_reconfig_ep0_ep_used_forced_true_ep1_honors_write(void)
 {
     rcp_regmap_ep_generic_cfg_t rows[2];
@@ -3155,11 +3163,13 @@ static void test_ep0_write_dispatcher_authorizes_rx_stream_status_bit_even_when_
     }
 }
 
-/* REQ-RMAP-050: watchdog_ms_per_tick == 0 ("not configured") makes
+/* REQ-RMAP-083 (split 2026-08-18 off REQ-RMAP-050, c-RCP-18-tracker
+ * issue #533): watchdog_ms_per_tick == 0 ("not configured") makes
  * rcp_regmap_wd_timeout_ms_to_ticks() fail unconditionally, so
  * rx_wd_timeout_ms falls back to 0x0000 exactly like the reserved
  * trailing octets -- see this table's own file-header note (regmap.h)
  * for the full fail-closed rationale. */
+//cfusa:test REQ-RMAP-083
 static void test_request_stream_cfg_render_falls_back_to_zero_when_watchdog_tick_rate_unconfigured(void)
 {
     rcp_regmap_request_stream_cfg_t row;
@@ -3181,10 +3191,11 @@ static void test_request_stream_cfg_render_falls_back_to_zero_when_watchdog_tick
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x0017]);
 }
 
-/* REQ-RMAP-050, the real (configured) path: a 1000 ms timeout at 10
+/* REQ-RMAP-083, the real (configured) path: a 1000 ms timeout at 10
  * ms/tick renders as exactly 100 ticks (0x0064), matching
  * rcp_regmap_wd_timeout_ms_to_ticks()'s own already-unit-tested
  * round-down/bounds-check behavior, now actually reachable on the wire. */
+//cfusa:test REQ-RMAP-083
 static void test_request_stream_cfg_render_produces_real_ticks_when_watchdog_tick_rate_configured(void)
 {
     rcp_regmap_request_stream_cfg_t row;
@@ -3199,13 +3210,14 @@ static void test_request_stream_cfg_render_produces_real_ticks_when_watchdog_tic
     TEST_ASSERT_EQUAL_UINT8(0x64u, out[0x000B]);
 }
 
-/* The other half of REQ-RMAP-050's own render-side fallback: an
+/* The other half of REQ-RMAP-083's own render-side fallback: an
  * internal ms value that does not fit the register's 16-bit tick width
  * even at the configured rate (here: 700000 ms at 10 ms/tick would need
  * 70000 ticks, one past UINT16_MAX) falls back to 0x0000 the same way
  * an unconfigured rate does -- render() has no error-return mechanism,
  * so this is the only representable outcome for an input a conformant
  * caller should never have accepted in the first place. */
+//cfusa:test REQ-RMAP-083
 static void test_request_stream_cfg_render_falls_back_to_zero_when_ms_value_does_not_fit_even_configured(void)
 {
     rcp_regmap_request_stream_cfg_t row;
@@ -3224,6 +3236,7 @@ static void test_request_stream_cfg_render_falls_back_to_zero_when_ms_value_does
  * exactly 16 bits, so it can never itself violate a width constraint)
  * converts to ms using the caller-supplied rate and lands in
  * rx_wd_timeout_ms -- the round-trip inverse of the render test above. */
+//cfusa:test REQ-RMAP-050
 static void test_request_stream_cfg_apply_reconfig_converts_ticks_to_ms_when_watchdog_tick_rate_configured(void)
 {
     rcp_regmap_request_stream_cfg_t rows[1];
@@ -3244,6 +3257,7 @@ static void test_request_stream_cfg_apply_reconfig_converts_ticks_to_ms_when_wat
  * the whole apply_reconfig() call still succeeds (OK, not an error) --
  * the arriving wire value is always valid 16-bit ticks regardless of
  * whether this library can currently interpret them as milliseconds. */
+//cfusa:test REQ-RMAP-050
 static void test_request_stream_cfg_apply_reconfig_leaves_rx_wd_timeout_ms_unchanged_when_unconfigured(void)
 {
     rcp_regmap_request_stream_cfg_t rows[1];
@@ -4788,9 +4802,12 @@ static void test_watchdog_timeout_internal_unit_is_still_milliseconds(void)
     TEST_ASSERT_TRUE(r.overflowed);
 }
 
-/* REQ-RMAP-050: ms -> ticks rounds down (never grants a longer enforced
+/* REQ-RMAP-083 (split 2026-08-18 off REQ-RMAP-050, c-RCP-18-tracker
+ * issue #533): ms -> ticks rounds down (never grants a longer enforced
  * watchdog period than requested) and rejects anything that would not
- * fit the register's 16-bit width. */
+ * fit the register's 16-bit width -- render()'s own read-direction
+ * primitive. */
+//cfusa:test REQ-RMAP-083
 static void test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks(void)
 {
     uint16_t ticks = 0xFFFFu;
@@ -4820,8 +4837,10 @@ static void test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks(void)
 }
 
 /* REQ-RMAP-050: ticks -> ms is the plain inverse, used when populating
- * rx_wd_timeout_ms from a value read off the wire; rejects a zero-length
- * tick the same way. */
+ * rx_wd_timeout_ms from a value read off the wire (apply_reconfig()'s
+ * own write-direction primitive); rejects a zero-length tick the same
+ * way. */
+//cfusa:test REQ-RMAP-050
 static void test_wd_timeout_ticks_to_ms_round_trips(void)
 {
     uint32_t ms = 0xFFFFFFFFu;
@@ -4914,6 +4933,7 @@ static void test_ep_id_row_now_has_request_stream_index(void)
  * Request_Stream_Index of 0 as the table's own end-of-table sentinel.
  * rcp_regmap_ep_id_map_effective_count() is the dedicated, sentinel-
  * aware consumer that stops scanning at the first such row. */
+//cfusa:test REQ-RMAP-054
 static void test_ep_id_map_effective_count_stops_at_sentinel(void)
 {
     rcp_regmap_ep_id_map_entry_t rows[4];
@@ -4937,10 +4957,12 @@ static void test_ep_id_map_effective_count_stops_at_sentinel(void)
     TEST_ASSERT_EQUAL_UINT((size_t)0u, rcp_regmap_ep_id_map_effective_count(NULL, 0u));
 }
 
-/* REQ-RMAP-054's other half: TC18 §12.7.8 requires the table's
- * power-on default contents to permit access to EP0 before any
+/* REQ-RMAP-084 (split 2026-08-18 off REQ-RMAP-054's own former "other
+ * half", c-RCP-18-tracker issue #533): TC18 §12.7.8 requires the
+ * table's power-on default contents to permit access to EP0 before any
  * configuration is written. rcp_regmap_ep_id_map_row_init_default()
  * supplies exactly that default row. */
+//cfusa:test REQ-RMAP-084
 static void test_ep_id_map_power_on_default_permits_ep0(void)
 {
     rcp_regmap_ep_id_map_entry_t row;

@@ -15,8 +15,10 @@
 //cfusa:test REQ-RMAP-012
 //cfusa:test REQ-RMAP-013
 //cfusa:test REQ-RMAP-014
+//cfusa:test REQ-RMAP-082
 //cfusa:test REQ-RMAP-015
 //cfusa:test REQ-RMAP-016
+//cfusa:test REQ-RMAP-086
 //cfusa:test REQ-RMAP-073
 //cfusa:test REQ-RMAP-074
 //cfusa:test REQ-RMAP-075
@@ -336,6 +338,63 @@ static void test_writer_ctx_denies_valid_stream_association_for_an_unrecognized_
     TEST_ASSERT_FALSE(ctx.via_valid_stream_association);
 }
 
+/* REQ-RMAP-086 (split 2026-08-18, c-RCP-18-tracker issue #533, out of
+ * REQ-RMAP-070's own former text): every one of the 5 members of the
+ * returned rcp_lifecycle_writer_ctx_t is explicitly assigned, none left
+ * uninitialized -- distinct from the individual per-axis tests above,
+ * which each only observe ONE member's own value in isolation. This test
+ * asserts ALL 5 members' values in each of two calls (root-client-
+ * configured and no-root-client), so every member is checked against a
+ * fully input-determined expected value at least once TRUE and once
+ * FALSE -- if any one of writer_ctx()'s 5 assignment statements were
+ * dropped, that member would instead carry whatever stack garbage the
+ * function's own local `ctx` held at return, extremely unlikely to
+ * coincidentally match every expected value below. Mutation-tested
+ * during development by temporarily deleting each assignment in turn
+ * inside rcp_regmap_writer_ctx() (src/regmap.c) and confirming this test
+ * fails; restoring returns the suite to green. */
+static void test_writer_ctx_every_member_is_explicitly_assigned(void)
+{
+    rcp_regmap_general_t         map;
+    rcp_regmap_ep_client_t       owner;
+    rcp_lifecycle_writer_ctx_t   ctx;
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}}; /* ep 1, bbid 0x100, stream 2 */
+
+    /* Call A: root client configured (index 7) and also the owning
+     * stream (index 7) -- both root-client and owning-stream axes true
+     * simultaneously (an explicitly documented legal combination, see
+     * this struct's own doc comment, lifecycle.h); via_unicast=false so
+     * via_non_unicast_frame is true; via_discovery_stream=true passed
+     * straight through. via_valid_stream_association is deterministically
+     * false here since a root client IS configured. */
+    rcp_regmap_general_init(&map);
+    map.svr_root_client_index = 7;
+    owner.has_owning_stream    = true;
+    owner.owning_stream_index  = 7;
+
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 7, true, false, true, 0x100, entries, 1);
+    TEST_ASSERT_TRUE(ctx.via_root_client_ep0);
+    TEST_ASSERT_TRUE(ctx.via_owning_stream);
+    TEST_ASSERT_TRUE(ctx.via_non_unicast_frame);
+    TEST_ASSERT_TRUE(ctx.via_discovery_stream);
+    TEST_ASSERT_FALSE(ctx.via_valid_stream_association);
+
+    /* Call B: no root client, ep_client NULL, via_ep0=false,
+     * via_unicast=true, via_discovery_stream=false -- the complementary
+     * combination, flipping every one of the first four members to
+     * false and via_valid_stream_association (the one member Call A
+     * could not exercise as true) to true via a real, matching
+     * EP_ID_config association. */
+    rcp_regmap_general_init(&map); /* svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT */
+
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 2, false, true, false, 0x100, entries, 1);
+    TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
+    TEST_ASSERT_FALSE(ctx.via_owning_stream);
+    TEST_ASSERT_FALSE(ctx.via_non_unicast_frame);
+    TEST_ASSERT_FALSE(ctx.via_discovery_stream);
+    TEST_ASSERT_TRUE(ctx.via_valid_stream_association);
+}
+
 /* ── HW pin-property bit assignments ───────────────────────────────────────── */
 
 static void test_pin_property_bits_are_pairwise_distinct(void)
@@ -360,6 +419,11 @@ static void test_pin_property_bits_are_pairwise_distinct(void)
 
 /* ── rcp_regmap_named_signal_string() ──────────────────────────────────────── */
 
+/* REQ-RMAP-014: every in-range value (0..RCP_REGMAP_SIGNAL_COUNT-1) returns
+ * a non-NULL, non-empty name -- the switch's own named cases. Split
+ * 2026-08-18 (c-RCP-18-tracker, issue #533) from the out-of-range
+ * "unknown" fallback below (REQ-RMAP-082), which used to share this one
+ * test function -- each split id now has its own distinct assertion. */
 static void test_named_signal_string_never_null(void)
 {
     int i;
@@ -369,7 +433,15 @@ static void test_named_signal_string_never_null(void)
         TEST_ASSERT_NOT_NULL(s);
         TEST_ASSERT_TRUE(strlen(s) > 0);
     }
+}
 
+/* REQ-RMAP-082: any value outside 0..RCP_REGMAP_SIGNAL_COUNT-1 (the
+ * switch's own default arm) returns "unknown" -- split 2026-08-18
+ * (c-RCP-18-tracker, issue #533) out of REQ-RMAP-014's own former test,
+ * which bundled this out-of-range fallback assertion with the in-range
+ * non-NULL loop above. */
+static void test_named_signal_string_unknown_for_out_of_range_value(void)
+{
     TEST_ASSERT_EQUAL_STRING("unknown",
         rcp_regmap_named_signal_string((rcp_regmap_named_signal_t)RCP_REGMAP_SIGNAL_COUNT));
     TEST_ASSERT_EQUAL_STRING("unknown",
@@ -742,10 +814,12 @@ int main(void)
     RUN_TEST(test_writer_ctx_grants_valid_stream_association_when_no_root_client);
     RUN_TEST(test_writer_ctx_denies_valid_stream_association_when_root_client_configured);
     RUN_TEST(test_writer_ctx_denies_valid_stream_association_for_an_unrecognized_pair);
+    RUN_TEST(test_writer_ctx_every_member_is_explicitly_assigned);
 
     RUN_TEST(test_pin_property_bits_are_pairwise_distinct);
 
     RUN_TEST(test_named_signal_string_never_null);
+    RUN_TEST(test_named_signal_string_unknown_for_out_of_range_value);
     RUN_TEST(test_named_signal_string_unique);
 
     RUN_TEST(test_ep_generic_cfg_init_zeroes);

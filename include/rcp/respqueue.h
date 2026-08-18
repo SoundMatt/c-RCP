@@ -5,6 +5,7 @@
 //cfusa:req REQ-RMAP-063
 //cfusa:req REQ-RMAP-064
 //cfusa:req REQ-RMAP-065
+//cfusa:req REQ-RMAP-085
 /*
  * respqueue.h -- per-response/acknowledge-stream transmit queue for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md gap-closure Phase
@@ -194,7 +195,8 @@
 extern "C" {
 #endif
 
-/* TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423, corrected by
+/* TC18 §12.9.4/§12.9.5 (REQ-RMAP-085, split 2026-08-18 off REQ-RMAP-059/061,
+ * c-RCP-18-tracker issue #533; originally GitHub #423, corrected by
  * GitHub #446, made universal by issue #521, the ASIL-D-oriented
  * no-dynamic-allocation push): the fixed capacity of entries[]/
  * entries_seq[] below, and so a hard ceiling on q->entries_len under
@@ -351,7 +353,8 @@ bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_l
 bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len,
                              uint8_t sequence_num);
 
-/* TC18 §12.9.4/§12.9.5's overflow bit (REQ-RMAP-059/061, GitHub #423):
+/* TC18 §12.9.4/§12.9.5's overflow bit (REQ-RMAP-085, split 2026-08-18 off
+ * REQ-RMAP-059/061, c-RCP-18-tracker issue #533; originally GitHub #423):
  * true iff rcp_respqueue_push()/_push_seq() has evicted at least one
  * entry since q was last rcp_respqueue_init()'d or last had
  * rcp_respqueue_clear_overflow() called. Matches this module's own
