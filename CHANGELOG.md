@@ -34,6 +34,68 @@ the rationale.
 
 ## Releases
 
+### v0.433.0 -- 2026-08-20 ([c-RCP-18] issue #533 batch REQ-OBS: 2 requirements split, atomicity audit)
+
+Group 3 (server/dispatch) batch of the issue #533 requirement-atomicity
+audit (#519's convention, `CONTRIBUTING.md`'s "Writing a requirement"
+section), scoped to `REQ-OBS-*` (`src/observe.c`/`include/rcp/observe.h`).
+Triaged all 19 `REQ-OBS-*` entries; the 2+-"shall" proxy flagged 2
+(`REQ-OBS-005`, `REQ-OBS-019`), and both were genuinely bundled on
+manual review, not false positives:
+
+- **`REQ-OBS-005`** ("Every callback in `rcp_noop_metrics_sink()`'s
+  vtable shall be safe to call... and shall have no observable side
+  effect") bundled three different functions' behavior under one id --
+  `record_span`, `record_gauge`, and `record_counter` -- exactly the
+  "more than one function" smell `CONTRIBUTING.md` calls out. Reused
+  for `record_span` alone; minted `REQ-OBS-020` (`record_gauge`) and
+  `REQ-OBS-021` (`record_counter`). `record_counter` had **zero**
+  requirement tags of its own before this (only reachable via the old
+  bundled id) -- the same zero-tag-helper risk #519's own finding
+  described. Each now has its own dedicated test that points a canary
+  struct at `ctx` (rather than the `ctx=NULL` every real caller passes)
+  and `memcmp`s it before/after the call -- a real, distinct
+  "no observable side effect" assertion per callback, not "did not
+  crash" restated three times.
+- **`REQ-OBS-019`** ("`rcp_in_memory_sink_destroy(s)` shall be a safe
+  no-op when s is NULL; otherwise it shall destroy s's mutex and free
+  its recorded-spans array before freeing s itself") bundled the
+  NULL-input branch with the non-NULL cleanup-sequence branch of the
+  same function -- the same shape as #519's own `REQ-DL-001` example.
+  Reused for the NULL clause; minted `REQ-OBS-022` for the non-NULL
+  destroy-ordering clause. The NULL branch had **no** test at all
+  before this batch (every existing `rcp_in_memory_sink_destroy()`
+  call site in `tests/test_observe.c` passes a live sink) -- a real,
+  previously-missing gap, not a re-tag of existing coverage. A
+  pre-existing stacked test tag that actually exercised the non-NULL
+  path (on `test_record_produces_a_span_with_every_field`) was
+  corrected from `REQ-OBS-019` to `REQ-OBS-022` to match the split.
+
+Every split id's independence was mutation-tested: each new/reused id's
+dedicated `//cfusa:test` tag was temporarily removed in turn and
+`cfusa trace --gaps`/`--sec-tested 100` confirmed it alone (not any
+sibling split id) dropped out of coverage, then restored.
+
+No other `REQ-OBS-*` entry was bundled despite occasional multi-field
+or multi-clause phrasing (`REQ-OBS-001`, `-012`, `-014`, `-016`,
+`-018`): each describes one function's one behavior, using a
+compound-object-joined-by-"and" the same way `REQ-PWM-002`-`009`'s own
+accepted pattern does, not multiple independently-testable behaviors.
+
+19 -> 22 `REQ-OBS-*` entries (net +3). `src/observe.c`: added
+`//cfusa:req REQ-OBS-020`/`REQ-OBS-021` above `noop_record_gauge`/
+`noop_record_counter`, `//cfusa:req REQ-OBS-022` alongside
+`REQ-OBS-019` above `rcp_in_memory_sink_destroy()`.
+`tests/test_observe.c`: split the noop-sink test into three
+per-callback canary tests, added a dedicated
+`rcp_in_memory_sink_destroy(NULL)` test, retagged the pre-existing
+non-NULL-destroy coverage.
+
+Full 67-test suite (14/14 `test_observe` assertions, was 10): 100%
+passing. ASan/UBSan (CI's exact flags): clean. Pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100 --sec-tested 100`: 100%/100%
+(1098/1098 reqs, 512/512 functions).
+
 ### v0.432.0 -- 2026-08-20 ([c-RCP-16 follow-up] issue #548: .fusa-reqs.json tc18-gap scope/text drift, 116 entries reclassified to tc18)
 
 Closes issue #548, filed by `FREEDOM_FROM_INTERFERENCE.md` §4

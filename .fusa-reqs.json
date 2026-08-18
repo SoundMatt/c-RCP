@@ -490,8 +490,28 @@
     },
     {
       "id": "REQ-OBS-005",
-      "title": "Noop sink does not crash",
-      "text": "Every callback in rcp_noop_metrics_sink()'s vtable shall be safe to call with any valid arguments and shall have no observable side effect.",
+      "title": "Noop sink's record_span callback is safe and side-effect-free",
+      "text": "rcp_noop_metrics_sink()'s record_span callback shall be safe to call with any valid arguments and shall have no observable side effect.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-OBS-020",
+      "title": "Noop sink's record_gauge callback is safe and side-effect-free",
+      "text": "rcp_noop_metrics_sink()'s record_gauge callback shall be safe to call with any valid arguments and shall have no observable side effect.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-OBS-021",
+      "title": "Noop sink's record_counter callback is safe and side-effect-free",
+      "text": "rcp_noop_metrics_sink()'s record_counter callback shall be safe to call with any valid arguments and shall have no observable side effect.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -2222,8 +2242,18 @@
     },
     {
       "id": "REQ-OBS-019",
-      "title": "rcp_in_memory_sink_destroy() releases every owned resource",
-      "text": "rcp_in_memory_sink_destroy(s) shall be a safe no-op when s is NULL; otherwise it shall destroy s's mutex and free its recorded-spans array before freeing s itself.",
+      "title": "rcp_in_memory_sink_destroy(NULL) is a safe no-op",
+      "text": "rcp_in_memory_sink_destroy(s) shall be a safe no-op when s is NULL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-OBS-022",
+      "title": "rcp_in_memory_sink_destroy() releases mutex, spans array, and s itself in order",
+      "text": "For non-NULL s, rcp_in_memory_sink_destroy(s) shall destroy s's mutex and free its recorded-spans array before freeing s itself.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
