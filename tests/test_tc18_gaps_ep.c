@@ -13,12 +13,10 @@
 //cfusa:test REQ-SPI-036
 //cfusa:test REQ-SPI-037
 //cfusa:test REQ-I2C-020
-//cfusa:test REQ-PWM-008
-//cfusa:test REQ-PWM-028
-//cfusa:test REQ-PWM-055
-//cfusa:test REQ-PWM-056
-//cfusa:test REQ-PWM-057
-//cfusa:test REQ-PWM-058
+/* REQ-PWM-008/-028/-055/-056/-057/-058: moved 2026-08-18 (c-RCP-18-tracker,
+ * REQ-PWM-* atomicity audit, issue #533) to sit directly above the
+ * specific test function each proves, per CONTRIBUTING.md's "Writing a
+ * requirement" convention -- see the PWM endpoints section below. */
 //cfusa:test REQ-WIREERR-007
 //cfusa:test REQ-WAKEUP-017
 //cfusa:test REQ-WAKEUP-018
@@ -1181,6 +1179,7 @@ static void test_pwm_out_trigger_fires_is_a_pure_selector(void)
  * delayed signal is used"): with skew == 0, the delayed edge coincides
  * with the undelayed one, so CYCLE_START fires at raw_tick == 0 exactly
  * as a naive, skew-unaware implementation would already expect. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_zero_skew_matches_undelayed_edge(void)
 {
     TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
@@ -1192,6 +1191,7 @@ static void test_pwm_out_trigger_events_zero_skew_matches_undelayed_edge(void)
  * with skew == 5, the delayed edge is 5 ticks LATER than the undelayed
  * source edge -- CYCLE_START must NOT fire at raw_tick == 0 (that's still
  * the undelayed edge), only at raw_tick == skew. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_nonzero_skew_delays_cycle_start(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 5u, 0u));
@@ -1202,6 +1202,7 @@ static void test_pwm_out_trigger_events_nonzero_skew_delays_cycle_start(void)
 
 /* Skew wraps modulo period rather than being applied verbatim -- an
  * 8-bit skew register (0-255) can legally exceed a small period. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_skew_wraps_modulo_period(void)
 {
     /* period 20, skew 25 -> skew_mod 5, same delayed edge as skew == 5. */
@@ -1211,6 +1212,7 @@ static void test_pwm_out_trigger_events_skew_wraps_modulo_period(void)
 
 /* MID_PULSE fires at active_duration/2 ticks past the delayed cycle
  * start, distinct from CYCLE_START for a genuine nonzero active phase. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_mid_pulse_at_half_active_duration(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 4u));
@@ -1224,6 +1226,7 @@ static void test_pwm_out_trigger_events_mid_pulse_at_half_active_duration(void)
  * MID_PULSE -- it fires alongside CYCLE_START, both OR'd into the same
  * tick's own return value, not dropped as a degenerate "no active phase"
  * case. */
+//cfusa:test REQ-PWM-067
 static void test_pwm_out_trigger_events_mid_pulse_fires_at_zero_duty_cycle(void)
 {
     uint8_t events = rcp_ep_pwm_out_trigger_events_at_tick(20u, 0u, 0u, 0u);
@@ -1237,6 +1240,7 @@ static void test_pwm_out_trigger_events_mid_pulse_fires_at_zero_duty_cycle(void)
 /* period == 0 (RCP_EP_PWM_OUT_GEN_STOPPED) yields no trigger events at
  * all, regardless of raw_tick -- a stopped generator has no cycle to
  * derive a phase within. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_stopped_generator_yields_nothing(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(0u, 0u, 0u, 0u));
@@ -1246,6 +1250,7 @@ static void test_pwm_out_trigger_events_stopped_generator_yields_nothing(void)
 /* raw_tick wraps modulo period the same way skew does -- a caller free-
  * running a tick counter across many cycles still gets the same
  * per-cycle answer every time around. */
+//cfusa:test REQ-PWM-055
 static void test_pwm_out_trigger_events_raw_tick_wraps_modulo_period(void)
 {
     TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
@@ -1259,6 +1264,7 @@ static void test_pwm_out_trigger_events_raw_tick_wraps_modulo_period(void)
  * pwmo_duty_cycle_max to be CAPPED to that limit, not applied verbatim.
  * rcp_ep_pwm_out_apply_write() now takes duty_cycle_min/duty_cycle_max
  * and clamps the resulting active_duration into that range. */
+//cfusa:test REQ-PWM-056
 static void test_pwm_out_duty_cap(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
@@ -1292,27 +1298,40 @@ static void test_pwm_out_duty_cap(void)
     TEST_ASSERT_EQUAL_UINT16(100u, cfg.duty_cycle_min);
 }
 
-/* REQ-PWM-057 IMPLEMENTED (issue #336, 2 of TC18 13.7.5.3's own 4 request
- * rules): rcp_ep_pwm_out_generation_state() classifies the endpoint's
- * signal-generation state purely from its own {period, active_duration}
- * pair -- period == 0 stops generation; active_duration == 0 with period
- * != 0 keeps the endpoint running with the output disabled (triggers still
- * fire); otherwise ordinary running generation. This is a pure classifier
- * over caller-supplied values, not a change to how rcp_ep_pwm_out_apply_write()
- * itself stores the two fields (still opaque 16-bit setpoints, as before --
- * see the module's own doc comment on rcp_ep_pwm_out_generation_state()). */
-static void test_pwm_out_generation_state(void)
+/* REQ-PWM-057/-068/-069 IMPLEMENTED (issue #336, 2 of TC18 13.7.5.3's own 4
+ * request rules): rcp_ep_pwm_out_generation_state() classifies the
+ * endpoint's signal-generation state purely from its own {period,
+ * active_duration} pair -- period == 0 stops generation; active_duration
+ * == 0 with period != 0 keeps the endpoint running with the output
+ * disabled (triggers still fire); otherwise ordinary running generation.
+ * This is a pure classifier over caller-supplied values, not a change to
+ * how rcp_ep_pwm_out_apply_write() itself stores the two fields (still
+ * opaque 16-bit setpoints, as before -- see the module's own doc comment
+ * on rcp_ep_pwm_out_generation_state()). Split 2026-08-18 (c-RCP-18-tracker,
+ * REQ-PWM-* atomicity audit, issue #533) into three separate test
+ * functions -- one per split id's own classifier outcome -- so each split
+ * id has its own distinct, independently mutation-testable assertion. */
+//cfusa:test REQ-PWM-057
+static void test_pwm_out_generation_state_stopped_when_period_zero(void)
 {
     /* period == 0: stopped, regardless of active_duration. */
     TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_STOPPED,
                           rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){0u, 400u}));
     TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_STOPPED,
                           rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){0u, 0u}));
+}
 
+//cfusa:test REQ-PWM-068
+static void test_pwm_out_generation_state_output_disabled_when_active_duration_zero(void)
+{
     /* active_duration == 0, period != 0: running with output disabled. */
     TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_OUTPUT_DISABLED,
                           rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){800u, 0u}));
+}
 
+//cfusa:test REQ-PWM-069
+static void test_pwm_out_generation_state_running_when_both_nonzero(void)
+{
     /* Both nonzero: ordinary running generation. */
     TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_RUNNING,
                           rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){1000u, 400u}));
@@ -1332,6 +1351,7 @@ static void test_pwm_out_generation_state(void)
  * itself an open spec question. The pin-readback rule needs real physical
  * IO this protocol-codec library has never modelled for any endpoint
  * type. The first two payload octets are always decoded as the period. */
+//cfusa:test REQ-PWM-057
 static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
 {
     rcp_ep_pwm_value_t decoded = {0u, 0u};
@@ -1416,6 +1436,8 @@ static void pwm_out_dispatch_handler(const uint8_t *request, size_t request_len,
  * fabricated by this test -- and current is left untouched (the
  * "ignored" half of Table 33's own two-part rule, unaffected by this
  * fix). */
+//cfusa:test REQ-PWM-008
+//cfusa:test REQ-PWM-028
 static void test_pwm_out_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response(void)
 {
     rcp_mock_server_t          *srv = rcp_mock_server_new();
@@ -1464,6 +1486,7 @@ static void test_pwm_out_dispatch_reserved_evt_write_gets_unsupported_cmd_error_
  * this comment previously cited "Table 45" -- PWM_OUT's own "pwmo trigger
  * outputs" table -- rather than Table 48, PWM_IN's real functional-
  * configuration table.) */
+//cfusa:test REQ-PWM-058
 static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -2449,7 +2472,9 @@ int main(void)
     RUN_TEST(test_pwm_out_trigger_events_stopped_generator_yields_nothing);
     RUN_TEST(test_pwm_out_trigger_events_raw_tick_wraps_modulo_period);
     RUN_TEST(test_pwm_out_duty_cap);
-    RUN_TEST(test_pwm_out_generation_state);
+    RUN_TEST(test_pwm_out_generation_state_stopped_when_period_zero);
+    RUN_TEST(test_pwm_out_generation_state_output_disabled_when_active_duration_zero);
+    RUN_TEST(test_pwm_out_generation_state_running_when_both_nonzero);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
     RUN_TEST(test_pwm_out_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);

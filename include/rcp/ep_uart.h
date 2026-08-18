@@ -39,6 +39,10 @@
 //cfusa:req REQ-UART-035
 //cfusa:req REQ-UART-036
 //cfusa:req REQ-UART-037
+//cfusa:req REQ-UART-046
+//cfusa:req REQ-UART-047
+//cfusa:req REQ-UART-048
+//cfusa:req REQ-UART-049
 /*
  * ep_uart.h -- UART endpoint for the TC18 Remote Control Protocol wire
  * layer (ROADMAP.md Phase 16, "Basic Endpoints", milestone 66).
