@@ -19106,7 +19106,7 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
-### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+### v0.442.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-AVTP-*: requirement-atomicity audit, Group 1 protocol-generic)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
@@ -19151,17 +19151,62 @@ implementation and confirming only that split id's own test failed
 depending on the mutation) while every sibling split id's test kept
 passing.
 
-`.fusa-reqs.json`: 1137 -> 1148 requirements (1105 -> 1116
-`scope: "tc18"`, 1001 -> 1011 ASIL-B / 34 -> 35 ASIL-A); `AUDIT_
-PACK.md`/`FREEDOM_FROM_INTERFERENCE.md` scope-count tables re-synced.
+This batch's own REQ-AVTP-* delta is 1137 -> 1148 requirements (11 new
+ids); merged on top of v0.441.0's concurrently-landed REQ-ACF-* batch
+(1137 -> 1157) below, `.fusa-reqs.json` now carries 1168 requirements
+total (1136 `scope: "tc18"`: 1031 ASIL-B / 35 ASIL-A / 70 QM).
+`AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md` scope-count tables
+re-synced to the merged total.
 
 Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
 0 errors; `trace --req-coverage 100` / `trace --sec-tested 100`
 (standalone, per the #533 REQ-CFG-* batch's combined-flag reporting-bug
-finding) each 100% (1148/1148 requirements, 512/512 functions).
+finding) each 100% (1168/1168 requirements, 512/512 functions) --
+re-verified after merging v0.441.0's REQ-ACF-* batch.
 
-**Next**: `REQ-ACF-*`/`REQ-RMAP-*`, closing out #533 Group 1
-(protocol-generic).
+**Next**: `REQ-RMAP-*`, closing out #533 Group 1 (protocol-generic) --
+`REQ-ACF-*` landed concurrently as v0.441.0 below.
+
+### v0.441.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-ACF-*: requirement-atomicity audit, Group 1 protocol-generic)
+
+Triaged all 32 `REQ-ACF-*` requirements (the densest Group 1
+sub-batch, 17/32 proxy-flagged). 15 bundled ids split into 35 total
+(20 new: `REQ-ACF-034`-`053`) -- `rcp_acf_classify_response()` 5-way
+by outcome (matching this file's own `REQ-PWM-*`/compound-wait
+per-case precedent); seven ABB/GBB compound-subject bundles split
+per this file's own `REQ-ACF-007`/`-008` precedent (three of the
+seven, 006/009/015, were missed by the 2+-"shall" proxy entirely --
+found only by reading the code); `rcp_acf_pack_header()`/
+`_unpack_header()`/`rcp_acf_pad_len()` 3-way split (three functions
+under one id); `RCP_ACF_MSG_TYPE_ABB`/`_GBB` constants split; op-bit
+encode/decode split; request-constraints-validator/admission-check
+split; compound-wait's shared-guard/reserved-fallback split;
+compound-wait's GE/LE mode pairs split one-mode-per-id. 5
+flagged-but-confirmed-atomic (012/013/024/032/033 -- boolean
+predicates' complete true/false spec, and one-function
+success+error-path patterns, are not bundling). 12 unflagged
+confirmed atomic; 2 more (020/022) carry zero "shall" text at all
+and were left as prose, tags preserved by relocating to the struct
+they describe. Full tag re-placement per-declaration in both
+`src/acf.c` and `include/rcp/acf.h` (both files' stacked header
+blocks retired). 6 new focused tests for splits whose old shared
+test didn't independently prove the new clause. Mutation-tested: a
+representative sample of split test-trace tags each drop `cfusa
+trace --sec-tested 100` by exactly one requirement when reverted
+(verified live, then restored); the new `REQ-ACF-006` test also
+catches a real code mutation (encode trusting the caller's
+`acf_msg_length`) with a concrete wrong value, not just a
+trace-coverage drop.
+
+`.fusa-reqs.json`: 1137 -> 1157 requirements. Full 67-test suite +
+ASan/UBSan (CI's exact flags) clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100` / `trace --sec-tested 100` (run
+standalone, the known combined-flag reporting bug) each 100%
+(1157/1157 requirements, 512/512 functions).
+
+**Next**: `REQ-AVTP-*`/`REQ-RMAP-*`, Group 1's remaining prefixes --
+`REQ-AVTP-*` landed concurrently as v0.442.0 above.
 
 ### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552:
 REQ-ISELED-028 scope corrected to retired)

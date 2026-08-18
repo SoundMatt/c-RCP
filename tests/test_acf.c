@@ -1,19 +1,15 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-ACF-001
-//cfusa:test REQ-ACF-002
-//cfusa:test REQ-ACF-004
-//cfusa:test REQ-ACF-005
-//cfusa:test REQ-ACF-006
-//cfusa:test REQ-ACF-007
-//cfusa:test REQ-ACF-008
-//cfusa:test REQ-ACF-009
-//cfusa:test REQ-ACF-010
-//cfusa:test REQ-ACF-011
-//cfusa:test REQ-ACF-012
-//cfusa:test REQ-ACF-013
-//cfusa:test REQ-ACF-014
-//cfusa:test REQ-ACF-015
-//cfusa:test REQ-ACF-016
+/* c-RCP-18-tracker (issue #533): the per-id test-trace tags that used to
+ * be stacked here at the file header (satisfying cfusa's --sec-tested
+ * gate for every id in the file regardless of which test function, if
+ * any, actually exercises each one) have been moved to sit directly
+ * above the specific test function that proves each requirement, per
+ * CONTRIBUTING.md's "Writing a requirement" convention. See each test
+ * function below for its own tag(s). (Deliberately not spelling out the
+ * literal tag syntax in this paragraph -- cfusa's own scanner reads that
+ * exact character sequence anywhere in a line, comment or not, as a real
+ * tag with whatever word follows it as the id, which is exactly the
+ * dangling-reference noise this rewrite fixes; see the PR description.) */
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -26,12 +22,19 @@ void tearDown(void) {}
 
 /* ── Message type constants ────────────────────────────────────────────────── */
 
-static void test_msg_type_constants(void)
+//cfusa:test REQ-ACF-017
+static void test_msg_type_abb_constant(void)
 {
     TEST_ASSERT_EQUAL_HEX8(0x0E, RCP_ACF_MSG_TYPE_ABB);
+}
+
+//cfusa:test REQ-ACF-048
+static void test_msg_type_gbb_constant(void)
+{
     TEST_ASSERT_EQUAL_HEX8(0x0D, RCP_ACF_MSG_TYPE_GBB);
 }
 
+//cfusa:test REQ-ACF-044
 static void test_gbb_header_is_exactly_8_bytes_longer_than_abb(void)
 {
     /* The presence/absence of message_timestamp is the only structural
@@ -61,6 +64,9 @@ static void test_gbb_header_is_exactly_8_bytes_longer_than_abb(void)
  * pre-CRC figures feed into, and this session's PR description for the
  * actual encoded bytes these two tests produce. */
 
+//cfusa:test REQ-ACF-004
+//cfusa:test REQ-ACF-006
+//cfusa:test REQ-ACF-014
 static void test_golden_figure19_abb_prelcrc_quadlets_and_pad(void)
 {
     uint8_t                      body[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
@@ -98,6 +104,9 @@ static void test_golden_figure19_abb_prelcrc_quadlets_and_pad(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-038
+//cfusa:test REQ-ACF-040
+//cfusa:test REQ-ACF-044
 static void test_golden_figure20_gbb_prelcrc_quadlets_and_pad(void)
 {
     uint8_t                body[7] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
@@ -139,6 +148,7 @@ static void test_golden_figure20_gbb_prelcrc_quadlets_and_pad(void)
 
 /* ── byte_message_info bit-position pins (Table 4) ─────────────────────────── */
 
+//cfusa:test REQ-ACF-016
 static void test_pack_header_bit_positions(void)
 {
     uint8_t                       out[8];
@@ -173,6 +183,7 @@ static void test_pack_header_bit_positions(void)
     TEST_ASSERT_EQUAL_HEX8(0xABu, out[7]);
 }
 
+//cfusa:test REQ-ACF-046
 static void test_unpack_header_is_pack_header_inverse(void)
 {
     uint8_t                       raw[8];
@@ -209,6 +220,37 @@ static void test_unpack_header_is_pack_header_inverse(void)
     TEST_ASSERT_EQUAL_UINT8(hdr.err, out.err);
     TEST_ASSERT_EQUAL_UINT8(hdr.ms, out.ms);
     TEST_ASSERT_EQUAL_UINT16(hdr.read_size_or_segment_num, out.read_size_or_segment_num);
+}
+
+/* Hand-crafted raw octets (independent of rcp_acf_pack_header() -- the
+ * same field values test_pack_header_bit_positions() feeds INTO pack, but
+ * computed here by hand and fed directly to unpack, so this test proves
+ * rcp_acf_unpack_header()'s own bit layout even if pack_header's own logic
+ * were wrong): acf_msg_type=0x0E, acf_msg_length=0x145, pad=0b10, mtv=1,
+ * byte_bus_id=0xAB, evt=0x5, hs=1, cs=0, transaction_num=0x77, op wire
+ * bit=0 (READ), rsp=1, err=0, ms=1, read_size_or_segment_num=0x0AB. */
+//cfusa:test REQ-ACF-046
+static void test_unpack_header_bit_positions_from_raw_bytes(void)
+{
+    const uint8_t                raw[8] = {0x1D, 0x45, 0xA0, 0xAB, 0x52, 0x77, 0x50, 0xAB};
+    rcp_acf_byte_message_info_t  out    = {0};
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(raw, &out));
+
+    TEST_ASSERT_EQUAL_HEX8(0x0Eu, out.acf_msg_type);
+    TEST_ASSERT_EQUAL_UINT16(0x145u, out.acf_msg_length);
+    TEST_ASSERT_EQUAL_UINT8(0x2u, out.pad);
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_MTV_VALID, out.mtv);
+    TEST_ASSERT_EQUAL_UINT16(0xABu, out.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x5u, out.evt);
+    TEST_ASSERT_EQUAL_UINT8(1u, out.hs);
+    TEST_ASSERT_EQUAL_UINT8(0u, out.cs);
+    TEST_ASSERT_EQUAL_UINT8(0x77u, out.transaction_num);
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_OP_READ, out.op); /* wire op bit = 0 */
+    TEST_ASSERT_EQUAL_UINT8(1u, out.rsp);
+    TEST_ASSERT_EQUAL_UINT8(0u, out.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, out.ms);
+    TEST_ASSERT_EQUAL_UINT16(0x0ABu, out.read_size_or_segment_num);
 }
 
 /* REQ-RMAP-053/REQ-ACF-020: byte_bus_id is 11 bits wide on the wire
@@ -281,6 +323,7 @@ static void test_peek_gbb_request_type(void)
     TEST_ASSERT_EQUAL_HEX8(0xFFu, request_type);
 }
 
+//cfusa:test REQ-ACF-047
 static void test_pad_len(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0, rcp_acf_pad_len(8));
@@ -292,6 +335,8 @@ static void test_pad_len(void)
 
 /* ── op wire-bit asymmetry (RCP_ACF_OP_NONE encodes as write) ──────────────── */
 
+//cfusa:test REQ-ACF-019
+//cfusa:test REQ-ACF-049
 static void test_op_none_wire_bit_is_write_roundtrip(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -313,6 +358,8 @@ static void test_op_none_wire_bit_is_write_roundtrip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-019
+//cfusa:test REQ-ACF-049
 static void test_op_read_wire_bit_is_read_roundtrip(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -336,6 +383,8 @@ static void test_op_read_wire_bit_is_read_roundtrip(void)
 
 /* ── ACF_ABB round-trip ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ACF-004
+//cfusa:test REQ-ACF-014
 static void test_abb_roundtrip_no_payload(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -366,6 +415,8 @@ static void test_abb_roundtrip_no_payload(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-010
+//cfusa:test REQ-ACF-015
 static void test_abb_roundtrip_with_payload_and_all_header_fields(void)
 {
     uint8_t body[] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -433,6 +484,7 @@ static void test_abb_roundtrip_pads_to_quadlet_boundary(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-005
 static void test_abb_decode_rejects_short_frame(void)
 {
     uint8_t buf[RCP_ACF_ABB_HEADER_LEN - 1] = {0};
@@ -444,6 +496,7 @@ static void test_abb_decode_rejects_short_frame(void)
                        rcp_acf_decode_abb(buf, sizeof(buf), &out, &payload, &payload_len));
 }
 
+//cfusa:test REQ-ACF-007
 static void test_abb_decode_rejects_wrong_msg_type(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -461,6 +514,7 @@ static void test_abb_decode_rejects_wrong_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-009
 static void test_abb_decode_rejects_declared_length_past_buffer(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -504,6 +558,9 @@ static void test_abb_encode_accepts_max_payload(void)
 
 /* ── ACF_GBB round-trip ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ACF-038
+//cfusa:test REQ-ACF-044
+//cfusa:test REQ-ACF-043
 static void test_gbb_roundtrip_no_payload(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -532,6 +589,7 @@ static void test_gbb_roundtrip_no_payload(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-042
 static void test_gbb_roundtrip_with_payload(void)
 {
     uint8_t body[] = {0x01, 0x02};
@@ -561,6 +619,46 @@ static void test_gbb_roundtrip_with_payload(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-ACF-045 split off REQ-ACF-015 (c-RCP-18-tracker, issue #533): the
+ * GBB half of byte_message_info's remaining flag/count field round-trip
+ * -- hs/cs/rsp/err/ms/read_size_or_segment_num -- previously had no test
+ * of its own distinct from the ABB half
+ * (test_abb_roundtrip_with_payload_and_all_header_fields); this is that
+ * dedicated GBB test. */
+//cfusa:test REQ-ACF-045
+static void test_gbb_roundtrip_remaining_header_fields(void)
+{
+    rcp_acf_gbb_header_t hdr = {0};
+    rcp_bytes_t          frame;
+    rcp_acf_gbb_header_t out = {0};
+    const uint8_t        *payload = NULL;
+    size_t                payload_len = 0;
+
+    hdr.info.byte_bus_id              = 4;
+    hdr.info.hs                       = 1;
+    hdr.info.cs                       = 1;
+    hdr.info.rsp                      = 1;
+    hdr.info.err                      = 0;
+    hdr.info.ms                       = 1;
+    hdr.info.op                       = RCP_ACF_OP_READ;
+    hdr.info.read_size_or_segment_num = 0x0CDE & 0x0FFF;
+
+    frame = rcp_acf_encode_gbb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                       rcp_acf_decode_gbb(frame.data, frame.len, &out, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(hdr.info.hs, out.info.hs);
+    TEST_ASSERT_EQUAL_UINT8(hdr.info.cs, out.info.cs);
+    TEST_ASSERT_EQUAL_UINT8(hdr.info.rsp, out.info.rsp);
+    TEST_ASSERT_EQUAL_UINT8(hdr.info.err, out.info.err);
+    TEST_ASSERT_EQUAL_UINT8(hdr.info.ms, out.info.ms);
+    TEST_ASSERT_EQUAL_UINT16(hdr.info.read_size_or_segment_num, out.info.read_size_or_segment_num);
+
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-ACF-039
 static void test_gbb_decode_rejects_short_frame(void)
 {
     uint8_t buf[RCP_ACF_GBB_HEADER_LEN - 1] = {0};
@@ -572,6 +670,7 @@ static void test_gbb_decode_rejects_short_frame(void)
                        rcp_acf_decode_gbb(buf, sizeof(buf), &out, &payload, &payload_len));
 }
 
+//cfusa:test REQ-ACF-008
 static void test_gbb_decode_rejects_wrong_msg_type(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -589,6 +688,7 @@ static void test_gbb_decode_rejects_wrong_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-041
 static void test_gbb_decode_rejects_declared_length_past_buffer(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -617,6 +717,7 @@ static void test_gbb_encode_rejects_oversized_payload(void)
 
 /* ── Timestamp-validity folding ────────────────────────────────────────────── */
 
+//cfusa:test REQ-ACF-012
 static void test_gbb_is_timed_true_only_when_valid(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -625,6 +726,7 @@ static void test_gbb_is_timed_true_only_when_valid(void)
     TEST_ASSERT_TRUE(rcp_acf_gbb_is_timed(&hdr));
 }
 
+//cfusa:test REQ-ACF-012
 static void test_gbb_is_timed_false_when_untimed(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -633,6 +735,7 @@ static void test_gbb_is_timed_false_when_untimed(void)
     TEST_ASSERT_FALSE(rcp_acf_gbb_is_timed(&hdr));
 }
 
+//cfusa:test REQ-ACF-011
 static void test_gbb_encode_zeroes_timestamp_region_when_untimed(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -677,6 +780,7 @@ static void test_gbb_encode_preserves_timestamp_when_valid(void)
 
 /* ── Four response-type identification rules ───────────────────────────────── */
 
+//cfusa:test REQ-ACF-034
 static void test_classify_response_error_takes_priority(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -686,6 +790,7 @@ static void test_classify_response_error_takes_priority(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
 }
 
+//cfusa:test REQ-ACF-035
 static void test_classify_response_write(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -694,6 +799,7 @@ static void test_classify_response_write(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_WRITE, rcp_acf_classify_response(&hdr));
 }
 
+//cfusa:test REQ-ACF-036
 static void test_classify_response_read(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -702,6 +808,7 @@ static void test_classify_response_read(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_READ, rcp_acf_classify_response(&hdr));
 }
 
+//cfusa:test REQ-ACF-037
 static void test_classify_response_acknowledge(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -716,6 +823,7 @@ static void test_classify_response_acknowledge(void)
  * doc comment). Without checking evt first, a real Acknowledge response
  * with op = RCP_ACF_OP_WRITE was silently misclassified as
  * RCP_ACF_RESP_WRITE. */
+//cfusa:test REQ-ACF-002
 static void test_classify_response_acknowledge_from_decoded_write_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -725,6 +833,7 @@ static void test_classify_response_acknowledge_from_decoded_write_op(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
 }
 
+//cfusa:test REQ-ACF-002
 static void test_classify_response_acknowledge_from_decoded_read_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -738,6 +847,7 @@ static void test_classify_response_acknowledge_from_decoded_read_op(void)
  * an Acknowledge, not an Error Response (§11.3.4's Error Response is the
  * distinct evt[3:0] < 0x9, err = 1 case) -- err must not take priority
  * over evt here. */
+//cfusa:test REQ-ACF-002
 static void test_classify_response_acknowledge_rejected_is_not_error(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -882,7 +992,7 @@ static void test_compound_wait_match_and_zeros_mask_mode(void)
 }
 
 //cfusa:test REQ-ACF-029
-static void test_compound_wait_match_leading_quadlet_hi_word_ge_le(void)
+static void test_compound_wait_match_leading_quadlet_hi_word_ge(void)
 {
     const uint8_t payload[4] = {0x00, 0x0A, 0x00, 0x00}; /* hi word = 10 */
     const uint8_t lower[4]   = {0x00, 0x05, 0x00, 0x00}; /* hi word = 5 */
@@ -892,6 +1002,20 @@ static void test_compound_wait_match_leading_quadlet_hi_word_ge_le(void)
     TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x4, payload, 4, lower, 4));  /* 10>=5 */
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x4, payload, 4, higher, 4)); /* 10>=15 */
     TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x4, payload, 4, equal, 4));  /* 10>=10 */
+}
+
+/* REQ-ACF-052 split off REQ-ACF-029 (c-RCP-18-tracker, issue #533): the
+ * evt[2:0]=101b (<=) counterpart used to share a test function (and an
+ * id) with the 100b (>=) case above -- now its own separately-testable
+ * mode, matching this function's own one-mode-per-id convention
+ * elsewhere (REQ-ACF-026/027/028). */
+//cfusa:test REQ-ACF-052
+static void test_compound_wait_match_leading_quadlet_hi_word_le(void)
+{
+    const uint8_t payload[4] = {0x00, 0x0A, 0x00, 0x00}; /* hi word = 10 */
+    const uint8_t lower[4]   = {0x00, 0x05, 0x00, 0x00}; /* hi word = 5 */
+    const uint8_t higher[4]  = {0x00, 0x0F, 0x00, 0x00}; /* hi word = 15 */
+    const uint8_t equal[4]   = {0x00, 0x0A, 0x00, 0x00};
 
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x5, payload, 4, lower, 4)); /* 10<=5 */
     TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x5, payload, 4, higher, 4)); /* 10<=15 */
@@ -899,7 +1023,7 @@ static void test_compound_wait_match_leading_quadlet_hi_word_ge_le(void)
 }
 
 //cfusa:test REQ-ACF-030
-static void test_compound_wait_match_leading_quadlet_lo_word_ge_le(void)
+static void test_compound_wait_match_leading_quadlet_lo_word_ge(void)
 {
     const uint8_t payload[4] = {0xFF, 0xFF, 0x00, 0x0A}; /* lo word = 10 */
     const uint8_t lower[4]   = {0xFF, 0xFF, 0x00, 0x05}; /* lo word = 5 */
@@ -907,6 +1031,17 @@ static void test_compound_wait_match_leading_quadlet_lo_word_ge_le(void)
 
     TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x6, payload, 4, lower, 4));  /* 10>=5 */
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x6, payload, 4, higher, 4)); /* 10>=15 */
+}
+
+/* REQ-ACF-053 split off REQ-ACF-030 (c-RCP-18-tracker, issue #533): the
+ * evt[2:0]=111b (<=) counterpart, previously sharing a test function (and
+ * an id) with the 110b (>=) case above. */
+//cfusa:test REQ-ACF-053
+static void test_compound_wait_match_leading_quadlet_lo_word_le(void)
+{
+    const uint8_t payload[4] = {0xFF, 0xFF, 0x00, 0x0A}; /* lo word = 10 */
+    const uint8_t lower[4]   = {0xFF, 0xFF, 0x00, 0x05}; /* lo word = 5 */
+    const uint8_t higher[4]  = {0xFF, 0xFF, 0x00, 0x0F}; /* lo word = 15 */
 
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x7, payload, 4, lower, 4)); /* 10<=5 */
     TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x7, payload, 4, higher, 4)); /* 10<=15 */
@@ -914,6 +1049,8 @@ static void test_compound_wait_match_leading_quadlet_lo_word_ge_le(void)
 
 //cfusa:test REQ-ACF-029
 //cfusa:test REQ-ACF-030
+//cfusa:test REQ-ACF-052
+//cfusa:test REQ-ACF-053
 static void test_compound_wait_match_ge_le_rejects_short_payload(void)
 {
     const uint8_t payload[3] = {0x00, 0x0A, 0x00};
@@ -925,7 +1062,11 @@ static void test_compound_wait_match_ge_le_rejects_short_payload(void)
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x7, payload, 3, status, 3));
 }
 
-//cfusa:test REQ-ACF-025
+/* REQ-ACF-051 split off REQ-ACF-025 (c-RCP-18-tracker, issue #533): the
+ * reserved-evt(0x3) fallback is its own separately-testable behaviour of
+ * rcp_acf_compound_wait_match(), distinct from the shared status-length
+ * rule REQ-ACF-025 now names alone. */
+//cfusa:test REQ-ACF-051
 static void test_compound_wait_match_reserved_mode_always_false(void)
 {
     const uint8_t payload[2] = {0x01, 0x02};
@@ -1056,6 +1197,7 @@ static void test_build_acknowledge_rejected_response_differs_from_error_response
 
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ACF-013
 static void test_peek_msg_type_reads_first_byte(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -1068,14 +1210,94 @@ static void test_peek_msg_type_reads_first_byte(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-ACF-013
 static void test_peek_msg_type_rejects_empty_buffer(void)
 {
     uint8_t msg_type = 0;
     TEST_ASSERT_EQUAL(RCP_ACF_ERR_SHORT_FRAME, rcp_acf_peek_msg_type(NULL, 0, &msg_type));
 }
 
+/* ── rcp_acf_header_is_request() (REQ-ACF-050) ─────────────────────────────── */
+
+/* REQ-ACF-050 split off REQ-ACF-021 (c-RCP-18-tracker, issue #533): a
+ * standalone test of rcp_acf_header_is_request() on its own, independent
+ * of test_acf_request_flags_round_trip_but_admission_now_rejects_rsp
+ * (tests/test_tc18_gaps_ep.c), which bundles this function's own
+ * true/false contract together with rcp_acf_request_header_constraints_
+ * valid() and a full server-admission call -- reverting just this
+ * function's own logic wouldn't necessarily fail that larger test in an
+ * attributable way. */
+//cfusa:test REQ-ACF-050
+static void test_header_is_request_true_for_rsp_zero_false_for_rsp_one(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    TEST_ASSERT_TRUE(rcp_acf_header_is_request(&hdr)); /* rsp=0: a request */
+
+    hdr.rsp = 1;
+    TEST_ASSERT_FALSE(rcp_acf_header_is_request(&hdr)); /* rsp=1: a response */
+}
+
+/* ── acf_msg_length is recomputed, never trusted from the caller (REQ-ACF-006/040) ── */
+
+/* REQ-ACF-006 (c-RCP-18-tracker, issue #533): rcp_acf_encode_abb() must
+ * ignore whatever acf_msg_length the caller's header happens to carry and
+ * derive it fresh from payload_len -- the golden-vector/roundtrip tests
+ * above always start from a zeroed header (acf_msg_length == 0), so they
+ * cannot distinguish "derived from payload_len" from "just echoed the
+ * caller's own (zero) value". This test deliberately poisons
+ * hdr.acf_msg_length with a wrong, nonzero value before encoding. */
+//cfusa:test REQ-ACF-006
+static void test_encode_abb_ignores_caller_supplied_acf_msg_length(void)
+{
+    uint8_t                      body[4] = {1, 2, 3, 4};
+    rcp_acf_byte_message_info_t  hdr     = {0};
+    rcp_bytes_t                  frame;
+    rcp_acf_byte_message_info_t  out         = {0};
+    const uint8_t                *payload    = NULL;
+    size_t                        payload_len = 0;
+
+    hdr.acf_msg_length = 0x1FF; /* deliberately wrong -- must be ignored */
+
+    frame = rcp_acf_encode_abb(&hdr, body, sizeof(body));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* 8 (header) + 4 (body) = 12 octets = 3 quadlets, NOT 0x1FF. */
+    TEST_ASSERT_EQUAL_UINT16(0x03u, (uint16_t)(((frame.data[0] & 0x01u) << 8) | frame.data[1]));
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                       rcp_acf_decode_abb(frame.data, frame.len, &out, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT16(3u, out.acf_msg_length);
+
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-ACF-040
+static void test_encode_gbb_ignores_caller_supplied_acf_msg_length(void)
+{
+    uint8_t                body[2] = {1, 2};
+    rcp_acf_gbb_header_t   hdr     = {0};
+    rcp_bytes_t            frame;
+    rcp_acf_gbb_header_t   out         = {0};
+    const uint8_t          *payload    = NULL;
+    size_t                  payload_len = 0;
+
+    hdr.info.acf_msg_length = 0x1FF; /* deliberately wrong -- must be ignored */
+
+    frame = rcp_acf_encode_gbb(&hdr, body, sizeof(body));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* 16 (header+ts) + 2 (body) = 18 -> pad to 20 octets = 5 quadlets. */
+    TEST_ASSERT_EQUAL_UINT16(0x05u, (uint16_t)(((frame.data[0] & 0x01u) << 8) | frame.data[1]));
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                       rcp_acf_decode_gbb(frame.data, frame.len, &out, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT16(5u, out.info.acf_msg_length);
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ACF-001
 static void test_acf_strerror_unique_nonempty(void)
 {
     const rcp_acf_errc_t codes[] = {
@@ -1098,7 +1320,8 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_msg_type_constants);
+    RUN_TEST(test_msg_type_abb_constant);
+    RUN_TEST(test_msg_type_gbb_constant);
     RUN_TEST(test_gbb_header_is_exactly_8_bytes_longer_than_abb);
 
     RUN_TEST(test_golden_figure19_abb_prelcrc_quadlets_and_pad);
@@ -1106,6 +1329,7 @@ int main(void)
 
     RUN_TEST(test_pack_header_bit_positions);
     RUN_TEST(test_unpack_header_is_pack_header_inverse);
+    RUN_TEST(test_unpack_header_bit_positions_from_raw_bytes);
     RUN_TEST(test_unpack_header_reads_full_11_bit_bus_id);
     RUN_TEST(test_peek_gbb_request_type);
     RUN_TEST(test_pad_len);
@@ -1124,6 +1348,7 @@ int main(void)
 
     RUN_TEST(test_gbb_roundtrip_no_payload);
     RUN_TEST(test_gbb_roundtrip_with_payload);
+    RUN_TEST(test_gbb_roundtrip_remaining_header_fields);
     RUN_TEST(test_gbb_decode_rejects_short_frame);
     RUN_TEST(test_gbb_decode_rejects_wrong_msg_type);
     RUN_TEST(test_gbb_decode_rejects_declared_length_past_buffer);
@@ -1153,8 +1378,10 @@ int main(void)
     RUN_TEST(test_compound_wait_match_exact_mode);
     RUN_TEST(test_compound_wait_match_and_ones_mask_mode);
     RUN_TEST(test_compound_wait_match_and_zeros_mask_mode);
-    RUN_TEST(test_compound_wait_match_leading_quadlet_hi_word_ge_le);
-    RUN_TEST(test_compound_wait_match_leading_quadlet_lo_word_ge_le);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_hi_word_ge);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_hi_word_le);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_lo_word_ge);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_lo_word_le);
     RUN_TEST(test_compound_wait_match_ge_le_rejects_short_payload);
     RUN_TEST(test_compound_wait_match_reserved_mode_always_false);
 
@@ -1165,6 +1392,10 @@ int main(void)
 
     RUN_TEST(test_peek_msg_type_reads_first_byte);
     RUN_TEST(test_peek_msg_type_rejects_empty_buffer);
+
+    RUN_TEST(test_header_is_request_true_for_rsp_zero_false_for_rsp_one);
+    RUN_TEST(test_encode_abb_ignores_caller_supplied_acf_msg_length);
+    RUN_TEST(test_encode_gbb_ignores_caller_supplied_acf_msg_length);
 
     RUN_TEST(test_acf_strerror_unique_nonempty);
 
