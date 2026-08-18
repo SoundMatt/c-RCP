@@ -19106,6 +19106,25 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.426.0 -- 2026-08-18 (c-RCP-21 L001 sub-effort: split 3
+over-length src/ functions, all real src/ candidates closed)
+
+Fourth sub-effort of the `[c-RCP-21]` CFUSA lint/hygiene bundle
+(issue #523) to land, after CY005 (PR #532) and CY001 (PRs #537,
+#541). Resolves the 3 real `src/` **L001** (MISRA R15.5,
+function-length) candidates: `lifecycle.c`'s
+`rcp_lifecycle_check_rcp_cfg()`, `config.c`'s
+`rcp_config_parse_json()`, `regmap.c`'s
+`rcp_regmap_named_signal_string()` -- each split into itself plus a
+small named `static` helper, pure extraction, no behavior change.
+See `CHANGELOG.md`'s matching entry for full per-function detail and
+the three mutation tests run (one of which surfaced a pre-existing
+`test_regmap.c` coverage gap, noted but out of scope to backfill
+here). `cfusa check` diff: `CFUSA-L001: 74 -> 71`, `CFUSA-L002: 3 ->
+1` (2 real `goto` eliminations), `COMP001: 11 -> 10` (real
+complexity reduction) -- every other rule's count byte-identical.
+Issue #523 stays open for L008/A003.
+
 ### v0.425.0 -- 2026-08-18 (c-RCP-19: mock.c TSCF/fragment E2E dispatch
 fault-injection coverage)
 

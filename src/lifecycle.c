@@ -39,6 +39,60 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
     return RCP_LIFECYCLE_OK;
 }
 
+/* Bullet 2/3 of rcp_lifecycle_check_rcp_cfg()'s own TC18 §12.3.1.2 check:
+ * every configured request stream names a real response stream slot, and
+ * every configured request stream is bound to at least one in-use
+ * endpoint (not an orphaned, unused stream slot). Split out of
+ * rcp_lifecycle_check_rcp_cfg() itself purely to keep that function under
+ * this project's own max_function_lines convention (CFUSA-L001) -- no
+ * behavior change, same snap fields read in the same order. */
+static bool request_streams_consistent(const rcp_lifecycle_plausibility_snapshot_t *snap)
+{
+    size_t i;
+
+    for (i = 0; i < snap->request_stream_count; i++) {
+        const rcp_lifecycle_request_stream_plausibility_t *rs = &snap->request_streams[i];
+        bool has_bound_endpoint;
+        size_t j;
+
+        if (!rs->configured) continue;
+        if (!rs->has_response_stream) return false;
+
+        /* REQ-RMAP-049 (issue #338): has_response_stream alone only
+         * proves SOME association was recorded, not that it names a
+         * response stream that actually exists -- response_stream_index
+         * must also be a real slot in snap->own response_stream_count
+         * space (0-based, the same rcp_lifecycle_endpoint_plausibility_t
+         * request_stream_index translation convention, REQ-LIFECYCLE-
+         * 038 -- see that field's own doc comment, lifecycle.h). */
+        if (rs->response_stream_index >= snap->response_stream_count)
+            return false;
+
+        /* REQ-LIFECYCLE-038: TC18 §12.3.1.2's third bullet -- a
+         * configured stream with no endpoint referencing it (an
+         * orphaned, unused stream slot) is also inconsistent. ep_used
+         * is checked here too, not just has_stream_assoc -- an unused
+         * endpoint slot (ep_used == false) is skipped by the bullet-1
+         * loop in rcp_lifecycle_check_rcp_cfg() entirely, so its own
+         * has_stream_assoc/request_stream_index values are never
+         * validated by anything and must not be trusted to "cover" an
+         * otherwise-orphaned stream here; only a genuinely in-use
+         * endpoint counts. */
+        has_bound_endpoint = false;
+        for (j = 0; j < snap->endpoint_count; j++) {
+            const rcp_lifecycle_endpoint_plausibility_t *ep = &snap->endpoints[j];
+
+            if (ep->ep_used && ep->has_stream_assoc && ep->request_stream_index == i) {
+                has_bound_endpoint = true;
+                break;
+            }
+        }
+        if (!has_bound_endpoint) return false;
+    }
+
+    return true;
+}
+
 //cfusa:req REQ-LIFECYCLE-005
 //cfusa:req REQ-LIFECYCLE-006
 //cfusa:req REQ-LIFECYCLE-007
@@ -57,44 +111,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
         if (!ep->has_stream_assoc) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
     }
 
-    for (i = 0; i < snap->request_stream_count; i++) {
-        const rcp_lifecycle_request_stream_plausibility_t *rs = &snap->request_streams[i];
-        bool has_bound_endpoint;
-        size_t j;
-
-        if (!rs->configured) continue;
-        if (!rs->has_response_stream) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
-
-        /* REQ-RMAP-049 (issue #338): has_response_stream alone only
-         * proves SOME association was recorded, not that it names a
-         * response stream that actually exists -- response_stream_index
-         * must also be a real slot in snap->own response_stream_count
-         * space (0-based, the same rcp_lifecycle_endpoint_plausibility_t
-         * request_stream_index translation convention, REQ-LIFECYCLE-
-         * 038 -- see that field's own doc comment, lifecycle.h). */
-        if (rs->response_stream_index >= snap->response_stream_count)
-            return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
-
-        /* REQ-LIFECYCLE-038: TC18 §12.3.1.2's third bullet -- a
-         * configured stream with no endpoint referencing it (an
-         * orphaned, unused stream slot) is also inconsistent. ep_used
-         * is checked here too, not just has_stream_assoc -- an unused
-         * endpoint slot (ep_used == false) is skipped by the bullet-1
-         * loop above entirely, so its own has_stream_assoc/
-         * request_stream_index values are never validated by anything
-         * and must not be trusted to "cover" an otherwise-orphaned
-         * stream here; only a genuinely in-use endpoint counts. */
-        has_bound_endpoint = false;
-        for (j = 0; j < snap->endpoint_count; j++) {
-            const rcp_lifecycle_endpoint_plausibility_t *ep = &snap->endpoints[j];
-
-            if (ep->ep_used && ep->has_stream_assoc && ep->request_stream_index == i) {
-                has_bound_endpoint = true;
-                break;
-            }
-        }
-        if (!has_bound_endpoint) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
-    }
+    if (!request_streams_consistent(snap)) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
 
     return RCP_LIFECYCLE_OK;
 }
