@@ -34,6 +34,120 @@ the rationale.
 
 ## Releases
 
+### v0.446.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-LINEP-*` prefix (`src/ep_lin.c`, `include/rcp/ep_lin.h`)
+-- Group 2's lowest total (24 reqs) with only 1 proxy-flagged. All 24
+requirements read in full against their actual `text` and traced
+code/tests, not just the 1 flagged one, per the tracker's own warning
+that Group 1's REQ-RMAP-* batch found real bundling with 0 "shall"
+occurrences that the proxy missed entirely.
+
+10 ids split into 34 (24 originals + 10 new, `REQ-LINEP-030..039`),
+plus 2 near-duplicate ids retired:
+
+- `REQ-LINEP-006` -> `-006`/`-030`: `rcp_ep_lin_trigger_fires()`'s
+  `RCP_EP_LIN_TRIGGER_NONE` always-false outcome (kept as `-006`) vs.
+  its `RCP_EP_LIN_TRIGGER_TX_DONE` AND-of-both-conditions outcome
+  (`-030`) -- two switch-arm behaviors of the same function, the
+  per-outcome granularity `REQ-PWM-002..009` already established.
+- `REQ-LINEP-023` RETIRED: duplicated `-030`'s own TX_DONE
+  AND-of-both-conditions rule under a separate id (added by issue #201,
+  never reconciled with `-006`'s own later correction), both citing the
+  identical `TC18-13.7.10.1-002` master id -- the same
+  near-duplicate-ids-describing-the-same-rule pattern as
+  `REQ-RMAP-059`/`-061` (consolidated into `REQ-RMAP-085` by the prior
+  Group 1 batch), caught only by reading the full narrative since it
+  carried 0 "shall" occurrences.
+- `REQ-LINEP-018` -> `-018`/`-031`/`-032`/`-033`:
+  `rcp_ep_lin_decode_command_request()`'s four rejection outcomes
+  (`SHORT_FRAME` kept as `-018`; `BAD_MSG_TYPE`, `WRONG_BUS`, `WRONG_OP`
+  split to `-031`/`-032`/`-033`) -- one "shall" sentence listing four
+  independently-testable error codes, each already proven by its own
+  separate pre-existing test function, missed by the "2+ shall" proxy
+  because the whole rule was one grammatical sentence.
+- `REQ-LINEP-019` -> `-019`/`-034`: `rcp_ep_lin_encode_response()`'s
+  untimed `ACF_ABB` encoding shape (kept as `-019`) vs. its timed
+  `ACF_GBB` encoding shape (`-034`) -- for consistency with
+  `rcp_ep_lin_decode_response()`'s own sibling untimed/timed split
+  (`REQ-LINEP-020`/`-021`), which already treats the two shapes as
+  separate ids.
+- `REQ-LINEP-022` -> `-022`/`-035`: `rcp_ep_lin_decode_response()`'s
+  `SHORT_FRAME` rejection (kept as `-022`) vs. its `WRONG_BUS` rejection
+  (`-035`) -- same one-sentence-two-error-codes pattern as `-018`.
+- `REQ-LINEP-026` RETIRED: duplicated `-016`'s own "evt = 0" encoding
+  fact under a separate id, explicitly self-cross-referencing `-016`
+  ("See REQ-LINEP-016") and citing the identical `TC18-13.5-001` master
+  id; its own remaining "no compare_mode parameter" claim is a static
+  API-shape fact, not an independently-testable runtime behavior.
+- `REQ-LINEP-028` -> `-028`/`-036`: `rcp_ep_lin_render_registers()`'s
+  own EP_func serialization contract (kept as `-028`) vs. a wholly
+  different function, `rcp_ep_lin_encode_reconfig_request()`'s own
+  wire-encoding contract (`-036`) -- two functions' behavior under one
+  id, the same class of violation `REQ-AUTH-009` (#519's own seed
+  example) demonstrated.
+- `REQ-LINEP-029` -> `-029`/`-037`/`-038`/`-039`:
+  `rcp_ep_lin_apply_reconfig()`'s out-of-range rejection (kept as
+  `-029`), its too-short-payload rejection (`-037`, previously
+  implemented and tested but untraced by any requirement text at all),
+  and its successful patch/read-only-register-skip behavior (`-038`),
+  plus a wholly different function, `rcp_ep_lin_reconfig_strerror()`'s
+  own never-NULL contract (`-039`) -- four independently-testable
+  behaviors, two functions, under one id.
+
+Confirmed atomic despite the proxy flag or manual review:
+`REQ-LINEP-006` (post-split), `-007`, `-008`, `-009`, `-010`, `-011`,
+`-012`, `-013`, `-014`, `-015`, `-016` (post-`-026`-retirement),
+`-017`, `-020`, `-021`, `-024` (distinct `TC18-13.7.10.2-001` citation
+from `-028`/`-029`, not a duplicate), `-025`, `-027`.
+
+Every split's `//cfusa:req`/`//cfusa:test` tags moved/duplicated to sit
+directly above the exact function/test each id describes, per
+`CONTRIBUTING.md` -- including retiring `tests/test_ep_lin.c`'s own
+former file-header-stacked `//cfusa:test` block entirely in favor of
+per-function placement, and adding vestigial `//cfusa:req`/
+`//cfusa:test` tags for the 2 retired ids (`-023`/`-026`) next to the
+code/test that used to describe them, the same convention
+`src/regmap.c`'s own `REQ-RMAP-004..008` retirement already uses. Two
+genuinely new, focused tests added
+(`test_encode_response_untimed_uses_abb_message_type`/
+`test_encode_response_timed_uses_gbb_message_type`) to independently
+prove `-019`/`-034`'s own wire-message-type choice, decoupled from
+`rcp_ep_lin_decode_response()`'s own type-dispatch correctness; the
+former shared `test_trigger_fires` was split into
+`test_trigger_fires_none_case`/`test_trigger_fires_tx_done_case` for
+the same reason. Every other split already had its own separate,
+pre-existing test function -- just mis-tagged or untagged at the
+function level.
+
+Every split mutation-tested against a real injected defect in
+`src/ep_lin.c`, reverted after confirming: in each case, the
+newly-independent clause's own test failed cleanly (and only that
+test), while sibling clauses' tests stayed green.
+
+Verification:
+- Full clean rebuild + **67/67** tests passing.
+- ASan/UBSan (CI's exact flags: `-fsanitize=address,undefined
+  -fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0` on
+  macOS) clean, 67/67 passing.
+- Pinned `cfusa` v0.5.54: `check` 0 errors.
+- `trace --req-coverage 100` / `trace --sec-tested 100` run
+  **standalone** (the known v0.5.54 combined-flag reporting bug) --
+  100% each (1184/1184 requirements, 512/512 functions).
+
+Version `0.445.0` -> `0.446.0` (`CMakeLists.txt`/`version.h`/
+`.fusa.json` kept in sync).
+
+Scope note: this is one batch of the `[c-RCP-18-tracker]` master
+tracker -- does **not** close issue #533. Other Group 2 prefixes
+(`REQ-ADC-*`, `REQ-CANEP-*`, `REQ-GPIO-*`, `REQ-I2C-*`, `REQ-MDIO-*`,
+`REQ-PWM-*`, `REQ-SPI-*`, `REQ-UART-*`, `REQ-ISELED-*`,
+`REQ-WAKEUP-*`) remain, tracked as separate concurrent batches against
+the same tracker.
+
 ### v0.445.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-ADC-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
@@ -245,6 +359,7 @@ Part of #533. Not closing it -- other Group 2 prefixes
 `REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-UART-*`,
 `REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4 remain, tracked as
 separate concurrent batches against the same tracker.
+
 
 ### v0.443.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-RMAP-*: requirement-atomicity audit, Group 1 protocol-generic)
 

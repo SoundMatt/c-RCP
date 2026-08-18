@@ -21,12 +21,27 @@
  * are catalogued in .fusa-reqs.json with a "tc18" citation and a
  * "status" of "implemented", "partial" or "not-implemented". The
  * not-implemented and partial ones describe normative TC18 behaviour
- * this module does NOT provide; their tests pin the deviation. */
-//cfusa:req REQ-LINEP-023
+ * this module does NOT provide; their tests pin the deviation.
+ * REQ-LINEP-023/026 were RETIRED by the REQ-LINEP-* atomicity audit
+ * (c-RCP-18-tracker, issue #533) as near-duplicates of REQ-LINEP-030/016
+ * respectively -- see .fusa-reqs.json for each entry's own history. */
 //cfusa:req REQ-LINEP-024
 //cfusa:req REQ-LINEP-025
-//cfusa:req REQ-LINEP-026
 //cfusa:req REQ-LINEP-027
+
+/* REQ-LINEP-* atomicity audit (c-RCP-18-tracker, issue #533) split ids --
+ * each tagged directly above its own function in ep_lin.c; listed here
+ * only for this header's own completeness-pass inventory. */
+//cfusa:req REQ-LINEP-030
+//cfusa:req REQ-LINEP-031
+//cfusa:req REQ-LINEP-032
+//cfusa:req REQ-LINEP-033
+//cfusa:req REQ-LINEP-034
+//cfusa:req REQ-LINEP-035
+//cfusa:req REQ-LINEP-036
+//cfusa:req REQ-LINEP-037
+//cfusa:req REQ-LINEP-038
+//cfusa:req REQ-LINEP-039
 /*
  * ep_lin.h -- LIN endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 71).

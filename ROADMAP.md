@@ -19106,6 +19106,57 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.446.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-LINEP-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-LINEP-*` (`src/ep_lin.c`,
+`include/rcp/ep_lin.h`), Group 2's smallest total (24 reqs, 1
+proxy-flagged) -- triaged all 24 in full rather than only the 1
+flagged, per the tracker's own warning that Group 1's REQ-RMAP-* batch
+found real bundling with 0 "shall" occurrences the proxy missed
+entirely.
+
+10 ids split into 10 new ones (`REQ-LINEP-030..039`): `-006`
+(`rcp_ep_lin_trigger_fires()`'s NONE-always-false vs. TX_DONE
+AND-of-both-conditions switch arms), `-018` (`decode_command_request`'s
+four rejection outcomes -- `SHORT_FRAME` kept, `BAD_MSG_TYPE`/
+`WRONG_BUS`/`WRONG_OP` split out, one sentence bundling four codes),
+`-019` (`encode_response`'s untimed ACF_ABB vs. timed ACF_GBB shapes,
+for consistency with `decode_response`'s own already-split
+`-020`/`-021`), `-022` (`decode_response`'s `SHORT_FRAME` vs.
+`WRONG_BUS`), `-028` (`render_registers`'s own contract vs. a wholly
+different function, `encode_reconfig_request`'s own contract -- two
+functions under one id), and `-029` (`apply_reconfig`'s out-of-range
+rejection kept, its short-payload rejection and successful-patch
+behavior split out, plus a third function, `reconfig_strerror`'s own
+never-NULL contract). 2 near-duplicate ids RETIRED: `-023` (duplicated
+`-030`'s own TX_DONE rule, same `TC18-13.7.10.1-002` master id as
+`-006`/`-030` -- the `REQ-RMAP-059`/`-061` pattern, 0 "shall"
+occurrences) and `-026` (duplicated `-016`'s own "evt = 0" fact,
+self-cross-referencing `-016` in its own text). 16 ids confirmed
+genuinely atomic on inspection.
+
+Tags moved/duplicated to sit above the exact function/test per split
+(not file-header-only, including retiring `tests/test_ep_lin.c`'s own
+former file-header-stacked block); vestigial tags added for the 2
+retired ids next to the code that used to describe them, matching
+`src/regmap.c`'s own `REQ-RMAP-004..008` convention. Two brand-new
+focused tests added to independently prove `-019`/`-034`'s own
+wire-message-type choice; the former shared trigger-fires test split
+in two; every other split already had its own distinct pre-existing
+test, just mis-tagged. Every split mutation-tested against a real
+injected defect, reverted after confirming.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1184/1184 requirements, 512/512 functions).
+
+**Next**: other Group 2 prefixes (`REQ-ADC-*`, `REQ-CANEP-*`,
+`REQ-GPIO-*`, `REQ-I2C-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-SPI-*`,
+`REQ-UART-*`, `REQ-ISELED-*`, `REQ-WAKEUP-*`) remain, tracked as
+separate batches against the same tracker.
+
 ### v0.445.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-ADC-*: requirement-atomicity audit, Group 2 per-endpoint)
 
