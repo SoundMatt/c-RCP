@@ -13,6 +13,8 @@
 //cfusa:test REQ-REC-012
 //cfusa:test REQ-REC-013
 //cfusa:test REQ-REC-014
+//cfusa:test REQ-REC-015
+//cfusa:test REQ-REC-016
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -94,8 +96,40 @@ static void test_multiple_captures_produce_sequential_entries(void)
     rcp_recorder_destroy(r);
 }
 
+/* REQ-REC-006 (byte-for-byte copy correctness) and REQ-REC-015 (the
+ * stored copy is immune to later mutation of the caller's buffer) were
+ * split from one bundled requirement by the c-RCP-18 requirement-atomicity
+ * audit (issue #533): a shallow-copy bug (aliasing `frame` instead of
+ * duplicating it) would fail only the immunity test below, while a
+ * truncated/off-by-one copy would fail only the correctness test here --
+ * distinct failure modes, so each gets its own id and its own assertion,
+ * checked at a different point relative to the caller's mutation. */
+
 //cfusa:test REQ-REC-006
-static void test_capture_copies_frame_bytes_by_value(void)
+static void test_capture_copies_frame_bytes_correctly(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[4];
+    rcp_recorder_entry_t out;
+
+    rcp_memcpy_bounded(frame, sizeof(frame), "\x01\x02\x03\x04", 4);
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 1, make_addr(1, 0), true, frame, 4));
+
+    /* Checked immediately, before any mutation of the caller's buffer --
+     * this isolates "the copy is byte-for-byte correct" from
+     * REQ-REC-015's separate mutation-immunity contract below. */
+    rcp_recorder_entries(r, &out, 1);
+    TEST_ASSERT_EQUAL_UINT(4, out.frame.len);
+    TEST_ASSERT_EQUAL_UINT8(0x01, out.frame.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x02, out.frame.data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x03, out.frame.data[2]);
+    TEST_ASSERT_EQUAL_UINT8(0x04, out.frame.data[3]);
+
+    rcp_recorder_destroy(r);
+}
+
+//cfusa:test REQ-REC-015
+static void test_capture_stored_entry_immune_to_caller_mutation(void)
 {
     rcp_recorder_t *r = rcp_recorder_new();
     uint8_t frame[4];
@@ -134,8 +168,44 @@ static void test_capture_records_addr_and_inbound(void)
 
 /* ── entries() cap handling ───────────────────────────────────────────────── */
 
+/* REQ-REC-009 (writes at most cap entries into out) and REQ-REC-016
+ * (always returns the true total, regardless of cap) were split from one
+ * bundled requirement by the c-RCP-18 requirement-atomicity audit (issue
+ * #533): a bug that writes past index cap-1 (buffer overflow) would fail
+ * only the bound-check test below, while a bug that returns cap instead
+ * of the true total when cap < total would fail only the count test --
+ * distinct failure modes, each with its own id and its own assertion. */
+
 //cfusa:test REQ-REC-009
-static void test_entries_honors_cap_but_reports_true_total(void)
+static void test_entries_writes_at_most_cap_entries(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x00};
+    rcp_recorder_entry_t out[2];
+    rcp_recorder_entry_t sentinel;
+    int i;
+
+    /* Sentinel-fill out[] so a write past index cap-1 is directly
+     * observable as a changed byte, not just an ASan catch. */
+    memset(out, 0xAB, sizeof(out));
+    memset(&sentinel, 0xAB, sizeof(sentinel));
+
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT_TRUE(rcp_recorder_capture(r, (uint64_t)i, make_addr((uint16_t)i, 0), true, frame, 1));
+    }
+
+    (void)rcp_recorder_entries(r, out, 1);
+
+    TEST_ASSERT_EQUAL_UINT64(0, out[0].timestamp_ms);
+    /* out[1] must remain the untouched sentinel -- entries() wrote at
+     * most cap (1) entries, even though 5 were available to copy. */
+    TEST_ASSERT_EQUAL_MEMORY(&sentinel, &out[1], sizeof(sentinel));
+
+    rcp_recorder_destroy(r);
+}
+
+//cfusa:test REQ-REC-016
+static void test_entries_always_returns_true_total_count(void)
 {
     rcp_recorder_t *r = rcp_recorder_new();
     uint8_t frame[] = {0x00};
@@ -147,6 +217,7 @@ static void test_entries_honors_cap_but_reports_true_total(void)
     }
 
     TEST_ASSERT_EQUAL_UINT(5, rcp_recorder_entries(r, out, 1));
+    TEST_ASSERT_EQUAL_UINT(5, rcp_recorder_entries(r, out, 0));
     TEST_ASSERT_EQUAL_UINT(5, rcp_recorder_size(r));
 
     rcp_recorder_destroy(r);
@@ -325,9 +396,11 @@ int main(void)
 
     RUN_TEST(test_capture_appends_an_entry);
     RUN_TEST(test_multiple_captures_produce_sequential_entries);
-    RUN_TEST(test_capture_copies_frame_bytes_by_value);
+    RUN_TEST(test_capture_copies_frame_bytes_correctly);
+    RUN_TEST(test_capture_stored_entry_immune_to_caller_mutation);
     RUN_TEST(test_capture_records_addr_and_inbound);
-    RUN_TEST(test_entries_honors_cap_but_reports_true_total);
+    RUN_TEST(test_entries_writes_at_most_cap_entries);
+    RUN_TEST(test_entries_always_returns_true_total_count);
     RUN_TEST(test_write_binary_creates_a_non_empty_file);
     RUN_TEST(test_write_binary_returns_busy_when_path_unopenable);
     RUN_TEST(test_playback_default_config_values);

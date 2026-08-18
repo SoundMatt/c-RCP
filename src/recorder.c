@@ -52,6 +52,7 @@ size_t rcp_recorder_size(rcp_recorder_t *r)
 }
 
 //cfusa:req REQ-REC-009
+//cfusa:req REQ-REC-016
 size_t rcp_recorder_entries(rcp_recorder_t *r, rcp_recorder_entry_t *out, size_t cap)
 {
     size_t i, n;
@@ -68,6 +69,7 @@ size_t rcp_recorder_entries(rcp_recorder_t *r, rcp_recorder_entry_t *out, size_t
 //cfusa:req REQ-REC-006
 //cfusa:req REQ-REC-007
 //cfusa:req REQ-REC-008
+//cfusa:req REQ-REC-015
 bool rcp_recorder_capture(rcp_recorder_t *r, uint64_t timestamp_ms, rcp_avtp_addr_t addr,
                            bool inbound, const uint8_t *frame, size_t frame_len)
 {
