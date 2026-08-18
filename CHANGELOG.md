@@ -34,6 +34,74 @@ the rationale.
 
 ## Releases
 
+### v0.436.0 -- 2026-08-21 ([c-RCP-18] issue #533 batch REQ-ADMIN-*: requirement-atomicity audit, Group 3 server/dispatch)
+
+First landed batch of #533, the requirement-atomicity audit tracker
+established by #519/PR #525 ("Writing a requirement" convention,
+`CONTRIBUTING.md`). Scope: every `REQ-ADMIN-*` entry in
+`.fusa-reqs.json` (10 total, 2 proxy-flagged by #519's ">=2 'shall'"
+heuristic), read against its own `text` and the `//cfusa:req`/
+`//cfusa:test` tags it traces to in `src/admin.c`/`include/rcp/admin.h`/
+`tests/test_admin.c`.
+
+**8 confirmed atomic despite the proxy's shape** (not flagged, and
+correctly not split): `REQ-ADMIN-001` through `-008`. `REQ-ADMIN-002`
+and `REQ-ADMIN-008` each name two or three functions in one
+shall-statement, but both describe a single independently-testable
+behaviour applied uniformly across that compound subject (membership-
+change reporting; thread-safety under one shared mutex) rather than
+several distinct contracts bundled together -- the "and"-joined-
+compound-object case `CONTRIBUTING.md`'s convention explicitly
+distinguishes from real bundling, not the `REQ-AUTH-009`-style pattern
+of unrelated functions' unrelated contracts sharing an id.
+
+**2 genuinely bundled, both split:**
+- `REQ-ADMIN-009` ("`rcp_admin_server_new()` shall return a
+  zero-initialized server ... it shall return NULL on allocation
+  failure") bundled the success path with the failure path of the same
+  function -- split into `REQ-ADMIN-009` (success path, kept) and new
+  `REQ-ADMIN-011` (NULL-on-allocation-failure). The failure path had
+  **no test at all** before this batch (not even a shared shallow one);
+  `test_new_returns_null_when_allocation_fails` (`tests/test_admin.c`)
+  is new, using this project's existing `rcp_alloc_set_hooks()`
+  fault-injection technique (`test_loan.c`'s own precedent).
+- `REQ-ADMIN-010` ("shall be a safe no-op when srv is NULL; otherwise
+  it shall destroy srv's mutex and free its ... arrays ...") bundled
+  NULL-tolerance with the real destroy behaviour of the same function
+  -- split into `REQ-ADMIN-010` (NULL-tolerance, kept) and new
+  `REQ-ADMIN-012` (destroy releases every owned resource).
+  `REQ-ADMIN-012`'s text also corrected a drift from the c-RCP-17
+  fixed-capacity conversion (#547/#549/#550): the old bundled text
+  described freeing separately-heap-allocated endpoint/subscriber/
+  counter arrays, which no longer exist as separate allocations (they
+  are embedded fields freed along with `srv` itself). New test
+  `test_destroy_frees_srv_when_non_null` installs a counting
+  `rcp_free()` hook and asserts it fires exactly once with `srv`'s own
+  pointer -- distinct from `test_destroy_tolerates_null`'s NULL-only
+  check and from every other test's untested teardown-only `destroy()`
+  call.
+
+Both splits' `//cfusa:req`/`//cfusa:test` tags placed directly above
+`rcp_admin_server_new()`/`rcp_admin_server_destroy()` and their new test
+functions (not just the file header). Both new tests mutation-tested:
+temporarily reverted `rcp_admin_server_new()`'s NULL-check and
+`rcp_admin_server_destroy()`'s `rcp_free()` call in turn, confirmed
+`test_new_returns_null_when_allocation_fails` (crash) and
+`test_destroy_frees_srv_when_non_null` (assertion failure) each
+independently catch the regression while every other test in the file
+stays green, then restored.
+
+Built and re-verified on top of #554 (REQ-OBS batch), #555 (REQ-REC
+batch), and #553 (REQ-AUTH batch), all also #533: this release's
+counts include those batches' entries alongside this one's own +2
+`REQ-ADMIN-*` entries. Full 67-test suite + ASan/UBSan (CI's exact
+flags) clean; pinned `cfusa` v0.5.54: `check` 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 100%/100% (1104/1104 reqs --
+1102 after #554/#555/#553 plus 2 from this batch's split; 512/512
+functions) -- neither gate regressed.
+
+[c-RCP-18-tracker]
+
 ### v0.435.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-AUTH-*: requirement-atomicity audit, Group 3 server/dispatch)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by

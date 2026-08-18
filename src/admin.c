@@ -50,6 +50,7 @@ struct rcp_admin_server {
 };
 
 //cfusa:req REQ-ADMIN-009
+//cfusa:req REQ-ADMIN-011
 rcp_admin_server_t *rcp_admin_server_new(void)
 {
     rcp_admin_server_t *srv = (rcp_admin_server_t *)rcp_calloc(1, sizeof(*srv));
@@ -59,6 +60,7 @@ rcp_admin_server_t *rcp_admin_server_new(void)
 }
 
 //cfusa:req REQ-ADMIN-010
+//cfusa:req REQ-ADMIN-012
 void rcp_admin_server_destroy(rcp_admin_server_t *srv)
 {
     if (!srv) return;

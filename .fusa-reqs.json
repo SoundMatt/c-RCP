@@ -681,7 +681,17 @@
     {
       "id": "REQ-ADMIN-009",
       "title": "rcp_admin_server_new() allocates a zero-initialized server",
-      "text": "rcp_admin_server_new() shall return a heap-allocated rcp_admin_server_t with no endpoints, subscribers, or counters registered, and its own mutex initialized; it shall return NULL on allocation failure.",
+      "text": "rcp_admin_server_new() shall return a heap-allocated rcp_admin_server_t with no endpoints, subscribers, or counters registered, and its own mutex initialized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ADMIN-011",
+      "title": "rcp_admin_server_new() returns NULL on allocation failure",
+      "text": "rcp_admin_server_new() shall return NULL on allocation failure.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -690,8 +700,18 @@
     },
     {
       "id": "REQ-ADMIN-010",
+      "title": "rcp_admin_server_destroy() tolerates a NULL server",
+      "text": "rcp_admin_server_destroy() shall be a safe no-op when srv is NULL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ADMIN-012",
       "title": "rcp_admin_server_destroy() releases every owned resource",
-      "text": "rcp_admin_server_destroy() shall be a safe no-op when srv is NULL; otherwise it shall destroy srv's mutex and free its endpoints, subscribers, and counters arrays before freeing srv itself.",
+      "text": "When srv is non-NULL, rcp_admin_server_destroy() shall destroy srv's mutex and free srv itself (srv's endpoints, subscribers, and counters are embedded arrays within the same allocation, released along with it, not separately heap-allocated).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
