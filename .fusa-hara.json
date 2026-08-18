@@ -6,7 +6,7 @@
   "language": "c",
   "generatedAt": "2026-08-17T00:00:00Z",
   "project": "c-RCP",
-  "version": "0.415.0",
+  "version": "0.418.0",
   "standard": "ISO 26262-3:2018",
   "operationalSituations": [
     {
@@ -272,6 +272,27 @@
         "SG-011"
       ],
       "ftti_ms": 0
+    },
+    {
+      "id": "H-012",
+      "item": "Protocol-bridge stub modules -- rcp_can_bridge_send()/canbr.c, rcp_lin_bridge_send()/linbr.c, rcp_dds_bridge_send()/ddsbr.c, rcp_mqtt_bridge_send()/mqttbr.c, rcp_grpc_bridge_send()/grpcbridge.c, rcp_rest_bridge_send()/restbridge.c, rcp_someip_bridge_send()/someipbr.c, rcp_uds_bridge_send()/udsbr.c, rcp_doip_bridge_send()/doipbr.c (c-RCP-22 Gap 4)",
+      "situations": [
+        "OS-001",
+        "OS-002"
+      ],
+      "hazardous_event": "A protocol-bridge module's bridge_send() function regresses from its documented fail-closed stub contract (REQ-CAN-001/REQ-LIN-001/REQ-DDS-001/REQ-MQTT-001/REQ-GRPC-001/REQ-REST-001/REQ-SOMEIP-001/REQ-UDS-001/REQ-DOIP-001: return RCP_ERR_NOT_SUPPORTED, leave *out_response untouched, while no concrete backend is linked) and instead reports apparent success or writes indeterminate data to *out_response, which a caller could treat as a genuine translated result from a bus/network this library does not actually reach",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E2",
+        "controllability": "C2",
+        "asil": "QM",
+        "rationale": "S2 (ISO 26262-3:2018 Table 1): a caller wrongly believing a request was successfully translated onto an external bus/network (CAN/LIN/DoIP/UDS/SOME-IP/DDS/MQTT/gRPC/REST) when it was not is severe -- an actuator or diagnostic action the caller assumed happened did not -- but this is a functional-integrity/silent-no-op failure of a translation layer, not a direct unsafe actuation by this library itself, so survival is probable, one class below H-001/H-005/H-007/H-008's S3. E2 (Table 2, low probability): this hazardous event requires two coincident preconditions that are each already atypical -- (a) a caller invokes one of these 9 bridges in a configuration where its concrete backend has not actually been linked (itself an OS-002-class configuration fault this hazard's REQ-*-001 exists specifically to guard against), AND (b) a code regression breaks the tested fail-closed contract verified by each module's own REQ-*-001 test -- so this is a low, not medium or high, probability event, distinct from H-006's E3 which needs only one of its two alternative preconditions. C2 (Table 3): normally controllable -- each of the 9 modules' REQ-*-001 requirement is independently test-covered (per-module bridge_send tests assert RCP_ERR_NOT_SUPPORTED and an untouched *out_response), and this project's own mutation-testing discipline (CONTRIBUTING.md) re-validates that exact contract on every behavior-changing change to these files, so a regression is caught before merge rather than reaching a deployed caller. A direct code read of all 9 modules (canbr.c, ddsbr.c, doipbr.c, grpcbridge.c, linbr.c, mqttbr.c, restbridge.c, someipbr.c, udsbr.c) confirms they are, as of this analysis, byte-for-byte structurally identical fail-closed stubs -- `(void)`-cast every parameter and unconditionally `return RCP_ERR_NOT_SUPPORTED`, no backend-specific logic exists yet to differentiate risk between them -- so a single consolidated hazard entry honestly represents all 9 rather than fabricating 9 cosmetically-distinct ASIL ratings from identical code. At S2/E2/C2 (sum=6) this computes to QM under Table 4, the honest 'analyzed, no hazard' conclusion this issue's Gap 4 asked for -- not every analyzed item must produce a new ASIL hazard."
+      },
+      "safe_state": "Each of the 9 bridge_send() functions unconditionally returns RCP_ERR_NOT_SUPPORTED and leaves *out_response untouched (REQ-CAN-001/REQ-LIN-001/REQ-DDS-001/REQ-MQTT-001/REQ-GRPC-001/REQ-REST-001/REQ-SOMEIP-001/REQ-UDS-001/REQ-DOIP-001, each covered by its own bridge test asserting this exact contract). This QM conclusion is scoped to the current stub implementation only: the first concrete backend linked into any one of these 9 modules moves that module out of this consolidated entry and requires its own dedicated hazard-identification pass (own H-0NN entry) before that backend ships, since a real CAN/LIN/DoIP/UDS/SOME-IP/DDS/MQTT/gRPC/REST translation to a live bus/network is not the same hazard as a stub that provably does nothing.",
+      "safetyGoals": [
+        "SG-012"
+      ],
+      "ftti_ms": 0
     }
   ],
   "safetyGoals": [
@@ -373,7 +394,16 @@
       ],
       "asil": "QM",
       "safeState": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration)."
+    },
+    {
+      "id": "SG-012",
+      "description": "Until a concrete backend is linked, every protocol-bridge module's bridge_send() function shall return RCP_ERR_NOT_SUPPORTED and shall leave *out_response untouched, never reporting apparent success for a translation that did not occur.",
+      "hazards": [
+        "H-012"
+      ],
+      "asil": "QM",
+      "safeState": "Each of the 9 bridge_send() functions (canbr/ddsbr/doipbr/grpcbridge/linbr/mqttbr/restbridge/someipbr/udsbr) unconditionally returns RCP_ERR_NOT_SUPPORTED and leaves *out_response untouched; each is covered by its own REQ-*-001 test asserting this exact contract."
     }
   ],
-  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). This HARA replaces the pre-TC18 Zone/Command-era hazard set in full (ROADMAP.md milestone 85, Phase 22 re-certification pass) -- it is derived from the actual implemented TC18 behavior (Phase 13-21), not carried over from the retired watchdog/CRC-16 model. See HARA.md's 'Safety Goals' table for the full SG-001..SG-011 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\\\"id\\\"' occurrence in this file as if it were a hazard entry). v0.415.0 (issue c-RCP-22, Gaps 1-3): promoted HARA.md's OS-001..008 operational-situations table into this file's own `operationalSituations` array (previously prose-only, per ISO 26262-3:2018 Clause 6.4.2's requirement that hazard analysis be performed per operational situation), added a `situations` reference array to every hazard linking it to the operational situation(s) its S/E/C rating is actually evaluated within, and added a `rationale` string to every hazard's `risk` object justifying its recorded S/E/C classification against ISO 26262-3:2018 Table 4's own class definitions and the linked operational situation(s) -- none of the existing severity/exposure/controllability/asil values themselves changed (that arithmetic was already corrected and closed by issue #125; this pass adds the missing written justification for those unchanged values, per ISO 26262-3:2018 Clause 6.4.3). Gap 4 (hazard-identification pass over the 9 protocol-bridge modules) and Gap 5 (FTTI-vs-measured-reaction-time cross-check) remain open, tracked against issue c-RCP-22 for a future pass -- see that issue's tracking comment."
+  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). This HARA replaces the pre-TC18 Zone/Command-era hazard set in full (ROADMAP.md milestone 85, Phase 22 re-certification pass) -- it is derived from the actual implemented TC18 behavior (Phase 13-21), not carried over from the retired watchdog/CRC-16 model. See HARA.md's 'Safety Goals' table for the full SG-001..SG-012 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\\\"id\\\"' occurrence in this file as if it were a hazard entry). v0.415.0 (issue c-RCP-22, Gaps 1-3): promoted HARA.md's OS-001..008 operational-situations table into this file's own `operationalSituations` array (previously prose-only, per ISO 26262-3:2018 Clause 6.4.2's requirement that hazard analysis be performed per operational situation), added a `situations` reference array to every hazard linking it to the operational situation(s) its S/E/C rating is actually evaluated within, and added a `rationale` string to every hazard's `risk` object justifying its recorded S/E/C classification against ISO 26262-3:2018 Table 4's own class definitions and the linked operational situation(s) -- none of the existing severity/exposure/controllability/asil values themselves changed (that arithmetic was already corrected and closed by issue #125; this pass adds the missing written justification for those unchanged values, per ISO 26262-3:2018 Clause 6.4.3). v0.418.0 (issue c-RCP-22, Gaps 4-5): closes the two remaining gaps. Gap 4 -- read and analyzed all 9 protocol-bridge modules (canbr.c, ddsbr.c, doipbr.c, grpcbridge.c, linbr.c, mqttbr.c, restbridge.c, someipbr.c, udsbr.c); confirmed each is currently a byte-for-byte identical fail-closed stub (unconditionally returns RCP_ERR_NOT_SUPPORTED, touches no state, no backend-specific logic exists yet to differentiate risk between them), so a single consolidated hazard (H-012/SG-012, QM) honestly records that analysis for all 9 rather than fabricating 9 cosmetically-distinct ASIL ratings from identical code; the entry explicitly scopes its QM conclusion to the stub implementation only and requires its own dedicated hazard analysis (a new H-0NN) the first time any one of the 9 gains a real backend. Gap 5 -- added tests/test_watchdog.c's test_overflow_detected_within_recorded_ftti(), which cross-checks H-001's recorded ftti_ms=100 against rcp_e2e_wd_evaluate()'s actual measured reaction time under real wall-clock timing (asserts detection lands within [ftti_ms, ftti_ms + bounded slack], not merely 'eventually' as the pre-existing poll_for_overflow()'s 5000ms bound alone enforced)."
 }

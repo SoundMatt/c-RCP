@@ -140,6 +140,52 @@ static void test_overflow_after_timeout_without_kick(void)
     rcp_watchdog_keeper_destroy(k);
 }
 
+/* ── FTTI cross-check (c-RCP-22 Gap 5) ────────────────────────────────────── */
+
+/*
+ * .fusa-hara.json's H-001 (and H-003, which shares the same underlying
+ * rcp_e2e_wd_evaluate() mechanism) records ftti_ms = 100 -- a claim about
+ * how quickly the watchdog actually detects-and-reacts to a lost request,
+ * asserted as HARA data but never previously cross-checked against a real
+ * measured reaction time anywhere in this repo (the pre-existing
+ * poll_for_overflow() above only bounds detection at a generous 5000ms,
+ * roughly 50x the recorded FTTI -- sufficient to prove eventual detection,
+ * not that the recorded FTTI value is honest). This test configures a real
+ * rcp_watchdog_keeper_t with H-001's exact recorded ftti_ms as its
+ * rx_wd_timeout_ms, measures actual wall-clock elapsed time to overflow
+ * detection under real timing (test_sleep_ms's own busy-wait, not a mocked
+ * clock), and asserts detection lands within a bounded window bracketing
+ * that FTTI: not before it (REQ-E2E-025 requires elapsed >= timeout), and
+ * not more than a fixed slack budget after it. The slack budget covers
+ * fine poll_interval_ms granularity plus CI scheduling/ASan-instrumentation
+ * jitter -- generous enough not to flake, but two orders of magnitude
+ * tighter than the pre-existing 5000ms "eventually" bound, so this
+ * actually constitutes a check of the recorded FTTI value, not just of
+ * eventual detection.
+ */
+//cfusa:test REQ-E2E-025
+static void test_overflow_detected_within_recorded_ftti(void)
+{
+    const uint32_t ftti_ms    = 100; /* .fusa-hara.json hazards[] H-001.ftti_ms */
+    const uint32_t slack_ms   = 300; /* poll granularity + CI/ASan jitter budget */
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(101, true, ftti_ms, true, true)};
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k;
+    uint64_t start, elapsed;
+
+    cfg.poll_interval_ms = 2; /* fine-grained so poll granularity doesn't dominate */
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
+
+    start = rcp_monotonic_ms();
+    TEST_ASSERT_TRUE(poll_for_overflow(k, 101, true));
+    elapsed = rcp_monotonic_ms() - start;
+
+    TEST_ASSERT_TRUE(elapsed >= ftti_ms);
+    TEST_ASSERT_TRUE(elapsed <= (uint64_t)ftti_ms + slack_ms);
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
 //cfusa:test REQ-WDG-008
 static void test_disabled_watchdog_never_overflows(void)
 {
@@ -278,6 +324,7 @@ int main(void)
     RUN_TEST(test_kick_unknown_stream_returns_false);
     RUN_TEST(test_status_unknown_stream_all_false);
     RUN_TEST(test_overflow_after_timeout_without_kick);
+    RUN_TEST(test_overflow_detected_within_recorded_ftti);
     RUN_TEST(test_disabled_watchdog_never_overflows);
     RUN_TEST(test_kick_resets_timer_prevents_overflow);
     RUN_TEST(test_notify_only_when_safestate_disabled);

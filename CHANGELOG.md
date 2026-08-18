@@ -34,7 +34,7 @@ the rationale.
 
 ## Releases
 
-### v0.418.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL hygiene batch 2 of N — issue #522 fully resolved)
+### v0.419.0 -- 2026-08-17 (c-RCP-20: CFUSA-CY006 free()-without-NULL hygiene batch 2 of N — issue #522 fully resolved)
 
 Completes issue #522: 94 defense-in-depth `= NULL;` additions across 31
 `src/` files, immediately after every remaining real raw-`free()`/
@@ -54,6 +54,62 @@ already-documented fact, not a regression); `cfusa trace
 --req-coverage 100 --sec-tested 100`: 100%/100%, unchanged. See
 `ROADMAP.md`'s matching entry for the full accounting. Issue #522
 closed as fully resolved.
+
+### v0.418.0 -- 2026-08-17 (c-RCP-22 Gaps 4-5: protocol-bridge hazard-ID pass + FTTI cross-check test, closing HARA structural gaps)
+
+Closes out issue #524 (`c-RCP-22`)'s two remaining gaps; gaps 1-3 were
+closed in v0.415.0 (PR #531).
+
+**Gap 4 -- protocol-bridge hazard-identification pass.** Read and
+analyzed all 9 protocol-bridge/adapter modules (`canbr.c`, `ddsbr.c`,
+`doipbr.c`, `grpcbridge.c`, `linbr.c`, `mqttbr.c`, `restbridge.c`,
+`someipbr.c`, `udsbr.c`), none of which had ever appeared in this
+HARA. Confirmed all 9 are, as of this pass, byte-for-byte identical
+fail-closed stubs (`(void)`-cast every parameter, unconditionally
+`return RCP_ERR_NOT_SUPPORTED`) with no backend-specific logic yet to
+differentiate risk between them. Rather than fabricate 9
+cosmetically-distinct ASIL ratings from identical code, added a single
+consolidated hazard, `H-012`/`SG-012` (QM, S2/E2/C2): a code regression
+away from the documented fail-closed contract could let a caller
+believe a bridge translation succeeded when it did not. The entry's
+own `safe_state` field explicitly scopes this QM conclusion to the
+*current stub implementation* and records that the first concrete
+backend linked into any one of the 9 modules moves that module out of
+this consolidated entry and requires its own dedicated
+hazard-identification pass (a new `H-0NN`) before that backend ships.
+
+**Gap 5 -- FTTI cross-check.** Added
+`tests/test_watchdog.c::test_overflow_detected_within_recorded_ftti()`,
+which configures a real `rcp_watchdog_keeper_t` with H-001's own
+recorded `ftti_ms` (100 ms) as its `rx_wd_timeout_ms`, measures actual
+wall-clock elapsed time from stream start to detected overflow under
+real timing (not a mocked clock), and asserts detection lands within
+`[ftti_ms, ftti_ms + 300ms]` -- not before (`REQ-E2E-025` requires
+`elapsed >= timeout`), and not more than a bounded CI/poll-granularity
+slack after. The pre-existing `poll_for_overflow()` helper's generous
+5000ms bound (roughly 50x the recorded FTTI) only ever proved
+*eventual* detection, never actually cross-checking the recorded FTTI
+value itself. Mutation-tested: temporarily changed `e2e.c`'s
+`rcp_e2e_wd_evaluate()` overflow comparison to multiply
+`rx_wd_timeout_ms` by 5 -- the new test failed (`Expected TRUE Was
+FALSE`, correctly catching the FTTI being missed) while the rest of
+the suite continued to pass; reverted, byte-identical restore
+confirmed via diff, full suite green again. H-003 shares H-001's 100ms FTTI and underlying mechanism, so
+this one sampled test cross-checks both; H-008's 200ms WakeUp-handshake
+FTTI is a distinct external-step-driven mechanism not covered by this
+test, consistent with issue `c-RCP-22`'s own "at least one" sampled
+cross-check ask.
+
+`.fusa-hara.json`'s hazard/safety-goal counts move from 11/11 to
+12/12; `HARA.md`'s "Known Content Gaps (issue c-RCP-22)" section now
+records all 5 gaps closed. Full 67-test suite (`test_watchdog` now
+14 tests, was 13) + ASan/UBSan clean; fresh CI-pinned `cfusa` (v0.5.54)
+`check`: 0 errors; `trace --req-coverage 100 --sec-tested 100`:
+100%/100%.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.418.0` to match `CMakeLists.txt`, per
+the `version-sources-agree` gate (c-RCP-09, PR #529).
 
 ### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document, `cfusa qualify` regression fix)
 
