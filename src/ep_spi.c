@@ -338,7 +338,7 @@ static bool reg_offset_read_only(uint16_t addr)
     return false;
 }
 
-//cfusa:req REQ-SPI-039
+//cfusa:req REQ-SPI-043
 const char *rcp_ep_spi_reconfig_strerror(rcp_ep_spi_reconfig_errc_t e)
 {
     switch (e) {
@@ -353,7 +353,6 @@ const char *rcp_ep_spi_reconfig_strerror(rcp_ep_spi_reconfig_errc_t e)
     }
 }
 
-//cfusa:req REQ-SPI-038
 //cfusa:req REQ-SPI-039
 rcp_ep_spi_reconfig_errc_t rcp_ep_spi_apply_reconfig(rcp_ep_spi_functional_cfg_t *cfg,
                                                       const uint8_t *payload, size_t payload_len)
@@ -393,7 +392,7 @@ rcp_ep_spi_reconfig_errc_t rcp_ep_spi_apply_reconfig(rcp_ep_spi_functional_cfg_t
     return RCP_EP_SPI_RECONFIG_OK;
 }
 
-//cfusa:req REQ-SPI-038
+//cfusa:req REQ-SPI-042
 rcp_bytes_t rcp_ep_spi_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                 uint16_t start_address, const uint8_t *data,
                                                 size_t data_len, uint8_t transaction_num)
@@ -450,7 +449,7 @@ const char *rcp_ep_spi_strerror(rcp_ep_spi_errc_t e)
 /* ── Transfer request ──────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-SPI-026
-//cfusa:req REQ-SPI-036
+//cfusa:req REQ-SPI-044
 rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, uint8_t channel,
                                                 const uint8_t *tx_data, size_t tx_len,
                                                 uint16_t read_size, uint8_t transaction_num)
@@ -475,9 +474,9 @@ rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, ui
     return rcp_acf_encode_abb(&hdr, tx_data, tx_len);
 }
 
-//cfusa:req REQ-SPI-026
 //cfusa:req REQ-SPI-027
-//cfusa:req REQ-SPI-036
+//cfusa:req REQ-SPI-041
+//cfusa:req REQ-SPI-044
 rcp_ep_spi_errc_t rcp_ep_spi_decode_transfer_request(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       uint8_t *out_channel,
