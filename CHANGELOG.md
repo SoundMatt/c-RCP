@@ -34,6 +34,84 @@ the rationale.
 
 ## Releases
 
+### v0.428.0 -- 2026-08-18 (c-RCP-17 Phase (b) continued: `powerstate.c` endpoint table + callback list, `admin.c`'s three growable arrays and per-call metrics scratch buffer, all fixed-capacity)
+
+Continues c-RCP-17 (issue #521) past PR #538/v0.427.0's `l2.c`/`udp.c`/
+`watchdog.c`/`deadline.c` slice, closing the two modules that PR
+explicitly deferred "purely for scope/time, not blocked on anything":
+`powerstate.c` (same fixed-capacity shape as watchdog/deadline) and
+`admin.c` (three independently-growable arrays plus a string-building
+scratch buffer, the more complex case).
+
+**`powerstate.c`.** `rcp_powerstate_manager_t`'s `entries[]` table
+(`rcp_calloc()`'d off caller-supplied `n_endpoints`) and its
+`callbacks[]`/`callback_ctx[]` list (doubling `rcp_realloc()`) are now
+fixed-capacity embedded arrays: `RCP_POWERSTATE_MAX_ENDPOINTS` (64,
+matching `mock.h`'s `RCP_MOCK_MAX_ENDPOINTS`/`regmap.h`'s
+`RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES`/`RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES`
+precedent -- this table is genuinely one entry per endpoint, the same
+scale those constants already use) and `RCP_POWERSTATE_MAX_CALLBACKS`
+(16, matching `watchdog.h`'s/`deadline.h`'s own callback-cap precedent).
+`rcp_powerstate_manager_new()` now also returns `NULL` past the
+endpoint cap; `rcp_powerstate_manager_subscribe()` now also returns
+`false` at callback capacity -- both the same failure channel every
+existing caller already had to check (allocation failure), just a new
+trigger for it. New boundary tests for both caps; both guards
+mutation-tested (temporarily widened past the real constant, confirmed
+the new over-capacity test fails, reverted).
+
+**`admin.c`.** All three of `rcp_admin_server_t`'s growable arrays
+(`endpoints[]`, `subscribers[]`, `counters[]`, each its own independent
+doubling-`rcp_realloc()` scheme) are now fixed-capacity embedded
+arrays: `RCP_ADMIN_MAX_ENDPOINTS` (64, same `RCP_MOCK_MAX_ENDPOINTS`-
+scale precedent as `powerstate.c` above -- this set also tracks one
+entry per endpoint), `RCP_ADMIN_MAX_SUBSCRIBERS` (16, the same
+watchdog/deadline/powerstate callback-cap precedent), and
+`RCP_ADMIN_MAX_COUNTERS` (256, a new conventional choice -- a
+Prometheus-style counter is keyed on a caller-chosen (name, labels)
+pair, so its cardinality scales with distinct metric series rather than
+endpoint count directly; 256 gives headroom for several counters per
+endpoint at `RCP_ADMIN_MAX_ENDPOINTS`' own scale without inventing an
+unrelated number). None of the three is TC18 wire-bounded -- `admin.c`
+is RELAY-envelope/admin glue, not protocol data (its own file header's
+"ADAPT-class rebind" note), so all three caps are this module's own
+policy choice, not a spec citation, exactly as issue #521's own filing
+anticipated for this file.
+
+Two further simplifications fell out of the endpoint/subscriber caps
+being fixed-capacity, beyond the mechanical swap:
+- `rcp_admin_server_emit()`'s per-call `rcp_malloc()`'d subscriber
+  snapshot (taken to invoke callbacks outside the lock) is now a fixed
+  `admin_subscriber_t[RCP_ADMIN_MAX_SUBSCRIBERS]` stack array -- small
+  enough (16 entries) that a stack copy costs nothing and, unlike the
+  old heap snapshot, can never itself fail.
+- `rcp_admin_server_metrics_text()`'s growing string-rendering
+  `scratch` buffer is now a fixed `srv->metrics_scratch[]` member sized
+  to `ADMIN_METRICS_TEXT_MAX` -- the true worst case given
+  `RCP_ADMIN_MAX_COUNTERS` counters at the per-line ceiling that
+  function's own `line[256]` stack buffer already enforced (255 bytes),
+  not an estimate. Embedded in `rcp_admin_server_t` itself (already
+  one single `rcp_calloc()` at construction time) rather than a
+  per-call heap allocation.
+
+All three `admin.c` capacity guards mutation-tested individually
+(temporarily widened each past its real constant, confirmed the
+matching new boundary test fails, reverted) -- confirmed each guard
+independently load-bearing, not incidentally correct via one shared
+code path.
+
+Full 67-test suite: 100% passing. ASan/UBSan build (CI's exact flags):
+clean. Pinned `cfusa` (v0.5.54): `check` -- 0 errors; `trace
+--req-coverage 100 --sec-tested 100` -- 100%/100%, unchanged from
+baseline.
+
+**Remaining for c-RCP-17**: `respqueue.c` (byte-budget-vs-fixed-slot-
+count admission logic) and `loan.c` (realloc-growing pool) still need
+the real redesign decisions issue #521's own filing flagged, not
+mechanical swaps; fragment-plan segment arrays; and Phase (c)'s
+"document what stays dynamic" pass (`fragment.c`, `relay.c`, `mdns.c`,
+`platform.c`) have not been reached yet.
+
 ### v0.427.0 -- 2026-08-18 (c-RCP-17 Phase (b), partial: fixed-capacity conversions for `l2.c`/`udp.c` recv scratch buffers and `watchdog.c`/`deadline.c` stream tables + callback lists)
 
 Continues c-RCP-17 (issue #521) past Phase (a) (PR #527, v0.412.0):

@@ -321,6 +321,68 @@ static void test_admin_server_tolerates_concurrent_mutation(void)
     rcp_admin_server_destroy(srv); /* must not crash (ASan/TSan-checked in CI) */
 }
 
+/* ── [c-RCP-17] Fixed-capacity endpoint set / subscriber list / counter table ── */
+
+//cfusa:test REQ-ADMIN-002
+static void test_register_endpoint_at_max_succeeds_then_next_fails(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    rcp_endpoint_info_t out[RCP_ADMIN_MAX_ENDPOINTS];
+    rcp_avtp_addr_t     overflow_addr;
+    size_t              i;
+    size_t              n;
+
+    for (i = 0; i < RCP_ADMIN_MAX_ENDPOINTS; i++) {
+        TEST_ASSERT_TRUE(rcp_admin_server_register_endpoint(srv, make_addr((uint16_t)(i + 1), 0)));
+    }
+    /* Last-registered endpoint is reachable -- confirms the fixed array was
+     * fully populated, not silently truncated below capacity. */
+    n = rcp_admin_server_endpoints(srv, out, RCP_ADMIN_MAX_ENDPOINTS);
+    TEST_ASSERT_EQUAL_size_t(RCP_ADMIN_MAX_ENDPOINTS, n);
+
+    /* One more, at capacity: rejected, not silently grown. */
+    overflow_addr = make_addr((uint16_t)(RCP_ADMIN_MAX_ENDPOINTS + 1), 0);
+    TEST_ASSERT_FALSE(rcp_admin_server_register_endpoint(srv, overflow_addr));
+
+    rcp_admin_server_destroy(srv);
+}
+
+//cfusa:test REQ-ADMIN-003
+static void test_subscribe_at_max_succeeds_then_next_fails(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    size_t               i;
+
+    for (i = 0; i < RCP_ADMIN_MAX_SUBSCRIBERS; i++) {
+        TEST_ASSERT_TRUE(rcp_admin_server_subscribe(srv, count_events, NULL));
+    }
+    /* One more, at capacity: rejected, not silently grown. */
+    TEST_ASSERT_FALSE(rcp_admin_server_subscribe(srv, count_events, NULL));
+
+    rcp_admin_server_destroy(srv);
+}
+
+//cfusa:test REQ-ADMIN-005
+static void test_record_counter_at_max_succeeds_then_next_new_one_fails(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    char                 name[32];
+    size_t               i;
+
+    for (i = 0; i < RCP_ADMIN_MAX_COUNTERS; i++) {
+        snprintf(name, sizeof(name), "counter_%zu", i);
+        TEST_ASSERT_TRUE(rcp_admin_server_record_counter(srv, name, "", 1.0));
+    }
+    /* A repeat delta against an already-tracked counter still succeeds at
+     * capacity -- only a genuinely new (name, labels) pair is rejected. */
+    TEST_ASSERT_TRUE(rcp_admin_server_record_counter(srv, "counter_0", "", 1.0));
+
+    /* One more, genuinely new, at capacity: rejected, not silently grown. */
+    TEST_ASSERT_FALSE(rcp_admin_server_record_counter(srv, "one_too_many", "", 1.0));
+
+    rcp_admin_server_destroy(srv);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -336,6 +398,9 @@ int main(void)
     RUN_TEST(test_metrics_text_renders_prometheus_format);
     RUN_TEST(test_metrics_text_with_long_name_and_labels_does_not_read_out_of_bounds);
     RUN_TEST(test_admin_server_tolerates_concurrent_mutation);
+    RUN_TEST(test_register_endpoint_at_max_succeeds_then_next_fails);
+    RUN_TEST(test_subscribe_at_max_succeeds_then_next_fails);
+    RUN_TEST(test_record_counter_at_max_succeeds_then_next_new_one_fails);
 
     return UNITY_END();
 }

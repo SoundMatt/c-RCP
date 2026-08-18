@@ -83,6 +83,32 @@ typedef void (*rcp_admin_event_fn)(const rcp_admin_event_t *ev, void *user_data)
 
 typedef struct rcp_admin_server rcp_admin_server_t;
 
+/* [c-RCP-17] Fixed capacities for rcp_admin_server_t's internal endpoint
+ * set, subscriber list, and counter table -- backs compile-time-sized
+ * embedded arrays, not heap allocations growable without bound. None of
+ * the three is TC18 wire-bounded (this module is RELAY-envelope/admin
+ * glue, not protocol data -- see the file header's own "ADAPT-class
+ * rebind" note), so each is this module's own conventional choice:
+ * RCP_ADMIN_MAX_ENDPOINTS matches mock.h's RCP_MOCK_MAX_ENDPOINTS and
+ * regmap.h's RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES/RCP_REGMAP_HW_PIN_MAP_MAX_
+ * ENTRIES precedent (64, a plausible real-device total-endpoint-count
+ * ceiling -- this set genuinely tracks one entry per endpoint, the same
+ * scale those constants already use). RCP_ADMIN_MAX_SUBSCRIBERS matches
+ * watchdog.h's/deadline.h's/powerstate.h's own RCP_WATCHDOG_MAX_
+ * CALLBACKS/RCP_DEADLINE_MAX_CALLBACKS/RCP_POWERSTATE_MAX_CALLBACKS
+ * precedent (16, a conventional integrator-subscriber cap -- it counts
+ * function pointers, not protocol entities). RCP_ADMIN_MAX_COUNTERS (256)
+ * is new: a Prometheus-style counter is keyed on a caller-chosen (name,
+ * labels) pair, so its cardinality scales with distinct metric series,
+ * not endpoint count directly -- 256 gives headroom for several counters
+ * per endpoint at RCP_ADMIN_MAX_ENDPOINTS' own scale without inventing an
+ * unrelated number. See rcp_admin_server_register_endpoint()'s,
+ * rcp_admin_server_subscribe()'s, and rcp_admin_server_record_counter()'s
+ * own doc comments for the resulting capacity-exceeded failure modes. */
+#define RCP_ADMIN_MAX_ENDPOINTS   ((size_t)64u)
+#define RCP_ADMIN_MAX_SUBSCRIBERS ((size_t)16u)
+#define RCP_ADMIN_MAX_COUNTERS    ((size_t)256u)
+
 /* Creates an admin server with no endpoints registered yet -- see
  * rcp_admin_server_register_endpoint(). Returns NULL on allocation
  * failure. */
@@ -97,7 +123,10 @@ void rcp_admin_server_destroy(rcp_admin_server_t *srv);
  * an RCP_ADMIN_EVT_ENDPOINT_REGISTERED event delivered to subscribers do
  * so themselves, the same caller-driven split rcp_admin_server_emit()
  * already uses for every other event type. Returns false without
- * changing anything on allocation failure. */
+ * changing anything if srv already holds RCP_ADMIN_MAX_ENDPOINTS
+ * endpoints (the endpoint set is a fixed-capacity embedded array, not a
+ * heap allocation growable without bound -- see that constant's own doc
+ * comment). */
 bool rcp_admin_server_register_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t addr);
 
 /* Removes addr from srv's registered-endpoint set. Returns true iff addr
@@ -112,8 +141,11 @@ bool rcp_admin_server_deregister_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr
 size_t rcp_admin_server_endpoints(rcp_admin_server_t *srv, rcp_endpoint_info_t *out, size_t cap);
 
 /* Registers cb to be invoked (with user_data) on every subsequent
- * rcp_admin_server_emit() call, in registration order. Returns false on
- * allocation failure (cb not added). */
+ * rcp_admin_server_emit() call, in registration order. Returns false if
+ * srv already holds RCP_ADMIN_MAX_SUBSCRIBERS subscribers (cb not added;
+ * the subscriber list is a fixed-capacity embedded array, not a heap
+ * allocation growable without bound -- see that constant's own doc
+ * comment). */
 bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, void *user_data);
 
 /* Invokes every registered subscriber with ev, in registration order. */
@@ -121,8 +153,13 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev);
 
 /* Adds delta to the running total of the counter identified by (name,
  * labels) -- a distinct running total is kept per unique (name, labels)
- * pair. labels may be "" (no labels). Thread-safe. Returns false on
- * allocation failure (delta not recorded). */
+ * pair. labels may be "" (no labels). Thread-safe. Returns false without
+ * recording delta if (name, labels) is not already tracked and srv
+ * already holds RCP_ADMIN_MAX_COUNTERS distinct counters (the counter
+ * table is a fixed-capacity embedded array, not a heap allocation
+ * growable without bound -- see that constant's own doc comment); an
+ * already-tracked (name, labels) pair always succeeds regardless of how
+ * many other counters exist. */
 bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, const char *labels, double delta);
 
 /* Renders every recorded counter as Prometheus text-format lines
