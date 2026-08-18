@@ -105,7 +105,6 @@ static rcp_ep_i2c_dir_t op_to_dir(uint8_t op)
 #define I2C_OPTIONS_BIT_RESP_TS   ((uint8_t)(1u << 3))
 #define I2C_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
 
-//cfusa:req REQ-I2C-019
 //cfusa:req REQ-I2C-021
 void rcp_ep_i2c_render_registers(const rcp_ep_i2c_functional_cfg_t *cfg,
                                   uint8_t out[RCP_EP_I2C_EP_FUNC_LEN])
@@ -166,7 +165,7 @@ static bool reg_offset_read_only(uint16_t addr)
            addr == (uint16_t)(RCP_EP_I2C_REG_BASE_CLK + 1u);
 }
 
-//cfusa:req REQ-I2C-022
+//cfusa:req REQ-I2C-026
 const char *rcp_ep_i2c_reconfig_strerror(rcp_ep_i2c_reconfig_errc_t e)
 {
     switch (e) {
@@ -181,7 +180,6 @@ const char *rcp_ep_i2c_reconfig_strerror(rcp_ep_i2c_reconfig_errc_t e)
     }
 }
 
-//cfusa:req REQ-I2C-019
 //cfusa:req REQ-I2C-022
 rcp_ep_i2c_reconfig_errc_t rcp_ep_i2c_apply_reconfig(rcp_ep_i2c_functional_cfg_t *cfg,
                                                       const uint8_t *payload, size_t payload_len)
@@ -221,7 +219,7 @@ rcp_ep_i2c_reconfig_errc_t rcp_ep_i2c_apply_reconfig(rcp_ep_i2c_functional_cfg_t
     return RCP_EP_I2C_RECONFIG_OK;
 }
 
-//cfusa:req REQ-I2C-021
+//cfusa:req REQ-I2C-025
 rcp_bytes_t rcp_ep_i2c_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                 uint16_t start_address, const uint8_t *data,
                                                 size_t data_len, uint8_t transaction_num)
@@ -308,6 +306,7 @@ rcp_bytes_t rcp_ep_i2c_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-I2C-011
 //cfusa:req REQ-I2C-012
+//cfusa:req REQ-I2C-023
 rcp_ep_i2c_errc_t rcp_ep_i2c_decode_transfer_request(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       rcp_ep_i2c_dir_t *out_direction,
@@ -350,6 +349,7 @@ rcp_ep_i2c_errc_t rcp_ep_i2c_decode_transfer_request(const uint8_t *b, size_t le
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-I2C-013
+//cfusa:req REQ-I2C-024
 rcp_bytes_t rcp_ep_i2c_encode_response(rcp_byte_bus_id_t byte_bus_id,
                                         rcp_ep_i2c_dir_t direction, const uint8_t *rx_data,
                                         size_t rx_len, uint8_t transaction_num, bool timed,

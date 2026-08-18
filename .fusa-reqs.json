@@ -1,6 +1,5 @@
 {
-  "requirements": [
-    {
+  "requirements": [{
       "id": "REQ-DL-001",
       "title": "heartbeat() resets a stream's deadline timer",
       "text": "rcp_deadline_monitor_heartbeat() shall reset the named stream's last-signal time to the current time.",
@@ -4771,8 +4770,8 @@
     },
     {
       "id": "REQ-I2C-012",
-      "title": "rcp_ep_i2c_decode_transfer_request() rejects a malformed or misaddressed frame and accepts both directions",
-      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 33's only legal value for a plain request in I2C's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer. It shall accept BOTH op senses -- an I2C transfer is half duplex and either-directional, so neither is malformed -- and report which via *out_direction.",
+      "title": "rcp_ep_i2c_decode_transfer_request() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 \u00a713.5 Table 33's only legal value for a plain request in I2C's endpoint-type row. Corrected 2026-08-18 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit): this entry previously also asserted (a) that every other evt value \"shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer\" -- a different layer's behavior this function/module does not itself implement (ep_i2c.c has no rcp_ep_i2c_wire_error()-style mapper, unlike ep_pwm.c's/ep_gpio.c's own RESERVED_EVT->RCP_ERROR_UNSUPPORTED_CMD mappers; the caller-obligation framing already used correctly in ep_i2c.h's own doc comment is what that clause should have been, not a testable contract of this function), and (b) \"It shall accept BOTH op senses ... report which via *out_direction\" -- a distinct, separately-tested success-path assertion unrelated to this entry's own reject-malformed-frame contract, now split into REQ-I2C-023.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4784,7 +4783,7 @@
     {
       "id": "REQ-I2C-013",
       "title": "rcp_ep_i2c_encode_response() encodes the direction's op and the right framing",
-      "text": "rcp_ep_i2c_encode_response() shall produce an ACF_ABB frame when timed is false and an ACF_GBB frame with mtv == RCP_ACF_MTV_VALID and message_timestamp == timestamp when timed is true, in both cases with evt == 0 and op selected by direction: op == RCP_ACF_OP_READ with payload exactly rx_data[0..rx_len) for RCP_EP_I2C_DIR_READ (a read response has a byte_msg_payload), and op == RCP_ACF_OP_WRITE with no payload for RCP_EP_I2C_DIR_WRITE (a write response does not). It shall return a zeroed rcp_bytes_t when direction is not rcp_ep_i2c_dir_valid() or when rx_len != 0 with RCP_EP_I2C_DIR_WRITE.",
+      "text": "rcp_ep_i2c_encode_response() shall produce an ACF_ABB frame when timed is false and an ACF_GBB frame with mtv == RCP_ACF_MTV_VALID and message_timestamp == timestamp when timed is true, in both cases with evt == 0 and op selected by direction: op == RCP_ACF_OP_READ with payload exactly rx_data[0..rx_len) for RCP_EP_I2C_DIR_READ (a read response has a byte_msg_payload), and op == RCP_ACF_OP_WRITE with no payload for RCP_EP_I2C_DIR_WRITE (a write response does not). Corrected 2026-08-18 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit): this entry previously also asserted the reject-invalid-input contract (\"shall return a zeroed rcp_bytes_t when direction is not rcp_ep_i2c_dir_valid() or when rx_len != 0 with RCP_EP_I2C_DIR_WRITE\"), a separate function-wide guard clause bundled with the encode-success contract above -- split into REQ-I2C-024, matching this module's own sibling split for rcp_ep_i2c_encode_transfer_request() (REQ-I2C-010 encode-success vs. REQ-I2C-018 reject-invalid-inputs).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7599,7 +7598,7 @@
       "status": "implemented",
       "tc18": "§12.7.7 Table 24; NOTE: rx_wd_info_enable (formerly 0x000D.7) is REPLACED in RC5 by rx_stream_status, a different mechanism (a passive aggregate status bit reacting to any of 4 fault causes) with no clean 1:1 mapping back to the old per-cause active notification concept -- already investigated, genuinely ambiguous, left open in regmap.h's own file header (task #97); see also REQ-E2E-046 (the new bit's own, separately-tracked requirement). TC18.txt L2889-2891 reflects the superseded 0.5.1_RC (RC1) wording."
     },
-        {
+    {
       "id": "REQ-LINEP-006",
       "title": "rcp_ep_lin_trigger_fires() never fires for trigger RCP_EP_LIN_TRIGGER_NONE",
       "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event and trailing_time_expired. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted RCP_EP_LIN_TRIGGER_TX_DONE's own AND-of-both-conditions outcome -- a second, independently-testable switch-arm behavior of the same function, the same per-switch-arm-per-id pattern REQ-PWM-002 through REQ-PWM-009 already establish for evt[2:0] write semantics. That clause is now REQ-LINEP-030's own id, which also absorbs REQ-LINEP-023 (RETIRED -- see that entry): -023's own text, added when issue #201 introduced trailing_time_expired, described the identical TX_DONE AND-of-both-conditions rule this entry's own now-removed TX_DONE clause already restated after its 2026-08-13 correction, both citing the same TC18-13.7.10.1-002 master id. This entry keeps only the NONE case.",
@@ -7727,7 +7726,7 @@
       "scope": "tc18",
       "status": "implemented"
     },
-        {
+    {
       "id": "REQ-LINEP-016",
       "title": "rcp_ep_lin_encode_command_request() encodes the read direction, evt=0, and carries the raw payload unmodified",
       "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 33 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte. MERGED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): REQ-LINEP-026 (RETIRED -- see that entry) duplicated this entry's own \"evt = 0\" fact under a separate id, both citing the same TC18-13.5-001 master id; that entry is now retired, this one remains the canonical home for this function's whole encode contract.",
@@ -7751,7 +7750,7 @@
       "tc18": "§13.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (§13.7.10.1), TC18.txt L5691-5693; evt[2:0] plain-request rule per §13.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-018",
       "title": "rcp_ep_lin_decode_command_request() rejects a frame too short for its ACF_ABB header or payload",
       "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled four independently-testable rejection outcomes of the same function under one 'shall' clause joined by commas (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_command_request_rejects_short_frame, test_command_request_rejects_bad_msg_type, test_command_request_rejects_wrong_bus, test_command_request_rejects_wrong_op) -- the exact 2+-independently-testable-behaviors-under-one-id pattern this audit exists to close, missed by the '2+ shall' proxy because the whole rule was phrased as a single sentence. The RCP_EP_LIN_ERR_BAD_MSG_TYPE clause is now REQ-LINEP-031's own id, RCP_EP_LIN_ERR_WRONG_BUS is REQ-LINEP-032's, and RCP_EP_LIN_ERR_WRONG_OP is REQ-LINEP-033's; the RCP_EP_LIN_ERR_BAD_EVT clause had already been split out as REQ-LINEP-027 before this audit. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
@@ -7799,7 +7798,7 @@
       "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-019",
       "title": "rcp_ep_lin_encode_response() encodes an untimed response as ACF_ABB",
       "text": "rcp_ep_lin_encode_response() shall encode an ACF_ABB message when timed is false, with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text also asserted the timed=true ACF_GBB encoding shape as a second, materially different (extra message_timestamp/mtv fields, different ACF message type entirely) independently-testable outcome of the same function -- for consistency with rcp_ep_lin_decode_response()'s own sibling untimed/timed split (REQ-LINEP-020/021), which already treats the two shapes as separate ids. That clause is now REQ-LINEP-034's own id. This entry keeps only the untimed (ACF_ABB) case.",
@@ -7847,7 +7846,7 @@
       "tc18": "§13.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
       "tc18_master_id": "TC18-13.7.10.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-022",
       "title": "rcp_ep_lin_decode_response() rejects a frame too short for its applicable ACF header",
       "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two independently-testable rejection outcomes of the same function under one 'shall' clause joined by 'and' (each already proven by its own separate, pre-existing test function in tests/test_ep_lin.c: test_response_decode_rejects_short_frame, test_response_decode_rejects_wrong_bus). The RCP_EP_LIN_ERR_WRONG_BUS clause is now REQ-LINEP-035's own id. This entry keeps only the RCP_EP_LIN_ERR_SHORT_FRAME case.",
@@ -10823,14 +10822,14 @@
     },
     {
       "id": "REQ-I2C-019",
-      "title": "I2C functional-config registers beyond i2c_mode, and the Ultra-fast preset, are now modeled",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): c-RCP's rcp_ep_i2c_functional_cfg_t now carries i2c_clock_divider, i2c_trail (minimum trail time between two transactions in I2C clock cycles), and i2c_ep_status alongside i2c_mode (i2c_base_clk is not itself stored -- it has no setter and always renders 0, the same \"no real clock source modelled\" honesty ep_gpio.h's own gpio_base_clk already commits to); rcp_ep_i2c_mode_valid() now accepts Ultra-fast mode (value 4, 5 Mbit/s). rcp_ep_i2c_render_registers()/_apply_reconfig() implement the whole Table 46 block at corrected addresses: Table 46's own printed relative-address column collides i2c_ep_enable&clr (0x0002) with i2c_base_clk (also printed at 0x0002) and i2c_base_clk's second octet with i2c_ep_status (both printed at 0x0004) -- confirmed via direct visual inspection of the source PDF (physical page 99), not a text-extraction artifact. PWM_OUT's, GPIO's, and SPI's own common EP_func prefixes all place the same five conceptual fields (EP_LEN / a reserved-or-count octet / enable&clr / options / a 16-bit read-only base-clock register) at the identical address sequence 0x0000/0x0001/0x0002/0x0003/0x0004-0x0005, followed by a 16-bit ep_status at 0x0006-0x0007 -- that cross-table pattern is authoritative here too, so i2c_base_clk is placed at 0x0004-0x0005 (not the table's own printed 0x0002), pushing i2c_ep_status to 0x0006-0x0007, i2c_clock_divider to 0x0008, i2c_mode to 0x0009, and i2c_trail to 0x000A (RCP_EP_I2C_EP_FUNC_LEN = 0x000B, 11 octets total). Table 46 still numbers two distinct rows '3' (High-speed 1.7 and 3.4 Mbit/s), an ambiguity ep_i2c.h resolves conservatively in favour of the lower numbering -- this remains unresolved pending spec errata, unrelated to the fixes above.",
+      "title": "RETIRED -- I2C functional-config registers beyond i2c_mode, and the Ultra-fast preset, are now modeled (superseded by REQ-I2C-001/-021/-022 after the REQ-I2C-* atomicity split)",
+      "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit). This entry originally documented the 2026-08-11 fix (c-RCP-AUDIT-06, issue #256 Group I) that added i2c_clock_divider/i2c_trail/i2c_ep_status to rcp_ep_i2c_functional_cfg_t, taught rcp_ep_i2c_mode_valid() to accept Ultra-fast mode (value 4), and gave rcp_ep_i2c_render_registers()/rcp_ep_i2c_apply_reconfig() their corrected-address Table 46 implementation -- three different functions' behavior bundled under one id, in violation of CONTRIBUTING.md's \"one requirement, one function's contract\" rule (added by #519/PR #525, after this entry was written). Each behavior it described is now the sole, already-atomic responsibility of another entry that fully subsumes it: rcp_ep_i2c_mode_valid()'s 0..4 acceptance is REQ-I2C-001's own contract (REQ-I2C-001's own text already cites this entry as the historical origin of that range); rcp_ep_i2c_render_registers()'s corrected-address rendering is REQ-I2C-021's; rcp_ep_i2c_apply_reconfig()'s decode+patch+adopt+reject-out-of-range contract is REQ-I2C-022's. No behavior described here is untested or unowned elsewhere. This entry's own //cfusa:req/-test tags have been trimmed to keep only a historical pointer at rcp_ep_i2c_mode_valid()/test_mode_valid_bounds (matching REQ-RMAP-004's own retired-entry precedent of keeping one tag pointing at real, still-relevant code rather than none); its render_registers()/apply_reconfig() tags have been removed in favor of REQ-I2C-021's/REQ-I2C-022's own exclusive ownership. The still-unresolved Table 46 High-speed dual-numbering ambiguity this entry also flagged (pending spec errata) is not itself a testable claim and remains documented in ep_i2c.h's file header, unaffected by this retirement.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "status": "implemented",
-      "tc18": "§13.7.7.2 Table 49, TC18.txt L5211-5234",
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "\u00a713.7.7.2 Table 49, TC18.txt L5211-5234",
       "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
@@ -10847,8 +10846,8 @@
     },
     {
       "id": "REQ-I2C-021",
-      "title": "rcp_ep_i2c_render_registers()/_encode_reconfig_request() implement the generic §12.7.1 configuration request for I2C",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 §12.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. rcp_ep_i2c_decode_transfer_request() already correctly rejected evt[2:0] = 111b as not a plain transfer (RCP_EP_I2C_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart function implemented that path at all. rcp_ep_i2c_render_registers() serializes cfg's whole (corrected-address) Table 46 block; rcp_ep_i2c_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's/SPI's own encode_reconfig_request() shape.",
+      "title": "rcp_ep_i2c_render_registers() implements the \u00a712.7.1 configuration-read for I2C's Table 46 block",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. rcp_ep_i2c_decode_transfer_request() already correctly rejected evt[2:0] = 111b as not a plain transfer (RCP_EP_I2C_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart function rendered this endpoint's own Table 46 block at all. rcp_ep_i2c_render_registers() shall serialize cfg's whole EP_func register block into out[0..RCP_EP_I2C_EP_FUNC_LEN) at the corrected (not the table's own colliding-printed) per-register offsets -- RCP_EP_I2C_REG_EP_LEN/_RESERVED_01/_EP_ENABLE_CLR/_EP_OPTIONS/_BASE_CLK/_EP_STATUS/_CLOCK_DIVIDER/_MODE/_TRAIL -- rendering the read-only i2c_base_clk register as a constant 0 (no real clock source modelled). Corrected 2026-08-18 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit): this entry previously also bundled rcp_ep_i2c_encode_reconfig_request()'s own separate contract -- a different function encoding the wire REQUEST rather than rendering the register block itself -- now split into REQ-I2C-025.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -10859,8 +10858,56 @@
     },
     {
       "id": "REQ-I2C-022",
-      "title": "rcp_ep_i2c_apply_reconfig()/_reconfig_strerror() apply the addressed configuration write and never return NULL for a status message",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_i2c_apply_reconfig() decodes the address+data payload TC18 §12.7.1 defines and patches cfg's Table 46 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_I2C_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE), matching §12.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, the reserved octet, or base_clk) are silently skipped while the rest of the span is still applied. rcp_ep_i2c_reconfig_strerror() never returns NULL, including for an unrecognized error code.",
+      "title": "rcp_ep_i2c_apply_reconfig() applies the addressed configuration write",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_i2c_apply_reconfig() decodes the address+data payload TC18 \u00a712.7.1 defines and patches cfg's Table 46 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_I2C_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE), matching \u00a712.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, the reserved octet, or base_clk) are silently skipped while the rest of the span is still applied. Corrected 2026-08-18 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit): this entry previously also asserted rcp_ep_i2c_reconfig_strerror()'s own separate never-NULL contract -- a different function -- now split into REQ-I2C-026.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
+    },
+    {
+      "id": "REQ-I2C-023",
+      "title": "rcp_ep_i2c_decode_transfer_request() accepts both op senses and reports which",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall accept BOTH RCP_ACF_OP_READ and RCP_ACF_OP_WRITE as valid -- an I2C transfer is half duplex and genuinely either-directional, so neither op sense is malformed -- and report the decoded direction via *out_direction, independent of the frame's evt/byte_bus_id validity checks. Split 2026-08-18 from REQ-I2C-012 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit): this is a distinct success-path assertion, not part of that entry's reject-malformed-frame contract.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.7.1 (\"The Client can request the I\u00b2C endpoint to send one or more bytes... Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L5199-5201 -- I2C's genuinely bidirectional read/write op sense",
+      "tc18_master_id": "TC18-13.7.7.1-002"
+    },
+    {
+      "id": "REQ-I2C-024",
+      "title": "rcp_ep_i2c_encode_response() rejects unencodable direction/rx_len inputs",
+      "text": "rcp_ep_i2c_encode_response() shall return a zeroed rcp_bytes_t (data == NULL) when direction is not rcp_ep_i2c_dir_valid(), or when rx_len != 0 with direction RCP_EP_I2C_DIR_WRITE (a write response has no byte_msg_payload). Split 2026-08-18 from REQ-I2C-013 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit), matching REQ-I2C-010/REQ-I2C-018's own established encode-success/reject-invalid split for the sibling rcp_ep_i2c_encode_transfer_request().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257",
+      "tc18_master_id": "TC18-13.7.7.3-001"
+    },
+    {
+      "id": "REQ-I2C-025",
+      "title": "rcp_ep_i2c_encode_reconfig_request() encodes the \u00a712.7.1 configuration-write request",
+      "text": "rcp_ep_i2c_encode_reconfig_request() shall encode an ACF_ABB write request (op == RCP_ACF_OP_WRITE, evt[2:0] == 111b) addressed to byte_bus_id, with payload equal to start_address (16-bit big-endian) followed by data[0..data_len), matching PWM_OUT's/GPIO's/SPI's own encode_reconfig_request() shape, and shall return a zeroed rcp_bytes_t (data == NULL) when data_len is 0 or data is NULL, when the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on allocation failure. Split 2026-08-18 from REQ-I2C-021 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
+    },
+    {
+      "id": "REQ-I2C-026",
+      "title": "rcp_ep_i2c_reconfig_strerror() never returns NULL and returns distinct messages",
+      "text": "rcp_ep_i2c_reconfig_strerror() shall return a distinct, non-NULL, human-readable message for each of RCP_EP_I2C_RECONFIG_OK, RCP_EP_I2C_RECONFIG_ERR_SHORT, and RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE, and a non-NULL message for any other value. Split 2026-08-18 from REQ-I2C-022 (c-RCP-18-tracker, issue #533 REQ-I2C-* atomicity audit), matching this codebase's own established strerror-family convention (REQ-I2C-009, REQ-GPIO-039, REQ-PWM-024, et al.).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -13037,7 +13084,7 @@
       "tc18": "§13.5 Table 33 (evt[2:0]=000b legality), TC18.txt L4069-4116; §13.7.12.3 Figure 41 (iseled request format), TC18.txt L5985-5995",
       "tc18_master_id": "TC18-13.7.12.3-001"
     },
-        {
+    {
       "id": "REQ-LINEP-023",
       "title": "RETIRED -- duplicated REQ-LINEP-030's TX_DONE AND-of-both-conditions rule (near-duplicate ids describing the same rule)",
       "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- added when issue #201 introduced trailing_time_expired as rcp_ep_lin_trigger_fires()'s second, caller-classified boolean parameter -- described the identical TX_DONE AND-of-both-conditions rule REQ-LINEP-006 (post its own 2026-08-13 correction) already restated in formal shall-statement form, both citing the same TC18-13.7.10.1-002 master id -- the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated into REQ-RMAP-085 by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is now REQ-LINEP-030; this entry's own design-rationale content (no dedicated Table 55 wire register for \"the configured trailing time\"; trailing_time_expired is caller-classified, not derived from a modeled clock) is preserved there. No code or test carries this id's tag any longer.",
@@ -13060,7 +13107,7 @@
       "tc18": "§13.7.10.2 Table 55, TC18.txt L5697-5714",
       "tc18_master_id": "TC18-13.7.10.2-001"
     },
-        {
+    {
       "id": "REQ-LINEP-028",
       "title": "rcp_ep_lin_render_registers() serializes the EP_func register block per Table 55's offsets",
       "text": "rcp_ep_lin_render_registers() shall serialize cfg's EP_func registers into out[0..RCP_EP_LIN_EP_FUNC_LEN) exactly as a configuration read of the whole block would report them, per Table 55's offsets. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled two entirely different functions' behavior under one id -- rcp_ep_lin_render_registers()'s own serialization contract (already independently tested by test_render_registers_matches_table_offsets) and rcp_ep_lin_encode_reconfig_request()'s own separate wire-encoding contract (already independently tested by test_reconfig_request_round_trip / test_encode_reconfig_request_rejects_empty_data) -- the same class of violation REQ-AUTH-009 (#519's own seed example) demonstrated: multiple functions' behavior under one id, not one function's one switch/if-arm outcome. rcp_ep_lin_encode_reconfig_request()'s own contract is now REQ-LINEP-036's own id. This entry keeps only rcp_ep_lin_render_registers()'s own serialization contract.",
@@ -13084,7 +13131,7 @@
       "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
       "tc18_master_id": "TC18-12.7.1-002"
     },
-        {
+    {
       "id": "REQ-LINEP-029",
       "title": "rcp_ep_lin_apply_reconfig() rejects a write extending past the EP_func block, leaving cfg unchanged",
       "text": "rcp_ep_lin_apply_reconfig() shall return RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE and leave cfg entirely unchanged when start_address + the payload's data length exceeds RCP_EP_LIN_EP_FUNC_LEN, matching \u00a712.7.1's own 'such a payload is to be ignored' rule. SPLIT 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own prior text bundled three of rcp_ep_lin_apply_reconfig()'s own independently-testable outcomes -- this out-of-range rejection (already tested by test_apply_reconfig_rejects_write_past_ep_len), the successful patch-and-adopt behavior including its read-only-register-skip rule (already tested by test_apply_reconfig_writes_clk_divider / test_apply_reconfig_writes_multi_register_span / test_apply_reconfig_ignores_read_only_registers) -- plus a wholly different function, rcp_ep_lin_reconfig_strerror()'s own never-NULL contract (already tested by test_reconfig_strerror_never_null), all under one id. The successful patch/read-only-skip clause is now REQ-LINEP-038's own id; rcp_ep_lin_reconfig_strerror()'s own contract is REQ-LINEP-039's own id. This entry also newly documents (previously untraced in any REQ-LINEP-* text, despite already being implemented and independently tested by test_apply_reconfig_rejects_payload_without_data) the function's third outcome, the too-short-payload rejection, now REQ-LINEP-037's own id. This entry keeps only the out-of-range rejection.",
@@ -13144,7 +13191,7 @@
       "tc18": "§13.7.10.1, TC18.txt L5694-5695; §13.5.1, TC18.txt L4134-4142",
       "tc18_master_id": "TC18-13.5.1-002"
     },
-        {
+    {
       "id": "REQ-LINEP-026",
       "title": "RETIRED -- duplicated REQ-LINEP-016's evt=0 encoding contract (near-duplicate ids describing the same rule)",
       "text": "RETIRED 2026-08-18 (c-RCP-18-tracker, REQ-LINEP-* atomicity audit, issue #533): this entry's own text -- \"rcp_ep_lin_encode_command_request() shall have no compare_mode parameter of any kind; it always encodes evt = 0\" -- explicitly cross-referenced REQ-LINEP-016 (\"See REQ-LINEP-016\") for the same rule, both citing the same TC18-13.5-001 master id. REQ-LINEP-016's own text already asserts the same 'evt = 0' encoding fact as part of that function's one full encode contract, independently tested (test_command_request_uses_read_direction_op / test_command_request_round_trip_carries_raw_bytes decode the encoded frame's evt field back). This entry's own remaining assertion -- the absence of a compare_mode parameter from the function's signature -- is a static API-shape fact, not a runtime behavior a test can independently verify beyond what REQ-LINEP-016 already covers; the same near-duplicate-ids-describing-the-same-rule pattern the tracker's own #519 background section flags (REQ-RMAP-059/061, consolidated by the REQ-RMAP-* batch of this same tracker). The canonical id for this rule is REQ-LINEP-016. No code or test carries this id's tag any longer.",
@@ -13711,7 +13758,6 @@
       "status": "implemented",
       "tc18": "§13.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)",
       "tc18_master_id": "TC18-13.5.1-002"
-    }
-  ],
+    }],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."
 }

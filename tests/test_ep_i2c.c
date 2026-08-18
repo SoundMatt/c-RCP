@@ -20,6 +20,10 @@
 //cfusa:test REQ-I2C-019
 //cfusa:test REQ-I2C-021
 //cfusa:test REQ-I2C-022
+//cfusa:test REQ-I2C-023
+//cfusa:test REQ-I2C-024
+//cfusa:test REQ-I2C-025
+//cfusa:test REQ-I2C-026
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -35,6 +39,8 @@ void tearDown(void) {}
 
 /* ── i2c_mode ───────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-I2C-001
+//cfusa:test REQ-I2C-019
 static void test_mode_valid_bounds(void)
 {
     uint8_t v;
@@ -155,6 +161,7 @@ static void test_set_mode_applies_when_valid_and_authorized(void)
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
 
+//cfusa:test REQ-I2C-021
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -184,6 +191,7 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT16(0x000Bu, RCP_EP_I2C_EP_FUNC_LEN);
 }
 
+//cfusa:test REQ-I2C-022
 static void test_apply_reconfig_writes_clock_divider(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -200,6 +208,7 @@ static void test_apply_reconfig_writes_clock_divider(void)
     TEST_ASSERT_EQUAL_UINT8(0x42, cfg.clock_divider);
 }
 
+//cfusa:test REQ-I2C-022
 static void test_apply_reconfig_writes_multi_register_span(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -220,6 +229,7 @@ static void test_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_I2C_MODE_FAST, cfg.i2c_mode);
 }
 
+//cfusa:test REQ-I2C-022
 static void test_apply_reconfig_ignores_read_only_registers(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -250,6 +260,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+//cfusa:test REQ-I2C-022
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -267,6 +278,7 @@ static void test_apply_reconfig_rejects_write_past_ep_len(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.trail);
 }
 
+//cfusa:test REQ-I2C-022
 static void test_apply_reconfig_rejects_payload_without_data(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -280,6 +292,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_i2c_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-I2C-025
 static void test_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -305,6 +318,7 @@ static void test_reconfig_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-I2C-025
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_i2c_encode_reconfig_request(0x00, 0, NULL, 0, 0);
@@ -312,16 +326,22 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
-static void test_reconfig_strerror_never_null(void)
+//cfusa:test REQ-I2C-026
+static void test_reconfig_strerror_never_null_and_distinct(void)
 {
     rcp_ep_i2c_reconfig_errc_t codes[] = {
         RCP_EP_I2C_RECONFIG_OK, RCP_EP_I2C_RECONFIG_ERR_SHORT,
         RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE,
     };
-    size_t i;
+    size_t i, j;
 
     for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
-        TEST_ASSERT_NOT_NULL(rcp_ep_i2c_reconfig_strerror(codes[i]));
+        const char *msg = rcp_ep_i2c_reconfig_strerror(codes[i]);
+
+        TEST_ASSERT_NOT_NULL(msg);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(msg, rcp_ep_i2c_reconfig_strerror(codes[j])));
+        }
     }
     TEST_ASSERT_NOT_NULL(rcp_ep_i2c_reconfig_strerror((rcp_ep_i2c_reconfig_errc_t)99));
 }
@@ -482,6 +502,7 @@ static void test_transfer_request_rejects_invalid_encode_inputs(void)
 
 /* ── Transfer request round trip ───────────────────────────────────────────── */
 
+//cfusa:test REQ-I2C-023
 static void test_transfer_request_round_trip_carries_address_bytes(void)
 {
     /* First byte models a raw target-device address byte; this module
@@ -550,6 +571,7 @@ static void test_transfer_request_round_trip_empty_payload(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-I2C-012
 static void test_transfer_request_rejects_wrong_bus(void)
 {
     uint8_t     tx[1] = {0xAB};
@@ -571,6 +593,7 @@ static void test_transfer_request_rejects_wrong_bus(void)
 /* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
  * plain I2C transfer request; every other value (here, 0b011, a reserved
  * value in I2C's endpoint-type row) shall be rejected. */
+//cfusa:test REQ-I2C-012
 static void test_transfer_request_rejects_nonzero_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -598,6 +621,7 @@ static void test_transfer_request_rejects_nonzero_evt(void)
  * see the direction tests above -- so its replacement asserts the
  * opposite: a hand-built op=0 frame decodes, and reports the read
  * direction along with the read_size that only that direction can carry. */
+//cfusa:test REQ-I2C-023
 static void test_transfer_request_accepts_hand_built_read_direction_frame(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -622,6 +646,7 @@ static void test_transfer_request_accepts_hand_built_read_direction_frame(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-I2C-012
 static void test_transfer_request_rejects_bad_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -643,6 +668,7 @@ static void test_transfer_request_rejects_bad_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-I2C-012
 static void test_transfer_request_rejects_short_frame(void)
 {
     uint8_t          too_short[3] = {0};
@@ -659,6 +685,7 @@ static void test_transfer_request_rejects_short_frame(void)
 
 /* ── Response round trip ───────────────────────────────────────────────────── */
 
+//cfusa:test REQ-I2C-013
 static void test_response_round_trip_untimed(void)
 {
     uint8_t     rx[4] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -685,6 +712,7 @@ static void test_response_round_trip_untimed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-I2C-013
 static void test_response_round_trip_timed(void)
 {
     uint8_t     rx[2] = {0x11, 0x22};
@@ -716,9 +744,9 @@ static void test_response_round_trip_timed(void)
  * write request. It does not have a byte_msg_payload." Before v0.104.0
  * this module encoded every response with op=0, so the response to an I2C
  * write transaction classified as a read response on the wire. */
+//cfusa:test REQ-I2C-013
 static void test_write_response_carries_op_write_and_no_payload(void)
 {
-    uint8_t                     rx[1] = {0xFF};
     rcp_bytes_t                 frame = rcp_ep_i2c_encode_response(2, RCP_EP_I2C_DIR_WRITE, NULL,
                                                                     0, 11, false, 0);
     rcp_acf_byte_message_info_t hdr;
@@ -730,7 +758,6 @@ static void test_write_response_carries_op_write_and_no_payload(void)
     bool                        timed;
     uint64_t                    ts;
     uint8_t                     txn;
-    rcp_bytes_t                 bad;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
@@ -745,8 +772,19 @@ static void test_write_response_carries_op_write_and_no_payload(void)
     TEST_ASSERT_EQUAL_UINT32(0u, out_rx_len);
 
     rcp_bytes_free(&frame);
+}
 
-    /* "It does not have a byte_msg_payload" -- so one cannot be attached. */
+/* REQ-I2C-024's own dedicated reject-path test, split out of the former
+ * test_write_response_carries_op_write_and_no_payload() (which now proves
+ * only REQ-I2C-013's encode-success contract): an invalid direction, and a
+ * write direction asked to carry a payload -- "It does not have a
+ * byte_msg_payload" (TC18 v0.5.1_RC §11.3.2) -- so neither can be encoded. */
+//cfusa:test REQ-I2C-024
+static void test_encode_response_rejects_invalid_inputs(void)
+{
+    uint8_t     rx[1] = {0xFF};
+    rcp_bytes_t bad;
+
     bad = rcp_ep_i2c_encode_response(2, RCP_EP_I2C_DIR_WRITE, rx, sizeof(rx), 11, false, 0);
     TEST_ASSERT_NULL(bad.data);
 
@@ -809,7 +847,7 @@ int main(void)
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
-    RUN_TEST(test_reconfig_strerror_never_null);
+    RUN_TEST(test_reconfig_strerror_never_null_and_distinct);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 
@@ -830,6 +868,7 @@ int main(void)
     RUN_TEST(test_response_round_trip_untimed);
     RUN_TEST(test_response_round_trip_timed);
     RUN_TEST(test_write_response_carries_op_write_and_no_payload);
+    RUN_TEST(test_encode_response_rejects_invalid_inputs);
     RUN_TEST(test_response_decode_rejects_wrong_bus);
     RUN_TEST(test_response_decode_rejects_short_frame);
 

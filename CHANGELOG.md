@@ -34,6 +34,124 @@ the rationale.
 
 ## Releases
 
+### v0.448.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-I2C-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533 (mirrors #256's pattern), executing the convention #519/PR
+#525 added to `CONTRIBUTING.md`'s "Writing a requirement" section.
+Covers the `REQ-I2C-*` prefix (`src/ep_i2c.c`/`include/rcp/ep_i2c.h`) --
+Group 2's smallest prefix (22 total, 4 proxy-flagged "2+ shall"). All 22
+requirements read in full against their actual `text` and traced
+code/tests, not just the 4 flagged ones -- per Group 1's REQ-RMAP-*
+batch finding two real bundled requirements with zero "shall"
+occurrences, missed entirely by the proxy.
+
+5 ids reworked, 4 new ids minted (`REQ-I2C-023..026`):
+
+- `REQ-I2C-012` -> `-012`/`-023`: `rcp_ep_i2c_decode_transfer_request()`'s
+  reject-malformed-frame contract (`SHORT_FRAME`/`BAD_MSG_TYPE`/
+  `WRONG_BUS`/`BAD_EVT`, kept as `-012`, matching the same
+  multi-error-code-under-one-id convention already established by
+  `REQ-GPIO-027`/`REQ-SPI-027`/`REQ-PWM-026`'s own sibling decode
+  functions) vs. its "accepts both op senses and reports which"
+  success-path assertion (`-023`, a distinct, already-separately-tested
+  regression guard for the pre-v0.104.0 inverted-op bug). `-012`'s text
+  also dropped a misattributed clause claiming a "dispatch layer"
+  UNSUPPORTED_CMD mapping this module never implements (`ep_i2c.c` has
+  no `rcp_ep_i2c_wire_error()`-style mapper, unlike `ep_pwm.c`'s/
+  `ep_gpio.c`'s own `RESERVED_EVT`->`UNSUPPORTED_CMD` mappers).
+- `REQ-I2C-013` -> `-013`/`-024`: `rcp_ep_i2c_encode_response()`'s
+  encode-success contract (kept as `-013`) vs. its reject-invalid-input
+  contract (`-024`), matching this same module's own sibling split
+  already established for `rcp_ep_i2c_encode_transfer_request()`
+  (`REQ-I2C-010` encode-success vs. `REQ-I2C-018` reject-invalid).
+- `REQ-I2C-021` -> `-021`/`-025`: `rcp_ep_i2c_render_registers()`'s
+  register-block-serialization contract (kept as `-021`) vs.
+  `rcp_ep_i2c_encode_reconfig_request()`'s own separate wire-request
+  contract (`-025`) -- two different functions bundled under one id,
+  the same defect pattern as the two splits below.
+- `REQ-I2C-022` -> `-022`/`-026`: `rcp_ep_i2c_apply_reconfig()`'s
+  decode+patch+adopt+reject-out-of-range contract (kept as `-022`) vs.
+  `rcp_ep_i2c_reconfig_strerror()`'s own separate never-NULL/distinct
+  contract (`-026`) -- again two different functions under one id.
+- `REQ-I2C-019` retired: this zero-"shall" narrative entry tagged
+  THREE different functions (`rcp_ep_i2c_mode_valid()`,
+  `rcp_ep_i2c_render_registers()`, `rcp_ep_i2c_apply_reconfig()`) and,
+  on inspection, every behavior it described duplicates content
+  `REQ-I2C-001`/`-021`/`-022` already atomically and independently own
+  (`REQ-I2C-001`'s own text already cites `-019` as the historical
+  origin of its 0..4 range) -- the same near-duplicate-across-ids risk
+  the tracker's own `REQ-RMAP-059`/`-061` finding flagged, caught only
+  by reading the full narrative rather than the "2+ shall" proxy (which
+  scored this entry 0). Retired using the same `scope`/`status:
+  "retired"` mechanism `REQ-RMAP-004`..`008` already established,
+  keeping one historical `//cfusa:req`/`//cfusa:test` pointer at
+  `rcp_ep_i2c_mode_valid()`/`test_mode_valid_bounds()` (matching
+  `REQ-RMAP-004`'s own retired-entry precedent) and removing its other
+  two now-redundant function tags in favor of `-021`'s/`-022`'s
+  exclusive ownership.
+
+17 requirements confirmed atomic on inspection, including 3 of the 4
+proxy-flagged ones and 2 zero-"shall" entries whose narrative bundles
+several details about ONE function rather than several functions:
+`REQ-I2C-001`-`009`, `REQ-I2C-011`, `REQ-I2C-014`-`018`, `REQ-I2C-020`.
+Notably `REQ-I2C-009` ("`rcp_ep_i2c_strerror()` shall return a
+non-NULL... message... with a distinct message per defined error
+code") matches a near-universal codebase convention already used by
+dozens of sibling `strerror()` requirements (`REQ-GPIO-001`,
+`REQ-SPI-001`, `REQ-PWM-024`, `REQ-ADC-024`, `REQ-UART-017`, et al.) --
+bundling non-NULL and distinctness is this codebase's established
+atomic shape for a `strerror()` contract, not a violation.
+`REQ-I2C-010`/`REQ-I2C-020` (2 "shall"s each) and `REQ-I2C-016` (2
+error codes in 1 "shall") were each confirmed atomic as one
+behavioral contract restated/elaborated, not two, matching Group 1's
+own `REQ-RMAP-051`/`-003`/`-018` precedent for that pattern.
+
+Every split id's `//cfusa:req`/`//cfusa:test` tags moved/duplicated to
+sit directly above the exact function/test each id describes, not left
+at a file header only, per `CONTRIBUTING.md`. `REQ-I2C-024` got a
+brand-new dedicated test (`test_encode_response_rejects_invalid_inputs`,
+split out of the former `test_write_response_carries_op_write_and_no_payload`,
+which now proves only `REQ-I2C-013`'s own encode-success contract).
+`REQ-I2C-026`'s test was extended with a real distinctness assertion
+(`test_reconfig_strerror_never_null_and_distinct`) matching the
+codebase's own `strerror()`-family convention -- the pre-existing test
+checked only non-NULL. The other three splits' tests already existed
+as separate, focused functions, just mis-tagged. Every split
+mutation-tested against a real injected defect (reverted after
+confirming): `REQ-I2C-024`'s guard-clause removal failed only its own
+new test; reintroducing the pre-v0.104.0 READ-rejection bug failed only
+`REQ-I2C-023`'s test (and `REQ-I2C-011`'s own unrelated round-trip
+test, correctly, since both depend on READ acceptance) while
+`REQ-I2C-012`'s reject-tests and the WRITE-direction test stayed green;
+duplicating `REQ-I2C-026`'s `ERR_SHORT` message onto `OK`'s failed only
+its own distinctness assertion. Also fixed, while in these files: a
+genuine `//cfusa:test` tag gap on `REQ-I2C-020` (previously carried
+only by `tests/test_tc18_gaps_ep.c`'s file-header block, now also
+tagged directly above `test_i2c_payload_address_carried_verbatim()`),
+and a stray requirement-id reference in a test comment that was
+confusing `cfusa`'s own tag scanner into reporting a dangling
+`'tag'` test reference.
+
+Full clean rebuild + 67/67 test suites passing; ASan/UBSan (CI's exact
+flags, `ASAN_OPTIONS=detect_leaks=0` on macOS) clean, 67/67 passing;
+pinned cfusa v0.5.54: `check` 0 errors; `trace --req-coverage 100` /
+`trace --sec-tested 100` (run standalone, per the #533 REQ-CFG-* batch's
+combined-flag reporting-bug finding) each 100% (1178/1178 requirements,
+512/512 functions).
+
+Version 0.445.0 -> 0.446.0 (`CMakeLists.txt`/`version.h`/`.fusa.json`
+kept in sync, renumbered past the concurrently-merged `REQ-SPI-*`
+(`v0.444.0`) and `REQ-ADC-*` (`v0.445.0`) batches); dated
+`CHANGELOG.md`/`ROADMAP.md` entries above the current highest version
+header in each.
+
+Part of #533. Not closing it -- other Group 2 (`REQ-CANEP-*`,
+`REQ-GPIO-*`, `REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`, `REQ-UART-*`,
+`REQ-ISELED-*`, `REQ-WAKEUP-*` -- `REQ-SPI-*`/`REQ-ADC-*` landed
+concurrently) and Group 4 prefixes remain, tracked as separate
+concurrent batches against the same tracker.
+
 ### v0.447.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-GPIO-*: requirement-atomicity audit, Group 2 per-endpoint)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
