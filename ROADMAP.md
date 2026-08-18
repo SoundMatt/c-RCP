@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.425.0 -- 2026-08-18 (c-RCP-19: mock.c TSCF/fragment E2E dispatch
+fault-injection coverage)
+
+Continues issue #520's category 2 backlog after the `adapt.c`/
+`ep_can.c`/`loan.c`/`tsn.c`/`shmem.c` batches (PRs #526/#540/#543):
+closes `src/mock.c`'s largest remaining gap -- the CRC-mismatch/
+fault-injection paths in its TSCF and fragment-mode E2E dispatch
+functions (`rcp_mock_server_dispatch_e2e_tscf()`, `_dispatch_e2e_
+fragment()`, `_dispatch_e2e_fragment_tscf()`), each documented as "a
+full, separate copy" of the already-well-tested plain `dispatch_e2e()`
+but previously only exercised for happy-path/`tv=true`-postponement
+behavior.
+
+`tests/test_tc18_gaps_e2e.c` only: a new `make_gbb()` helper plus 14
+new tests -- `dispatch_e2e_tscf()`'s CRC-mismatch+safe-state-broadcast;
+five for `dispatch_e2e_fragment()` (already-faulted-stream reject,
+plain-command-mode fallback, too-short-header reject, a first-ever
+2-fragment ACF_GBB round trip, a GBB fragmented-CRC-mismatch
+safe-state broadcast); eight mirroring `dispatch_e2e_fragment()`'s own
+suite for `dispatch_e2e_fragment_tscf()`. Mutation-tested two sites
+(the TSCF safe-state-broadcast condition, the GBB `got != want` CRC
+check); both new tests failed as expected, both reverted.
+
+Measured impact (local `lcov`/CI-pinned `cfusa` v0.5.54 `coverage`,
+same invocation as prior batches; toolchain is AppleClang + `llvm-cov
+gcov` this session, not gcc-12, so treat the branch delta as
+directional -- CI's own `Coverage (LCOV)` job is authoritative):
+`src/mock.c` line 77.7% -> 88.6%, branch 62.5% -> 70.6%; project-wide
+line 94.4% -> 95.7%, branch 81.1% -> 82.1%.
+
+Full 67-test suite (`test_tc18_gaps_e2e` 50 -> 64 cases) + ASan/UBSan
+clean. `cfusa check`/`trace --req-coverage 100 --sec-tested 100`
+(v0.5.54): 0 errors, unchanged 100%/100%. See `CHANGELOG.md`'s
+matching entry for full detail.
+
+**Next**: issue #520 stays open -- `mock.c`'s multi-member frame
+wrappers (`dispatch_frame_e2e()`/`_frame_e2e_tscf()`) still have
+untested chained-member branches (~55 lines), plus smaller gaps in a
+few other `mock.c` functions; `relay.c`/`regmap.c` and similar
+per-file long-tail gaps are a separate ongoing hygiene backlog; the
+branch-coverage floor stays blocked on SoundMatt/c-FuSa#137.
+
 ### v0.424.0 -- 2026-08-17 (c-RCP-165: unify the 5-file conditional-request
 split into `request.h`/`request.c`)
 
