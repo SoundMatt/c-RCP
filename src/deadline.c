@@ -205,6 +205,7 @@ rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
         if (!m->states) {
             rcp_mutex_destroy(&m->mu);
             rcp_free(m);
+            m = NULL;
             return NULL;
         }
     }
@@ -270,8 +271,12 @@ void rcp_deadline_monitor_destroy(rcp_deadline_monitor_t *m)
     rcp_deadline_monitor_close(m);
 
     rcp_free(m->states);
+    m->states = NULL;
     rcp_free(m->callbacks);
+    m->callbacks = NULL;
     rcp_free(m->callback_ctx);
+    m->callback_ctx = NULL;
     rcp_mutex_destroy(&m->mu);
     rcp_free(m);
+    m = NULL;
 }

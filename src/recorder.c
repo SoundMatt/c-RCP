@@ -36,7 +36,9 @@ void rcp_recorder_destroy(rcp_recorder_t *r)
     for (i = 0; i < r->len; i++) rcp_bytes_free(&r->entries[i].frame);
     rcp_mutex_destroy(&r->mu);
     rcp_free(r->entries);
+    r->entries = NULL;
     rcp_free(r);
+    r = NULL;
 }
 
 //cfusa:req REQ-REC-013
@@ -202,5 +204,6 @@ int rcp_playback_run_all(rcp_recorder_t *rec, rcp_playback_deliver_fn deliver, v
     }
 
     rcp_free(snapshot);
+    snapshot = NULL;
     return RCP_OK;
 }

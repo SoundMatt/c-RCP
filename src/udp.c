@@ -195,10 +195,12 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
 
         if (closed_now) {
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_ERR_TIMEOUT;
         }
 
@@ -256,11 +258,13 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * to leave queued. This matches UDP's own inherent
                  * no-delivery-guarantee contract rather than fighting it. */
                 rcp_free(tmp);
+                tmp = NULL;
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back
@@ -289,6 +293,7 @@ static void udp_avtp_destroy(rcp_avtp_transport_t *self)
     }
     rcp_mutex_destroy(&u->mu);
     rcp_free(u);
+    u = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t udp_avtp_vtable = {
@@ -467,6 +472,7 @@ static int stub_close(rcp_avtp_transport_t *self)
 static void stub_destroy(rcp_avtp_transport_t *self)
 {
     rcp_free(self);
+    self = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t udp_stub_vtable = {

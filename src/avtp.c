@@ -415,7 +415,9 @@ static void loopback_destroy(rcp_avtp_transport_t *self)
     rcp_mutex_destroy(&lb->mu);
     rcp_cond_destroy(&lb->cv);
     rcp_free(lb->items);
+    lb->items = NULL;
     rcp_free(lb);
+    lb = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t loopback_vtable = {
@@ -441,6 +443,7 @@ rcp_avtp_transport_t *rcp_avtp_loopback_transport_new(bool time_sync_supported,
     items = (rcp_bytes_t *)rcp_calloc(queue_capacity, sizeof(*items));
     if (!items) {
         rcp_free(lb);
+        lb = NULL;
         return NULL;
     }
     lb->items = items;

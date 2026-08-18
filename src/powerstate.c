@@ -118,6 +118,7 @@ rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endp
         if (!m->entries) {
             rcp_mutex_destroy(&m->mu);
             rcp_free(m);
+            m = NULL;
             return NULL;
         }
     }
@@ -437,8 +438,12 @@ void rcp_powerstate_manager_destroy(rcp_powerstate_manager_t *m)
     if (!m) return;
 
     rcp_free(m->entries);
+    m->entries = NULL;
     rcp_free(m->callbacks);
+    m->callbacks = NULL;
     rcp_free(m->callback_ctx);
+    m->callback_ctx = NULL;
     rcp_mutex_destroy(&m->mu);
     rcp_free(m);
+    m = NULL;
 }

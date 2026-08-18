@@ -172,10 +172,12 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
 
         if (closed_now) {
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_ERR_TIMEOUT;
         }
 
@@ -235,11 +237,13 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * retry against once recvfrom() already consumed it"
                  * reasoning as udp.c's own oversized-datagram handling. */
                 rcp_free(tmp);
+                tmp = NULL;
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) rcp_memcpy_bounded(buf, buf_cap, payload, payload_len);
             *out_len = payload_len;
             rcp_free(tmp);
+            tmp = NULL;
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back
@@ -267,6 +271,7 @@ static void l2_avtp_destroy(rcp_avtp_transport_t *self)
     }
     rcp_mutex_destroy(&l->mu);
     rcp_free(l);
+    l = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t l2_avtp_vtable = {
@@ -387,6 +392,7 @@ static int l2_stub_close(rcp_avtp_transport_t *self)
 static void l2_stub_destroy(rcp_avtp_transport_t *self)
 {
     rcp_free(self);
+    self = NULL;
 }
 
 static const rcp_avtp_transport_vtable_t l2_stub_vtable = {
