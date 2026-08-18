@@ -285,15 +285,19 @@ static void test_overflow_flag_latches_until_cleared(void)
     rcp_respqueue_destroy(&q);
 }
 
-static void test_capacity_octets_nonzero_disables_max_entries_slot_eviction(void)
+static void test_capacity_octets_nonzero_still_enforces_max_entries_slot_bound(void)
 {
-    /* GitHub #446: once capacity_octets (the real queue_size bound) is
-     * configured, RCP_RESPQUEUE_MAX_ENTRIES is no longer the "queue is
-     * completely full" trigger at all -- it is retained only as the
-     * fallback for the capacity_octets == 0 (unbounded) case. A
-     * capacity_octets budget generous enough in bytes but tiny per-entry
-     * must therefore be able to hold MORE than RCP_RESPQUEUE_MAX_ENTRIES
-     * entries without ever evicting. */
+    /* Issue #521 (ASIL-D-oriented no-dynamic-allocation push):
+     * entries[]/entries_seq[] are now fixed-capacity arrays embedded in
+     * rcp_respqueue_t, sized to RCP_RESPQUEUE_MAX_ENTRIES, so that bound
+     * is enforced UNCONDITIONALLY -- not only as a capacity_octets == 0
+     * fallback (GitHub #446's original behavior, superseded here). A
+     * capacity_octets budget generous enough in bytes but fed tiny
+     * per-entry frames therefore still tops out at exactly
+     * RCP_RESPQUEUE_MAX_ENTRIES entries: the (n+1)th push evicts the
+     * lowest-sequence_num entry (sequence_num 0, pushed first) to make
+     * room, latching overflow, even though plenty of byte budget
+     * remains unused. */
     rcp_respqueue_t q;
     uint8_t         frame[1] = {0};
     size_t          i;
@@ -303,9 +307,9 @@ static void test_capacity_octets_nonzero_disables_max_entries_slot_eviction(void
     for (i = 0; i < n; i++) {
         TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
     }
-    TEST_ASSERT_EQUAL_UINT(n, rcp_respqueue_len(&q));
-    TEST_ASSERT_EQUAL_UINT(n, rcp_respqueue_octets(&q));
-    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+    TEST_ASSERT_EQUAL_UINT(RCP_RESPQUEUE_MAX_ENTRIES, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(RCP_RESPQUEUE_MAX_ENTRIES, rcp_respqueue_octets(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
 
     rcp_respqueue_destroy(&q);
 }
@@ -635,7 +639,7 @@ int main(void)
 
     RUN_TEST(test_push_evicts_lowest_sequence_num_not_oldest_inserted);
     RUN_TEST(test_overflow_flag_latches_until_cleared);
-    RUN_TEST(test_capacity_octets_nonzero_disables_max_entries_slot_eviction);
+    RUN_TEST(test_capacity_octets_nonzero_still_enforces_max_entries_slot_bound);
     RUN_TEST(test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction);
 
     RUN_TEST(test_push_evicts_single_entry_when_capacity_octets_would_be_exceeded);

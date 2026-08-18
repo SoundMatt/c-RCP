@@ -134,12 +134,6 @@ static void *always_fails_calloc(size_t nmemb, size_t size)
     (void)nmemb; (void)size;
     return NULL;
 }
-static void *always_fails_realloc(void *ptr, size_t size)
-{
-    (void)ptr; (void)size;
-    return NULL;
-}
-
 /* rcp_loan_pool_acquire()'s `if (!loan || !release_ctx)` cleanup, `!loan`
  * side: force the loan struct's own rcp_calloc() to fail. The pool already
  * holds a reusable entry so the earlier `data` rcp_calloc() this same hook
@@ -187,34 +181,57 @@ static void test_acquire_returns_null_when_release_ctx_allocation_fails(void)
     rcp_loan_pool_destroy(pool);
 }
 
-/* pool_append()'s own growth-allocation failure: rcp_loan_return() on an
- * empty pool (entries_cap == 0) always tries to grow it, so failing
- * rcp_realloc() here forces loan_release_to_pool()'s "pool bookkeeping
- * allocation failed, free the buffer outright instead of leaking it"
- * fallback (src/loan.c) -- the buffer must still be freed correctly (not
- * leaked, not double-freed), just not returned to the pool for reuse. */
-static void test_return_frees_buffer_outright_when_pool_growth_allocation_fails(void)
+/* pool_append()'s own "free list already full" path (issue #521:
+ * entries[] is now a fixed-capacity array of RCP_LOAN_POOL_MAX_ENTRIES
+ * slots, not realloc()-grown heap storage, so this is deterministically
+ * reachable without an allocation-failure hook -- fill the free list to
+ * its real capacity, then return one more). loan_release_to_pool()'s
+ * "pool bookkeeping is full, free the buffer outright instead of
+ * leaking it" fallback (src/loan.c) must still free the buffer
+ * correctly (not leaked, not double-freed, ASan-checked), just not
+ * return it to the pool for reuse -- and the pool itself must remain
+ * fully usable afterwards. */
+static void test_return_frees_buffer_outright_when_pool_free_list_is_full(void)
 {
     rcp_loan_pool_t *pool = rcp_loan_pool_new();
-    rcp_loan_t *loan = rcp_loan_pool_acquire(pool, 8);
-    rcp_alloc_hooks_t hooks = {0};
-    rcp_loan_t *reacquired;
+    rcp_loan_t      *loans[RCP_LOAN_POOL_MAX_ENTRIES];
+    rcp_loan_t      *overflow_loan;
+    rcp_loan_t      *reacquired;
+    size_t           i;
 
-    hooks.realloc_fn = always_fails_realloc;
-    rcp_alloc_set_hooks(&hooks);
+    /* Distinct sizes: every acquire() below is a fresh allocation (the
+     * free list starts empty, so nothing to reuse yet), and no cap of an
+     * already-returned entry happens to satisfy a later size by
+     * coincidence. */
+    for (i = 0; i < RCP_LOAN_POOL_MAX_ENTRIES; i++) {
+        loans[i] = rcp_loan_pool_acquire(pool, i + 1);
+        TEST_ASSERT_NOT_NULL(loans[i]);
+    }
+    for (i = 0; i < RCP_LOAN_POOL_MAX_ENTRIES; i++) {
+        rcp_loan_return(loans[i]); /* free list now holds exactly MAX entries */
+    }
 
-    rcp_loan_return(loan); /* pool_append()'s growth realloc fails; buffer freed, not pooled */
+    /* A size larger than every already-freed cap: guaranteed not to
+     * reuse, so this is a genuinely fresh allocation whose eventual
+     * return is the one that finds the free list already full. */
+    overflow_loan = rcp_loan_pool_acquire(pool, RCP_LOAN_POOL_MAX_ENTRIES + 1u);
+    TEST_ASSERT_NOT_NULL(overflow_loan);
 
-    rcp_alloc_reset_hooks();
+    rcp_loan_return(overflow_loan); /* free list full: pool_append() returns
+                                        false, buffer freed outright */
 
-    /* Must not crash or double-free (ASan-checked in CI) and the pool must
-     * still be fully usable afterwards -- pool_append() failing must not
-     * corrupt entries_len/entries_cap bookkeeping for later real appends. */
-    reacquired = rcp_loan_pool_acquire(pool, 8);
+    /* Must not crash or double-free (ASan-checked in CI) and the pool
+     * must still be fully usable afterwards -- pool_append() returning
+     * false must not corrupt entries_len bookkeeping for later real
+     * appends. */
+    reacquired = rcp_loan_pool_acquire(pool, 1);
     TEST_ASSERT_NOT_NULL(reacquired);
 
-    rcp_loan_release(loan);
+    rcp_loan_release(overflow_loan);
     rcp_loan_release(reacquired);
+    for (i = 0; i < RCP_LOAN_POOL_MAX_ENTRIES; i++) {
+        rcp_loan_release(loans[i]);
+    }
     rcp_loan_pool_destroy(pool);
 }
 
@@ -230,7 +247,7 @@ int main(void)
     RUN_TEST(test_pool_destroy_frees_every_returned_buffer);
     RUN_TEST(test_acquire_returns_null_when_loan_struct_allocation_fails);
     RUN_TEST(test_acquire_returns_null_when_release_ctx_allocation_fails);
-    RUN_TEST(test_return_frees_buffer_outright_when_pool_growth_allocation_fails);
+    RUN_TEST(test_return_frees_buffer_outright_when_pool_free_list_is_full);
 
     return UNITY_END();
 }

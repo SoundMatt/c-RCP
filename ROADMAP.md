@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.430.0 -- 2026-08-18 (c-RCP-17 round 3: respqueue.c/loan.c
+fixed-capacity redesigns, ep_can.c fragment-plan conversion, Phase (c)
+dynamic-allocation posture write-up)
+
+Round 3 on issue #521. Resolved the two "real design decision"
+items PR #547's status comment left open: `respqueue.c`'s
+`RCP_RESPQUEUE_MAX_ENTRIES` slot bound is now universal (not only a
+`capacity_octets == 0` fallback) so `entries[]`/`entries_seq[]` can be
+fixed-capacity arrays; `loan.c`'s pool free-list bookkeeping array is
+likewise now fixed-capacity (`RCP_LOAN_POOL_MAX_ENTRIES`), degrading
+gracefully (free outright, don't pool) once full. Also converted
+`ep_can.c`'s `build_payload()` scratch buffer and fragment-plan
+segment array to fixed stack arrays (new
+`RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS` = 256) -- `ep_can.c` now has zero
+dynamic allocation of its own. `ep_iseled.c`'s equivalent fragment-plan
+array was deliberately left dynamic: its response length is bounded
+only by a 16-bit `read_size` register (65535 max), with no small
+compile-time ceiling to size a fixed array against safely.
+
+New "Dynamic Allocation Posture" subsection in `AUDIT_PACK.md` §2
+closes out this issue's own Phase (c): documents, by category, what
+remains genuinely dynamic and why none of it is a Phase (b)-style
+mechanical conversion -- the pervasive `rcp_bytes_t`-returning encode/
+decode API surface (input-proportional output size, no small fixed
+ceiling), `ep_iseled.c`'s fragment-plan array, `loan.c`'s pooled
+buffers/control blocks, `relay.c`'s message metadata (no TC18 wire
+bound), and `mdns.c`/`platform.c`'s one-time config-path allocations.
+
+Mutation-tested (respqueue.c's universal eviction trigger, loan.c's
+free-list capacity check, ep_can.c's new segment ceiling -- each
+reverted, confirmed the relevant test/assertion fails or crashes,
+reapplied). Full 67-test suite + ASan/UBSan clean; pinned `cfusa`
+v0.5.54: `check` 0 errors, `trace --req-coverage 100 --sec-tested 100`
+100%/100%, unchanged.
+
+**Next**: none identified against this issue's own phased scope --
+what remains (`ep_iseled.c`'s fragment array, `rcp_bytes_t`'s pervasive
+per-message heap use) is now documented Phase (c) territory, not
+outstanding mechanical work.
+
 ### v0.429.0 -- 2026-08-18 (c-RCP-16: SEOOC evidence package items 3-5
 -- real MC/DC, freedom-from-interference, AUDIT_PACK reframe)
 

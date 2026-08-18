@@ -1,12 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_can.h"
-#include "rcp/alloc.h"
 
 #include "mem_bounded.h"
 
-#include "alloc_overflow.h"
-
-#include <stdlib.h>
 #include <string.h>
 
 /* ── Byte-order helpers (this TU's own copy, matching acf.c's/avtp.c's house
@@ -302,26 +298,24 @@ static bool encode_preconditions_ok(rcp_ep_can_frame_format_t frame_format,
     return true;
 }
 
-/* Builds this module's own prefix-then-data buffer into a freshly
- * malloc()'d block; returns NULL on allocation failure. *out_len is set to
- * the block's length either way it is reached (0 on allocation failure is
- * not meaningful since data is NULL). Caller frees the result with
- * free(). */
-static uint8_t *build_payload(rcp_ep_can_frame_format_t frame_format, uint32_t arbitration_id,
-                               const rcp_ep_can_xl_header_t *xl_header, const uint8_t *data,
-                               size_t data_len, size_t *out_len)
+/* Builds this module's own prefix-then-data layout into the caller-owned
+ * out_buf (issue #521: every caller of this function already validates
+ * data_len against rcp_ep_can_frame_format_max_data_len() via
+ * encode_preconditions_ok() before calling, so prefix_len + data_len can
+ * never exceed RCP_EP_CAN_XL_MAX_ENCODED_LEN -- out_buf must be at least
+ * that large; every caller below declares it as a fixed-size stack
+ * array of exactly that size, no heap allocation needed). *out_len is
+ * set to the written length. */
+static void build_payload(rcp_ep_can_frame_format_t frame_format, uint32_t arbitration_id,
+                           const rcp_ep_can_xl_header_t *xl_header, const uint8_t *data,
+                           size_t data_len, uint8_t *out_buf, size_t *out_len)
 {
-    size_t   prefix_len = prefix_len_for(frame_format);
-    size_t   total_len  = prefix_len + data_len;
-    uint8_t *buf        = (uint8_t *)rcp_malloc(total_len > 0 ? total_len : 1);
+    size_t prefix_len = prefix_len_for(frame_format);
 
-    if (!buf) return NULL;
+    write_prefix(out_buf, frame_format, arbitration_id, xl_header);
+    if (data_len > 0) rcp_memcpy_bounded(&out_buf[prefix_len], data_len, data, data_len);
 
-    write_prefix(buf, frame_format, arbitration_id, xl_header);
-    if (data_len > 0) rcp_memcpy_bounded(&buf[prefix_len], data_len, data, data_len);
-
-    *out_len = total_len;
-    return buf;
+    *out_len = prefix_len + data_len;
 }
 
 /* ── Frame request ─────────────────────────────────────────────────────────── */
@@ -336,14 +330,12 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
 {
     rcp_bytes_t                 frame = {0};
     rcp_acf_byte_message_info_t hdr   = {0};
-    uint8_t                     *payload;
-    size_t                       payload_len;
+    uint8_t                     payload[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t                      payload_len;
 
     if (!encode_preconditions_ok(frame_format, arbitration_id, xl_header, tx_len)) return frame;
 
-    payload = build_payload(frame_format, arbitration_id, xl_header, tx_data, tx_len,
-                             &payload_len);
-    if (!payload) return frame;
+    build_payload(frame_format, arbitration_id, xl_header, tx_data, tx_len, payload, &payload_len);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;
@@ -351,8 +343,6 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    rcp_free(payload);
-    payload = NULL;
     return frame;
 }
 
@@ -412,14 +402,12 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
                                               uint64_t timestamp)
 {
     rcp_bytes_t frame = {0};
-    uint8_t     *payload;
-    size_t       payload_len;
+    uint8_t     payload[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t      payload_len;
 
     if (!encode_preconditions_ok(frame_format, arbitration_id, xl_header, rx_len)) return frame;
 
-    payload = build_payload(frame_format, arbitration_id, xl_header, rx_data, rx_len,
-                             &payload_len);
-    if (!payload) return frame;
+    build_payload(frame_format, arbitration_id, xl_header, rx_data, rx_len, payload, &payload_len);
 
     if (timed) {
         rcp_acf_gbb_header_t hdr = {0};
@@ -445,8 +433,6 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
         frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     }
 
-    rcp_free(payload);
-    payload = NULL;
     return frame;
 }
 
@@ -533,11 +519,20 @@ size_t rcp_ep_can_frame_response_fragment_count(rcp_ep_can_frame_format_t frame_
                                                  size_t rx_len, size_t max_fragment_payload)
 {
     size_t combined_len;
+    size_t count;
 
     if (!encode_preconditions_ok(frame_format, arbitration_id, xl_header, rx_len)) return 0;
 
     combined_len = prefix_len_for(frame_format) + rx_len;
-    return rcp_fragment_plan_count(combined_len, max_fragment_payload);
+    count        = rcp_fragment_plan_count(combined_len, max_fragment_payload);
+    /* Issue #521: rcp_ep_can_encode_frame_response_fragmented()'s own
+     * fragment-plan array is a fixed-capacity RCP_EP_CAN_MAX_FRAGMENT_
+     * SEGMENTS array now, not heap-allocated -- see that constant's own
+     * doc comment (ep_can.h) for why this ceiling is realistic. Reject
+     * (0, fragment.h's own "not representable" convention) rather than
+     * report a count the encoder could never actually build. */
+    if (count > RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS) return 0;
+    return count;
 }
 
 //cfusa:req REQ-CANEP-024
@@ -551,35 +546,20 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
                                                     size_t max_fragment_payload,
                                                     rcp_bytes_t *out_frames)
 {
-    uint8_t                *combined;
+    uint8_t                 combined[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
     size_t                   combined_len;
     size_t                   count;
-    rcp_fragment_segment_t  *segs;
+    rcp_fragment_segment_t   segs[RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS];
     size_t                   i;
 
     count = rcp_ep_can_frame_response_fragment_count(frame_format, arbitration_id, xl_header,
                                                        rx_len, max_fragment_payload);
     if (count == 0) return 0;
 
-    combined = build_payload(frame_format, arbitration_id, xl_header, rx_data, rx_len,
-                              &combined_len);
-    if (!combined) return 0;
-
-    {
-        size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
-        segs = alloc_bytes == 0 ? NULL : (rcp_fragment_segment_t *)rcp_malloc(alloc_bytes);
-    }
-    if (!segs) {
-        rcp_free(combined);
-        combined = NULL;
-        return 0;
-    }
+    build_payload(frame_format, arbitration_id, xl_header, rx_data, rx_len, combined,
+                   &combined_len);
 
     if (rcp_fragment_plan(combined_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        rcp_free(segs);
-        segs = NULL;
-        rcp_free(combined);
-        combined = NULL;
         return 0;
     }
 
@@ -620,20 +600,12 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            rcp_free(segs);
-            segs = NULL;
-            rcp_free(combined);
-            combined = NULL;
             return 0;
         }
 
         out_frames[i] = frame;
     }
 
-    rcp_free(segs);
-    segs = NULL;
-    rcp_free(combined);
-    combined = NULL;
     return count;
 }
 

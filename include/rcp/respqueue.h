@@ -91,21 +91,29 @@
  * (queue unchanged, no eviction attempted) -- no amount of eviction
  * could ever make room for it, even against a fully empty queue.
  *
- * RCP_RESPQUEUE_MAX_ENTRIES is RETAINED, but only as a secondary,
- * defensive slot-count bound for the capacity_octets == 0 (unbounded)
- * case: with no byte budget configured at all, there is nothing for the
- * eviction rule above to trigger against, so this module falls back to
- * bounding its own slot count instead, matching the "realistic bound"
- * convention this codebase already uses for every other repeated-row
- * table (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
+ * RCP_RESPQUEUE_MAX_ENTRIES is a UNIVERSAL slot-count bound (issue #521,
+ * ASIL-D-oriented no-dynamic-allocation push): entries[]/entries_seq[]
+ * are fixed-capacity arrays embedded directly in rcp_respqueue_t, sized
+ * to this constant, so q itself now carries no heap allocation of its
+ * own regardless of how capacity_octets is configured (only each
+ * queued frame's own rcp_bytes_t payload copy remains a per-entry heap
+ * allocation -- see this header's own file comment for why that
+ * particular allocation is out of this fix's scope). Consequently the
+ * eviction loop now triggers on EITHER condition: q->capacity_octets != 0
+ * and accepting frame_len would exceed the remaining byte budget, OR
+ * q->entries_len has reached RCP_RESPQUEUE_MAX_ENTRIES outright -- not
+ * only as a capacity_octets == 0 fallback as an earlier revision of this
+ * header stated. A server configured with a generous capacity_octets
+ * (bytes) but a workload of many small messages will therefore find the
+ * slot count a real, additional binding constraint even while byte
+ * budget remains -- an intentional trade accepted in exchange for
+ * eliminating this module's own realloc()-based array growth, matching
+ * the "realistic bound" convention this codebase already uses for every
+ * other repeated-row table (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
  * RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES,
  * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES, RCP_REGMAP_EP_ID_MAP_MAX_
- * ENTRIES, all 64). Once capacity_octets is nonzero, this slot-count
- * bound no longer applies at all -- q->entries_len may legitimately
- * exceed RCP_RESPQUEUE_MAX_ENTRIES if capacity_octets is generous
- * enough in bytes relative to typical entry size; capacity_octets is
- * the only "completely full" TC18 itself defines, and eviction now
- * follows it directly.
+ * ENTRIES, all 64). q->entries_len can never exceed
+ * RCP_RESPQUEUE_MAX_ENTRIES under any configuration, by construction.
  *
  * rcp_respqueue_push() itself keeps its original signature and assigns
  * sequence_num automatically, from an internal wrapping uint8_t
@@ -138,20 +146,23 @@
  * ── FIFO order, byte-budget capacity ─────────────────────────────────────────
  *
  * Entries drain in the order they were pushed (server.h's own queue
- * convention). Capacity is enforced in OCTETS, not entry count --
- * TC18's own queue_size register is a memory reservation ("assigned
- * memory in 32bit words"), not a message-count limit. As of GitHub
- * #446, rcp_respqueue_push() no longer simply refuses once accepting a
- * frame would push the queue's own running octet total past
+ * convention). Capacity is primarily enforced in OCTETS, not entry
+ * count -- TC18's own queue_size register is a memory reservation
+ * ("assigned memory in 32bit words"), not a message-count limit. As of
+ * GitHub #446, rcp_respqueue_push() no longer simply refuses once
+ * accepting a frame would push the queue's own running octet total past
  * capacity_octets: it first evicts lowest-sequence_num entries (TC18
  * §12.9.4/§12.9.5, see above) to try to free enough room, and only
  * refuses (queue entirely unchanged) if frame_len exceeds
  * capacity_octets outright -- unfixable by any amount of eviction.
- * capacity_octets == 0 means unbounded (no reservation configured at
- * all), the same fail-open default server.h's own queue uses for a
- * caller that never sets an explicit cap -- and, as described above, is
- * the one case where the RCP_RESPQUEUE_MAX_ENTRIES slot-count bound
- * applies instead.
+ * capacity_octets == 0 means unbounded byte budget (no reservation
+ * configured at all), the same fail-open default server.h's own queue
+ * uses for a caller that never sets an explicit cap. As of issue #521,
+ * RCP_RESPQUEUE_MAX_ENTRIES is ALSO always enforced as a hard slot-count
+ * ceiling regardless of capacity_octets (see above) -- q's own
+ * entries[]/entries_seq[] storage is fixed-capacity, not realloc()-grown,
+ * so this is a real structural bound, not merely a fallback for the
+ * unbounded-byte-budget case.
  *
  * ── Per-message Max_AVTPDUsize ceiling ────────────────────────────────────────
  *
@@ -184,47 +195,53 @@ extern "C" {
 #endif
 
 /* TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423, corrected by
- * GitHub #446): a secondary, defensive slot-count bound
- * rcp_respqueue_push()/_push_seq() evict against ONLY when
- * capacity_octets == 0 (unbounded -- no queue_size byte budget
- * configured to evict against instead). Whenever capacity_octets is
- * nonzero, IT is TC18's own "queue is completely full" condition
- * (§12.7.9's queue_size register) and eviction triggers against it
- * directly instead -- this bound does not apply, and q->entries_len may
- * legitimately exceed it. Matches the "realistic bound" convention this
- * codebase already uses for every other repeated-row table
- * (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
+ * GitHub #446, made universal by issue #521, the ASIL-D-oriented
+ * no-dynamic-allocation push): the fixed capacity of entries[]/
+ * entries_seq[] below, and so a hard ceiling on q->entries_len under
+ * EVERY configuration, not only capacity_octets == 0. Whenever
+ * capacity_octets is nonzero, it remains TC18's own "queue is
+ * completely full" condition (§12.7.9's queue_size register) and the
+ * eviction loop triggers against it first -- but once q->entries_len
+ * also reaches this slot-count bound, eviction triggers on that alone
+ * too, even with byte budget still available. This is a deliberate
+ * trade, made to give q's own storage a fixed compile-time footprint
+ * (no realloc()-grown array): a server configured with a generous
+ * capacity_octets but a workload of many small messages will find the
+ * slot count a real, additional binding constraint. Matches the
+ * "realistic bound" convention this codebase already uses for every
+ * other repeated-row table (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
  * RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES,
  * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES,
  * RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES, all regmap.h, all 64). */
 #define RCP_RESPQUEUE_MAX_ENTRIES ((size_t)64u)
 
 typedef struct {
-    rcp_bytes_t *entries;
-    uint8_t     *entries_seq;    /* entries_seq[i] is the sequence_num
+    rcp_bytes_t entries[RCP_RESPQUEUE_MAX_ENTRIES]; /* Fixed-capacity
+                                     (issue #521): each entries[i].data
+                                     is still an individual rcp_bytes_dup()
+                                     heap allocation sized to that one
+                                     frame's own frame_len -- the array
+                                     SLOTS are static, the per-entry
+                                     PAYLOAD bytes are not (see this
+                                     header's own file comment for why:
+                                     frame_len is caller/message-
+                                     dependent, not a compile-time
+                                     protocol constant). */
+    uint8_t     entries_seq[RCP_RESPQUEUE_MAX_ENTRIES]; /* entries_seq[i]
+                                     is the sequence_num
                                      rcp_respqueue_push()/_push_seq()
                                      assigned entries[i] at push time,
                                      0 <= i < entries_len -- the value
                                      rcp_respqueue_push()/_push_seq()
                                      compares to find the lowest-
                                      sequence_num entry to evict once
-                                     capacity_octets would be exhausted
-                                     (or, only when capacity_octets == 0,
-                                     once RCP_RESPQUEUE_MAX_ENTRIES is
-                                     reached) (TC18 §12.9.4/§12.9.5,
-                                     GitHub #423/#446). */
-    size_t       entries_len;
-    size_t       entries_cap;    /* entries[]/entries_seq[] array growth
-                                     capacity -- an implementation
-                                     detail, not the TC18 queue_size
-                                     reservation below. Bounded by
-                                     RCP_RESPQUEUE_MAX_ENTRIES only when
-                                     capacity_octets == 0; when
-                                     capacity_octets is nonzero,
-                                     entries_len (and so entries_cap) may
-                                     legitimately exceed it, bounded
-                                     instead by however many entries fit
-                                     within capacity_octets bytes. */
+                                     capacity_octets would be exhausted,
+                                     or once RCP_RESPQUEUE_MAX_ENTRIES
+                                     itself is reached (TC18
+                                     §12.9.4/§12.9.5, GitHub #423/#446,
+                                     issue #521). */
+    size_t       entries_len;    /* Always <= RCP_RESPQUEUE_MAX_ENTRIES,
+                                     by construction. */
     size_t       octets;         /* running total of entries[i].len,
                                      0 <= i < entries_len */
     size_t       capacity_octets; /* REQ-RMAP-059: the configured
@@ -267,8 +284,11 @@ typedef struct {
 void rcp_respqueue_init(rcp_respqueue_t *q, size_t capacity_octets,
                          size_t max_avtpdu_size_octets);
 
-/* Frees every queued entry and q's own internal array storage. Safe to
- * call on an empty queue. Does not free q itself. */
+/* Frees every queued entry's own per-frame payload allocation (issue
+ * #521: entries[]/entries_seq[] themselves are fixed-capacity arrays
+ * embedded in *q, not heap storage -- there is no array to free any
+ * more, only each entries[i].data). Safe to call on an empty queue.
+ * Does not free q itself. */
 void rcp_respqueue_destroy(rcp_respqueue_t *q);
 
 /* Appends a copy of frame[0..frame_len) to q's tail (frame may be NULL
@@ -276,7 +296,7 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q);
  * that counter, wrapping mod 256). Identical in every other respect to
  * rcp_respqueue_push_seq() below -- see its doc comment for the full
  * REQ-RMAP-059/061 byte-budget-and-eviction behavior and the
- * capacity_octets == 0 slot-count fallback.
+ * RCP_RESPQUEUE_MAX_ENTRIES slot-count ceiling.
  * Existing callers that never cared about sequence_num keep working
  * unchanged; a caller that wants explicit control over sequence_num
  * (e.g. to keep it in agreement with an eventual AVTPDU header's own
@@ -298,30 +318,30 @@ bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_l
  *   - the internal frame-copy allocation fails.
  *
  * Otherwise, once the checks above pass, TC18 §12.9.4/§12.9.5
- * (REQ-RMAP-059/061, GitHub #423, corrected by GitHub #446) applies:
+ * (REQ-RMAP-059/061, GitHub #423, corrected by GitHub #446, made
+ * universal by issue #521) applies: entries are evicted in ascending
+ * sequence_num order -- always the queued entry with the
+ * currently-lowest sequence_num (a literal numeric minimum over
+ * q->entries_seq[], evaluated by linear scan), never merely the
+ * FIFO-oldest -- REPEATEDLY, once for each of the following that still
+ * holds, until neither does:
  *
- *   - if q->capacity_octets is nonzero (a real queue_size budget is
+ *   - q->capacity_octets is nonzero (a real queue_size budget is
  *     configured -- TC18's own, and the only, "queue is completely
- *     full" condition, §12.7.9) and accepting frame_len would exceed
- *     it, entries are evicted in ascending sequence_num order -- always
- *     the queued entry with the currently-lowest sequence_num (a
- *     literal numeric minimum over q->entries_seq[], evaluated by
- *     linear scan), never merely the FIFO-oldest -- REPEATEDLY, as many
- *     times as it takes to free enough octets for frame_len (a single
- *     eviction frees only its own evicted entry's own byte length,
- *     which may be smaller than frame_len -- one eviction is not always
- *     enough), until frame_len fits within the remaining budget. Since
- *     frame_len was already confirmed not to exceed capacity_octets
- *     outright, this always terminates successfully, evicting the
- *     entire queue at the very worst.
+ *     full" condition, §12.7.9) and accepting frame_len would still
+ *     exceed the remaining budget (a single eviction frees only its own
+ *     evicted entry's own byte length, which may be smaller than
+ *     frame_len -- one eviction is not always enough); or
  *
- *   - otherwise (q->capacity_octets == 0, unbounded -- no queue_size
- *     byte budget configured to evict against), RCP_RESPQUEUE_MAX_ENTRIES
- *     is used as a secondary, defensive slot-count bound instead: once
- *     q->entries_len has reached it, the single queued entry with the
- *     lowest sequence_num is evicted to make room, exactly as above.
+ *   - q->entries_len has reached RCP_RESPQUEUE_MAX_ENTRIES, q's own
+ *     fixed-capacity slot-count ceiling (issue #521) -- enforced
+ *     unconditionally, independently of capacity_octets, since
+ *     entries[]/entries_seq[] cannot hold more than that many slots by
+ *     construction.
  *
- * Either way, every eviction latches q->overflow true
+ * Since frame_len was already confirmed not to exceed capacity_octets
+ * outright, and RCP_RESPQUEUE_MAX_ENTRIES >= 1, this always terminates
+ * successfully. Either way, every eviction latches q->overflow true
  * (rcp_respqueue_overflow()/_clear_overflow() below). This is NOT
  * simply "evict the FIFO-oldest entry" -- sequence_num-order and
  * FIFO-order coincide only until sequence_num wraps (256 values,

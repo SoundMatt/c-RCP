@@ -443,6 +443,29 @@ size_t rcp_ep_can_frame_format_max_data_len(rcp_ep_can_frame_format_t format);
  * discussion of why this exceeds RCP_AVTP_NTSCF_MAX_PAYLOAD (avtp.h). */
 #define RCP_EP_CAN_XL_MAX_ENCODED_LEN ((size_t)(4u + 6u + RCP_EP_CAN_XL_MAX_DATA_LEN))
 
+/* Issue #521 (ASIL-D-oriented no-dynamic-allocation push): fixed
+ * capacity of rcp_ep_can_encode_frame_response_fragmented()'s own
+ * internal fragment-plan array. RCP_EP_CAN_XL_MAX_ENCODED_LEN (2058)
+ * bytes is this module's own hard compile-time ceiling on the combined
+ * payload being fragmented (unlike ep_iseled.h's equivalent, which has
+ * no such small compile-time bound -- see that header's own file
+ * comment for why its fragment-plan array stays heap-allocated), so a
+ * genuinely unbounded fragment count is not possible here; 256 is this
+ * module's own realistic ceiling on top of that, chosen so a
+ * max_fragment_payload as small as ~8 octets (RCP_EP_CAN_XL_MAX_ENCODED_LEN
+ * / 256) is still representable -- smaller than any ACF fixed header
+ * alone, and so smaller than any max_fragment_payload
+ * rcp_respqueue_max_fragment_payload() (respqueue.h) could ever
+ * actually hand this module in practice. A caller configuring a
+ * max_fragment_payload below that floor gets 0 (fragment.h's own "not
+ * representable" convention) from
+ * rcp_ep_can_frame_response_fragment_count()/
+ * _encode_frame_response_fragmented() rather than a silently truncated
+ * plan -- matching the "realistic bound" convention this codebase
+ * already uses elsewhere (RCP_RESPQUEUE_MAX_ENTRIES,
+ * RCP_LOAN_POOL_MAX_ENTRIES, both 64). */
+#define RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS ((size_t)256u)
+
 /* ── CAN XL's extra header fields (RRS/SDT/VCID/AF) ──────────────────────── */
 
 /* Only meaningful (and only ever populated on decode) when the associated

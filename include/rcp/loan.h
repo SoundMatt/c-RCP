@@ -72,6 +72,26 @@ void rcp_loan_return(rcp_loan_t *loan);
  * Call exactly once. */
 void rcp_loan_release(rcp_loan_t *loan);
 
+/* Fixed capacity of a pool's own internal free-list (issue #521,
+ * ASIL-D-oriented no-dynamic-allocation push): the free-list bookkeeping
+ * array (which buffer-and-capacity pair is available for reuse) is a
+ * fixed-size array embedded in rcp_loan_pool_t, not realloc()-grown heap
+ * storage. Once the free list already holds this many returned buffers,
+ * a further rcp_loan_return()/rcp_loan_release() simply frees the
+ * returned buffer outright instead of pooling it (rcp_loan_pool_acquire()
+ * falls back to a fresh allocation next time, exactly as it already does
+ * whenever the free list is empty) -- this never leaks or corrupts
+ * state, it only forfeits reuse for the buffer that didn't fit. Matches
+ * the "realistic bound" convention this codebase already uses for every
+ * other fixed-capacity free-list/table (RCP_RESPQUEUE_MAX_ENTRIES,
+ * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES, all 64). Each individual pooled
+ * buffer's own DATA bytes remain heap-allocated regardless (see this
+ * header's own file comment: acquire()'s `size` argument is caller/
+ * runtime-chosen, not a compile-time protocol constant, so the buffers
+ * themselves cannot be embedded fixed-size storage without changing
+ * what this module's API contract promises). */
+#define RCP_LOAN_POOL_MAX_ENTRIES ((size_t)64u)
+
 typedef struct rcp_loan_pool rcp_loan_pool_t;
 
 /* Creates an empty pool. Returns NULL on allocation failure. */
