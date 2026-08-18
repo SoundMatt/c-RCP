@@ -24,14 +24,10 @@
 //cfusa:test REQ-SPI-023
 //cfusa:test REQ-SPI-024
 //cfusa:test REQ-SPI-025
-//cfusa:test REQ-SPI-026
 //cfusa:test REQ-SPI-027
 //cfusa:test REQ-SPI-028
 //cfusa:test REQ-SPI-029
 //cfusa:test REQ-SPI-030
-//cfusa:test REQ-SPI-036
-//cfusa:test REQ-SPI-038
-//cfusa:test REQ-SPI-039
 //cfusa:test REQ-SPI-040
 #include "unity.h"
 
@@ -370,6 +366,7 @@ static void test_set_channel_trigger_applies_when_authorized(void)
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
 
+//cfusa:test REQ-SPI-038
 static void test_render_registers_matches_table_offsets(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
@@ -422,6 +419,7 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT16(0x0036u, RCP_EP_SPI_EP_FUNC_LEN);
 }
 
+//cfusa:test REQ-SPI-039
 static void test_apply_reconfig_writes_baud_rate(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
@@ -580,6 +578,7 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
         rcp_ep_spi_apply_reconfig(&cfg, NULL, 0));
 }
 
+//cfusa:test REQ-SPI-042
 static void test_reconfig_request_round_trip(void)
 {
     rcp_bytes_t                 frame;
@@ -612,6 +611,7 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-SPI-043
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_spi_reconfig_errc_t codes[] = {
@@ -666,6 +666,7 @@ static void test_strerror_never_null_and_distinct(void)
  * the literal wire bit rather than against re-encoded output: acf.h maps
  * RCP_ACF_OP_READ onto wire op=0. This module previously encoded op=1 and
  * rejected op=0 -- exactly inverted. */
+//cfusa:test REQ-SPI-026
 static void test_transfer_request_uses_read_direction_op(void)
 {
     uint8_t                     tx[1] = {0x55};
@@ -688,6 +689,8 @@ static void test_transfer_request_uses_read_direction_op(void)
  * response with 10 on SPI channel 3" -- evt = 0101b, op=0, read_size =
  * 0x0A. Verifies read_size itself now round-trips through the ACF
  * header's read_size_or_segment_num field. */
+//cfusa:test REQ-SPI-041
+//cfusa:test REQ-SPI-044
 static void test_transfer_request_round_trip(void)
 {
     uint8_t     tx[3] = {0x01, 0x02, 0x03};
@@ -840,6 +843,7 @@ static void test_transfer_request_rejects_short_frame(void)
  * full payload on PICO otherwise -- verified directly against
  * rcp_ep_spi_transfer_length(), one case per direction plus the
  * exactly-equal boundary. */
+//cfusa:test REQ-SPI-036
 static void test_spi_transfer_length_zero_fills_when_read_size_exceeds_payload(void)
 {
     TEST_ASSERT_EQUAL_UINT(10u, rcp_ep_spi_transfer_length(3u, 10u));

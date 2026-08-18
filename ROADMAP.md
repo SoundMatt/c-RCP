@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.444.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
+REQ-SPI-*: requirement-atomicity audit, Group 2 per-endpoint)
+
+Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
+issue #533. Covers `REQ-SPI-*` (`src/ep_spi.c`/`include/rcp/ep_spi.h`),
+Group 2's lowest proxy-flag density (1/38) -- triaged all 38 in full
+rather than only the one flagged, per Group 1's own `REQ-RMAP-*`
+finding that real bundling can hide behind zero "shall" occurrences.
+
+4 ids split into 4 new ones (`REQ-SPI-041..044`): `-026` (the one
+flagged id -- `encode_transfer_request()`'s read-direction `op` vs.
+`decode_transfer_request()`'s own round-trip recovery contract,
+`-041`), `-036` (zero-"shall" miss -- `transfer_length()`'s own
+`max()` formula, kept as `-036`, had `encode`/`decode_transfer_request()`'s
+unrelated `read_size` carry-through folded in, `-044`), `-038` (its
+own title named both bundled functions --
+`render_registers()`/`_encode_reconfig_request()`, split `-042`), and
+`-039` (likewise -- `apply_reconfig()`/`_reconfig_strerror()`, split
+`-043`; a stray `-038` tag mistakenly sitting above `apply_reconfig()`
+removed too). 34 requirements confirmed genuinely atomic, including
+several already matching this codebase's established "one function's
+multiple validation-branch outcomes stay one id" pattern
+(`REQ-SPI-027`/`-030`) and "one id per init function regardless of
+field count" pattern (`REQ-SPI-010`).
+
+Tags moved to sit directly above the exact function/test per split;
+every split has its own distinct test assertion, confirmed via
+mutation testing against a real injected defect per split (reverted
+after confirming) -- each newly-independent clause's test failed
+cleanly while the paired id's own test stayed green.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54: `check`
+0 errors; `trace --req-coverage 100`/`--sec-tested 100` (standalone)
+each 100% (1178/1178 requirements, 512/512 functions).
+
+**Next**: other Group 2 prefixes (`REQ-ADC-*`, `REQ-CANEP-*`,
+`REQ-GPIO-*`, `REQ-I2C-*`, `REQ-LINEP-*`, `REQ-MDIO-*`, `REQ-PWM-*`,
+`REQ-UART-*`, `REQ-ISELED-*`, `REQ-WAKEUP-*`) and Group 4 remain,
+tracked as separate concurrent batches against the same tracker.
+
 ### v0.443.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-RMAP-*: requirement-atomicity audit, Group 1 protocol-generic)
 

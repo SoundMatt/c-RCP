@@ -4511,8 +4511,8 @@
     },
     {
       "id": "REQ-SPI-026",
-      "title": "SPI transfer request encode/decode round-trips in the read direction, including channel selection via evt[2:0]",
-      "text": "rcp_ep_spi_encode_transfer_request() shall encode op RCP_ACF_OP_READ (the reply-expected direction), and rcp_ep_spi_decode_transfer_request() shall, given a frame it produced with the same byte_bus_id, return RCP_EP_SPI_OK and recover the original channel, PICO-out payload bytes, and transaction_num.",
+      "title": "SPI transfer request encode uses the read-direction op",
+      "text": "rcp_ep_spi_encode_transfer_request() shall encode op RCP_ACF_OP_READ (the reply-expected direction). SPLIT 2026-08-18 (c-RCP-18-tracker, issue #533): the decode round-trip-recovery half of this id is now REQ-SPI-041.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -11923,7 +11923,7 @@
     {
       "id": "REQ-SPI-036",
       "title": "SPI zero-fill when read_size exceeds the payload, full payload on PICO otherwise",
-      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_spi_encode_transfer_request()/_decode_transfer_request() now carry read_size through the ACF header's own read_size_or_segment_num field (previously unwired), and the new rcp_ep_spi_transfer_length(tx_len, read_size) computes TC18 13.7.3.3's own transfer-length rule -- max(tx_len, read_size): a caller driving real SPI hardware clocks tx_data[0..tx_len) verbatim followed by zero octets up to the returned length when read_size exceeds tx_len (the bus clocks read_size octets total), and always clocks at least the full tx_len-byte payload on PICO even when read_size is smaller (never truncated). All existing call sites (src/adapt.c's RCP_ADAPT_OP_SPI_TRANSFER, plus test call sites) updated for the new parameter; adapt.c defaults an absent rcp.spi.read_size meta key to the payload's own length, matching a request that asks for exactly what it sends back. Mutation-tested: dropping read_size on encode and bypassing the max() computation both caught cleanly; a `>` vs `>=` boundary mutation at read_size==tx_len is a provably equivalent mutant (both branches return the identical numeric value at that exact point) and needs no discriminating test.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): the new rcp_ep_spi_transfer_length(tx_len, read_size) computes TC18 13.7.3.3's own transfer-length rule -- max(tx_len, read_size): a caller driving real SPI hardware clocks tx_data[0..tx_len) verbatim followed by zero octets up to the returned length when read_size exceeds tx_len (the bus clocks read_size octets total), and always clocks at least the full tx_len-byte payload on PICO even when read_size is smaller (never truncated). Mutation-tested: bypassing the max() computation caught cleanly; a `>` vs `>=` boundary mutation at read_size==tx_len is a provably equivalent mutant (both branches return the identical numeric value at that exact point) and needs no discriminating test. SPLIT 2026-08-18 (c-RCP-18-tracker, issue #533): the encode_transfer_request()/decode_transfer_request() read_size-carrying half of this id (a second, unrelated pair of functions bundled under the same id -- zero \"shall\" occurrences, missed by the 2+-\"shall\" proxy) is now REQ-SPI-044.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -11944,8 +11944,8 @@
     },
     {
       "id": "REQ-SPI-038",
-      "title": "rcp_ep_spi_render_registers()/_encode_reconfig_request() implement the generic \u00a712.7.1 configuration request for SPI",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. SPI's own Table 33 row confirms 111b carries this exact meaning (distinct from evt[2:0] 000b-101b, which select one of SPI's six pre-configured channels, and 110b, which is reserved/UNSUPPORTED_CMD). rcp_ep_spi_render_registers() serializes cfg's whole Table 39/42 block (the 6-octet common prefix plus six 8-octet per-channel blocks); rcp_ep_spi_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's own encode_reconfig_request() shape.",
+      "title": "rcp_ep_spi_render_registers() serializes the whole \u00a712.7.1 EP_func register block",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. SPI's own Table 33 row confirms 111b carries this exact meaning (distinct from evt[2:0] 000b-101b, which select one of SPI's six pre-configured channels, and 110b, which is reserved/UNSUPPORTED_CMD). rcp_ep_spi_render_registers() serializes cfg's whole Table 39/42 block (the 6-octet common prefix plus six 8-octet per-channel blocks). SPLIT 2026-08-18 (c-RCP-18-tracker, issue #533): the encode_reconfig_request() half of this id (a second, unrelated function bundled under the same id, matching the REQ-AUTH-009 anti-pattern CONTRIBUTING.md documents) is now REQ-SPI-042.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -11956,8 +11956,8 @@
     },
     {
       "id": "REQ-SPI-039",
-      "title": "rcp_ep_spi_apply_reconfig()/_reconfig_strerror() apply the addressed configuration write and never return NULL for a status message",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_apply_reconfig() decodes the address+data payload TC18 \u00a712.7.1 defines and patches cfg's Table 39/42 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_SPI_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE), matching \u00a712.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, NR_CS, or a channel's own reserved octet) are silently skipped while the rest of the span is still applied. rcp_ep_spi_reconfig_strerror() never returns NULL, including for an unrecognized error code.",
+      "title": "rcp_ep_spi_apply_reconfig() applies the addressed \u00a712.7.1 configuration write",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_apply_reconfig() decodes the address+data payload TC18 \u00a712.7.1 defines and patches cfg's Table 39/42 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_SPI_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE), matching \u00a712.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, NR_CS, or a channel's own reserved octet) are silently skipped while the rest of the span is still applied. SPLIT 2026-08-18 (c-RCP-18-tracker, issue #533): the reconfig_strerror() half of this id (a second, unrelated function bundled under the same id) is now REQ-SPI-043.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -11977,6 +11977,53 @@
       "status": "implemented",
       "tc18": "\u00a713.7.3.2 Table 42, TC18.txt L4663-4665, spec revision 0.5.1_RC5 PDF p.96 (ticket NXP_100, tags 051RC5 \"new configuration, optional\" + \"added for clarification\")",
       "tc18_master_id": "TC18-13.7.3.2-004"
+    },
+    {
+      "id": "REQ-SPI-041",
+      "title": "SPI transfer request decode recovers channel, PICO-out payload, and transaction_num on round trip",
+      "text": "rcp_ep_spi_decode_transfer_request() shall, given a frame produced by rcp_ep_spi_encode_transfer_request() with the same byte_bus_id, return RCP_EP_SPI_OK and recover the original channel, PICO-out payload bytes, and transaction_num. Split off REQ-SPI-026 (c-RCP-18-tracker, issue #533).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.3.3 (\"...even if the read_size is less than the number of bytes in the byte_msg_payload.\"), TC18.txt L4767-4769; Figure 24 (renumbered from Figure 23 by the 0.5.1_RC5 rebaseline) worked example (\"SPI request (example to write 20 bytes and get a response with 10 on SPI channel 3)\", op=0/read direction), TC18.txt L4764 -- fresh PDF extraction confirms current Figure 23 is now \"Endpoint sleep request\", an unrelated figure; channel selection per \u00a713.5 Table 33 SPI row (unchanged).",
+      "tc18_master_id": "TC18-13.7.3.3-007"
+    },
+    {
+      "id": "REQ-SPI-042",
+      "title": "rcp_ep_spi_encode_reconfig_request() encodes the \u00a712.7.1 configuration write request",
+      "text": "rcp_ep_spi_encode_reconfig_request() shall encode an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's own encode_reconfig_request() shape. Split off REQ-SPI-038 (c-RCP-18-tracker, issue #533).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860; \u00a713.5 Table 33 (SPI row), TC18.txt L4076-4078",
+      "tc18_master_id": "TC18-12.7.1-001"
+    },
+    {
+      "id": "REQ-SPI-043",
+      "title": "rcp_ep_spi_reconfig_strerror() never returns NULL",
+      "text": "rcp_ep_spi_reconfig_strerror() shall never return NULL, including for an unrecognized error code. Split off REQ-SPI-039 (c-RCP-18-tracker, issue #533).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
+    },
+    {
+      "id": "REQ-SPI-044",
+      "title": "SPI transfer request encode/decode carry read_size through the ACF header's read_size_or_segment_num field",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_spi_encode_transfer_request()/_decode_transfer_request() carry read_size through the ACF header's own read_size_or_segment_num field (previously unwired) and recover it losslessly on decode. All existing call sites (src/adapt.c's RCP_ADAPT_OP_SPI_TRANSFER, plus test call sites) were updated for the new parameter when this was introduced; adapt.c defaults an absent rcp.spi.read_size meta key to the payload's own length, matching a request that asks for exactly what it sends back. Mutation-tested: dropping read_size on encode caught cleanly. Split off REQ-SPI-036 (c-RCP-18-tracker, issue #533).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.3.3, TC18.txt L4767-4769"
     },
     {
       "id": "REQ-SRV-015",
