@@ -19106,6 +19106,30 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552:
+REQ-ISELED-028 scope corrected to retired)
+
+`REQ-ISELED-028`'s `text`/`status` already said RETIRED (a stale
+duplicate of `REQ-ISELED-007`'s already-fixed
+`rcp_ep_iseled_requires_isp_n()` inverted-polarity bug, per issue
+#256 Group I), but `scope` was still `"tc18-gap"` -- surfaced by
+issue #548's own sweep, which correctly declined to promote it (that
+would have double-counted `REQ-ISELED-007`'s ASIL-B coverage) but
+left the actual scope fix as a separate item. Moved `scope` to
+`"retired"`, matching the other 6 `retired`-scope entries' convention
+(dropped `tc18_master_id`, which none of them carry).
+
+Re-synced `AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s scope-count
+tables, stale again since #533 Group 3's atomicity splits landed:
+1137 total (1105 `tc18` / 19 `tc18-gap` / 7 `retired` / 6 `internal`),
+re-verified by direct enumeration.
+
+Full 67-test suite + ASan/UBSan clean; pinned `cfusa` v0.5.54:
+`check` 0 errors; `trace --req-coverage 100` / `trace --sec-tested
+100` (standalone, per the #533 REQ-CFG-* batch's combined-flag
+reporting-bug finding) each 100% (1137/1137 requirements, 512/512
+functions).
+
 ### v0.439.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch
 REQ-SRV-*: requirement-atomicity audit, Group 3 server/dispatch)
 

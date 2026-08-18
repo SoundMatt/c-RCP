@@ -12423,10 +12423,9 @@
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
+      "scope": "retired",
       "status": "retired",
-      "tc18": "\u00a713.7.12.2, TC18.txt L5948-5952 and L5964-5966",
-      "tc18_master_id": "TC18-13.7.12.2-004"
+      "tc18": "\u00a713.7.12.2, TC18.txt L5948-5952 and L5964-5966"
     },
     {
       "id": "REQ-ISELED-029",

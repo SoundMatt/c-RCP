@@ -28,13 +28,15 @@ Issue #518's own text describes the split as `.fusa-reqs.json` mixing
 "the retired pre-TC18 Zone/Command surface, still linked into the same
 binary per `src/rcp.c`/`tests/legacy_mock.*`"). That framing is now
 **stale** — `.fusa-reqs.json`'s current `scope` values (verified by
-direct enumeration of all 1095 entries at HEAD) are:
+direct enumeration of all 1137 entries at HEAD, after the [c-RCP-16
+follow-up] issue #552 fix and the [c-RCP-18-tracker] issue #533 Group
+3 requirement-atomicity splits) are:
 
 | `scope` | Count | ASIL mix | What it actually is today |
 |---|---|---|---|
-| `tc18` | 1063 | 959 ASIL-B, 34 ASIL-A, 70 QM | The shipped TC18 behavior. The 70 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
-| `tc18-gap` | 20 | 20 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. |
-| `retired` | 6 | 4 ASIL-B, 1 ASIL-A, 1 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. |
+| `tc18` | 1105 | 1001 ASIL-B, 34 ASIL-A, 70 QM | The shipped TC18 behavior. The 70 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
+| `tc18-gap` | 19 | 19 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. |
+| `retired` | 7 | 4 ASIL-B, 1 ASIL-A, 2 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. Includes `REQ-ISELED-028` (moved here from `tc18-gap` by issue #552 -- its own text already said RETIRED, only the scope field hadn't caught up). |
 | `internal` | 6 | 6 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. See §2's main finding. |
 
 The `tests/legacy_mock.*` file the issue cites no longer exists, and
@@ -209,10 +211,10 @@ self-describes as a stale duplicate of `REQ-ISELED-007` rather than a
 closed implementation gap, so promoting it would have double-counted
 `REQ-ISELED-007`'s ASIL-B coverage under a second id.
 
-**20 entries remain genuinely `tc18-gap`** at HEAD, all QM (the
+**19 entries remain genuinely `tc18-gap`** at HEAD, all QM (the
 catalog note's invariant now actually holds, with zero exceptions):
 `REQ-RMAP-023/043/044/045/065/067/081`, `REQ-ADC-037`,
-`REQ-CANEP-029/030`, `REQ-DISC-029`, `REQ-GPIO-035`, `REQ-ISELED-028`,
+`REQ-CANEP-029/030`, `REQ-DISC-029`, `REQ-GPIO-035`,
 `REQ-LIFECYCLE-022/025/034`, `REQ-MDIO-024`, `REQ-PWM-057`,
 `REQ-SPI-037`, `REQ-SRV-017`. Three of these
 (`REQ-RMAP-081`/`REQ-SPI-037`/`REQ-CANEP-029`) still literally *begin*
@@ -224,7 +226,13 @@ narrower open questions, each confirmed by direct code inspection
 during the #548 pass to have a real remaining gap the entry's own text
 (read in full, not just its leading word) still honestly describes.
 
-All 20 remaining `tc18-gap` entries, and the 116 now-`tc18`-scope
+`REQ-ISELED-028` (held back from promotion, above) no longer appears
+in this list either — issue #552 moved it to `scope: "retired"`
+instead, matching what its own text already said, rather than leaving
+it as a `tc18-gap` entry that was never going to be closed by further
+implementation work.
+
+All 19 remaining `tc18-gap` entries, and the 116 now-`tc18`-scope
 entries this section previously worried about, share one property that
 *is* verifiable without a further per-entry audit: whatever their
 ASIL rating, the live code they describe is subject to exactly the
