@@ -1,31 +1,14 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:req REQ-ACF-001
-//cfusa:req REQ-ACF-002
-//cfusa:req REQ-ACF-004
-//cfusa:req REQ-ACF-005
-//cfusa:req REQ-ACF-006
-//cfusa:req REQ-ACF-007
-//cfusa:req REQ-ACF-008
-//cfusa:req REQ-ACF-009
-//cfusa:req REQ-ACF-010
-//cfusa:req REQ-ACF-011
-//cfusa:req REQ-ACF-012
-//cfusa:req REQ-ACF-013
-//cfusa:req REQ-ACF-014
-//cfusa:req REQ-ACF-015
-//cfusa:req REQ-ACF-016
-
-/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
- * are catalogued in .fusa-reqs.json with a "tc18" citation and a
- * "status" of "implemented", "partial" or "not-implemented". The
- * not-implemented and partial ones describe normative TC18 behaviour
- * this module does NOT provide; their tests pin the deviation. */
-//cfusa:req REQ-ACF-017
-//cfusa:req REQ-ACF-018
-//cfusa:req REQ-ACF-019
-//cfusa:req REQ-ACF-020
-//cfusa:req REQ-ACF-021
-//cfusa:req REQ-ACF-022
+/* c-RCP-18-tracker (issue #533): the per-id requirement-trace tags that
+ * used to be stacked here at the file header (one block per id,
+ * satisfying cfusa's file-level --func-coverage metric without saying
+ * which declaration each id actually describes) have been moved to sit
+ * directly above the specific declaration/#define each one describes,
+ * per CONTRIBUTING.md's "Writing a requirement" convention. See each
+ * declaration below for its own tag(s). (Deliberately not spelling out
+ * the literal tag syntax in this paragraph -- cfusa's own scanner reads
+ * that exact character sequence anywhere in a line, comment or not, as
+ * a real tag with whatever word follows it as the id.) */
 /*
  * acf.h -- ACF message format + byte_message_info header for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 13, "Wire Format
@@ -146,7 +129,9 @@ extern "C" {
 #endif
 
 /* acf_msg_type byte values for the two variants modeled by this milestone. */
+//cfusa:req REQ-ACF-017
 #define RCP_ACF_MSG_TYPE_ABB ((uint8_t)0x0Eu)
+//cfusa:req REQ-ACF-048
 #define RCP_ACF_MSG_TYPE_GBB ((uint8_t)0x0Du)
 
 /* Fixed header lengths in octets, excluding the variable-length payload
@@ -194,6 +179,7 @@ typedef enum {
 } rcp_acf_errc_t;
 
 /* Human-readable message for an rcp_acf_errc_t value. Never returns NULL. */
+//cfusa:req REQ-ACF-001
 const char *rcp_acf_strerror(rcp_acf_errc_t e);
 
 /* ── mtv: message-timestamp validity (ACF_GBB only) ───────────────────────── */
@@ -254,6 +240,17 @@ typedef enum {
 
 /* ── byte_message_info: the shared header ─────────────────────────────────── */
 
+/* REQ-ACF-020 (byte_bus_id is a full 11-bit field, see rcp_byte_bus_id_t/
+ * avtp.h and rcp_acf_pack_header()/rcp_acf_unpack_header()'s own tags for
+ * the encode/decode side of this) and REQ-ACF-022 (every rcp_ep_*_encode_
+ * response()/rcp_discovery_encode_response*() function across all 13
+ * endpoint modules sets rsp=1 on the ACF header it builds -- see each
+ * endpoint module's own req-trace tag for that call site) are both
+ * properties of fields this struct declares; tagged here as this
+ * struct's own single source of truth, per this file's own doc comment
+ * above. */
+//cfusa:req REQ-ACF-020
+//cfusa:req REQ-ACF-022
 typedef struct {
     uint8_t           acf_msg_type;   /* RCP_ACF_MSG_TYPE_ABB/_GBB on decode;
                                          ignored by rcp_acf_encode_abb()/
@@ -307,6 +304,11 @@ typedef struct {
  * RCP_ACF_OP_NONE) is unreachable from decoded input (see rcp_acf_op_t's
  * doc comment) -- it remains only for callers that construct hdr by hand
  * with op left at its zero value and no evt set either. */
+//cfusa:req REQ-ACF-002
+//cfusa:req REQ-ACF-034
+//cfusa:req REQ-ACF-035
+//cfusa:req REQ-ACF-036
+//cfusa:req REQ-ACF-037
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr);
 
 /* ── REQ-ACF-018: read_size_or_segment_num's dual interpretation ──────────── */
@@ -329,6 +331,7 @@ typedef enum {
  * encode-only RCP_ACF_OP_NONE both select the write sense on the wire --
  * see rcp_acf_op_t's own doc comment -- so both classify as segment_num
  * here, matching what a real decoded peer would see). */
+//cfusa:req REQ-ACF-018
 rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_message_info_t *hdr);
 
 /* ── REQ-ACF-021: fixed-value fields on an encoded request ─────────────────── */
@@ -352,6 +355,7 @@ rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_mess
  * and every endpoint's own request encoder -- is the one place that knows
  * it is building a request rather than a response, and can assert this
  * before encoding. */
+//cfusa:req REQ-ACF-021
 bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t *hdr,
                                                bool cs_has_meaning);
 
@@ -363,6 +367,7 @@ bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t 
  * transport) should call this before admission and refuse the frame if it
  * returns false, rather than silently processing what TC18 itself labels
  * a response as though it were a request. */
+//cfusa:req REQ-ACF-050
 bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr);
 
 /* TC18 §13.5 Table 33's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
@@ -381,6 +386,7 @@ bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr);
  * PWM_OUT (their own dedicated Table 33 row, the 8-value write-semantics
  * selector) -- see rcp_ep_gpio_write_semantics_valid()/
  * rcp_ep_spi_channel_valid() for those rows' own rules instead. */
+//cfusa:req REQ-ACF-023
 bool rcp_acf_evt_row2_is_plain(uint8_t evt);
 
 /* ── TC18 §13.5.1: compound-wait's own, endpoint-type-independent evt[2:0] rule ─ */
@@ -400,6 +406,7 @@ bool rcp_acf_evt_row2_is_plain(uint8_t evt);
  * passing to rcp_acf_compound_wait_match() below (that function's return
  * value for a reserved evt is not a meaningful "never matches" result --
  * see its own doc comment). */
+//cfusa:req REQ-ACF-024
 bool rcp_acf_compound_wait_evt_valid(uint8_t evt);
 
 /* TC18 §13.5.1: evaluates whether payload[0..payload_len) matches
@@ -441,6 +448,15 @@ bool rcp_acf_compound_wait_evt_valid(uint8_t evt);
  *              fail-safe.
  *
  * status/payload may be NULL iff their respective length is 0. */
+//cfusa:req REQ-ACF-025
+//cfusa:req REQ-ACF-026
+//cfusa:req REQ-ACF-027
+//cfusa:req REQ-ACF-028
+//cfusa:req REQ-ACF-029
+//cfusa:req REQ-ACF-030
+//cfusa:req REQ-ACF-051
+//cfusa:req REQ-ACF-052
+//cfusa:req REQ-ACF-053
 bool rcp_acf_compound_wait_match(uint8_t evt, const uint8_t *payload, size_t payload_len,
                                   const uint8_t *status, size_t status_len);
 
@@ -453,6 +469,8 @@ bool rcp_acf_compound_wait_match(uint8_t evt, const uint8_t *payload, size_t pay
  * accounting (i.e. everything except the request_* modules' own repurposed-
  * timestamp builders) should prefer rcp_acf_encode_abb()/_gbb() instead of
  * calling this directly. */
+//cfusa:req REQ-ACF-016
+//cfusa:req REQ-ACF-019
 void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_length,
                           const rcp_acf_byte_message_info_t *hdr);
 
@@ -466,6 +484,8 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
  * the entire wire range, so there is no overflow case left to reject
  * (REQ-RMAP-053/REQ-ACF-020; this function used to return
  * RCP_ACF_ERR_BUS_ID_OVERFLOW here, now retired). */
+//cfusa:req REQ-ACF-046
+//cfusa:req REQ-ACF-049
 rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_info_t *out_hdr);
 
 /* ── Peeking a GBB frame's own request_type without a full kind-specific decode ── */
@@ -491,6 +511,7 @@ rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_i
  * defined request_type values -- callers compare it against each
  * module's own RCP_REQUEST_TYPE_* constants or is-this-kind predicate
  * (e.g. rcp_request_type_is_compound_wait(), request_compound.h). */
+//cfusa:req REQ-ACF-032
 bool rcp_acf_peek_gbb_request_type(const uint8_t *frame, size_t frame_len,
                                     uint8_t *out_request_type);
 
@@ -499,6 +520,7 @@ bool rcp_acf_peek_gbb_request_type(const uint8_t *frame, size_t frame_len,
  * the unit acf_msg_length is expressed in. Exposed so any module building
  * a raw ACF_GBB header of its own (the request_* modules) can compute the
  * same pad/quadlet accounting rcp_acf_encode_abb()/_gbb() use internally. */
+//cfusa:req REQ-ACF-047
 uint8_t rcp_acf_pad_len(size_t unpadded_len);
 
 /* The effective number of octets to be written by an EP0 register-write
@@ -568,6 +590,7 @@ size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad);
  * zeroed rcp_bytes_t (data=NULL) only on allocation failure -- a single
  * payload octet is always within RCP_ACF_ABB_MAX_PAYLOAD. Caller frees
  * the result with rcp_bytes_free(). */
+//cfusa:req REQ-ACF-031
 rcp_bytes_t rcp_acf_build_error_response(rcp_byte_bus_id_t byte_bus_id,
                                           uint8_t transaction_num,
                                           rcp_wire_error_t error_code);
@@ -627,10 +650,14 @@ rcp_bytes_t rcp_acf_build_acknowledge_response(rcp_byte_bus_id_t byte_bus_id,
  * (data=NULL) only on allocation failure -- a single payload octet is
  * always within RCP_ACF_ABB_MAX_PAYLOAD. Caller frees the result with
  * rcp_bytes_free(). */
+//cfusa:req REQ-ACF-033
 rcp_bytes_t rcp_acf_build_acknowledge_rejected_response(rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t transaction_num,
                                                           rcp_wire_error_t error_code);
 
+//cfusa:req REQ-ACF-004
+//cfusa:req REQ-ACF-006
+//cfusa:req REQ-ACF-014
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 
@@ -645,6 +672,11 @@ rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
  * payload region it is declared to trail. Returns
  * RCP_ACF_ERR_BAD_MSG_TYPE if the decoded acf_msg_type is not
  * RCP_ACF_MSG_TYPE_ABB. */
+//cfusa:req REQ-ACF-005
+//cfusa:req REQ-ACF-007
+//cfusa:req REQ-ACF-009
+//cfusa:req REQ-ACF-010
+//cfusa:req REQ-ACF-015
 rcp_acf_errc_t rcp_acf_decode_abb(const uint8_t *b, size_t len,
                                   rcp_acf_byte_message_info_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len);
@@ -667,12 +699,22 @@ typedef struct {
  * for a nonzero value while mtv=0 -- request_compound.c and its siblings
  * -- build their own raw header with rcp_acf_pack_header() instead of
  * calling this function, precisely to avoid this zeroing rule.) */
+//cfusa:req REQ-ACF-011
+//cfusa:req REQ-ACF-038
+//cfusa:req REQ-ACF-040
+//cfusa:req REQ-ACF-044
 rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 
 /* Same conventions as rcp_acf_decode_abb(). Returns
  * RCP_ACF_ERR_BAD_MSG_TYPE if the decoded acf_msg_type is not
  * RCP_ACF_MSG_TYPE_GBB. */
+//cfusa:req REQ-ACF-008
+//cfusa:req REQ-ACF-039
+//cfusa:req REQ-ACF-041
+//cfusa:req REQ-ACF-042
+//cfusa:req REQ-ACF-043
+//cfusa:req REQ-ACF-045
 rcp_acf_errc_t rcp_acf_decode_gbb(const uint8_t *b, size_t len,
                                   rcp_acf_gbb_header_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len);
@@ -681,6 +723,7 @@ rcp_acf_errc_t rcp_acf_decode_gbb(const uint8_t *b, size_t len,
  * RCP_ACF_MTV_VALID. RCP_ACF_MTV_UNTIMED (mtv=0, zeroed timestamp region)
  * is the only other wire state -- see rcp_acf_mtv_t's doc comment for why
  * there is no longer a distinct "uncertain" state to also fold in here. */
+//cfusa:req REQ-ACF-012
 bool rcp_acf_gbb_is_timed(const rcp_acf_gbb_header_t *hdr);
 
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
@@ -689,6 +732,7 @@ bool rcp_acf_gbb_is_timed(const rcp_acf_gbb_header_t *hdr);
  * received ACF message, so a caller can decide which of
  * rcp_acf_decode_abb()/_gbb() to invoke without a full decode attempt
  * first. Returns RCP_ACF_ERR_SHORT_FRAME if len == 0. */
+//cfusa:req REQ-ACF-013
 rcp_acf_errc_t rcp_acf_peek_msg_type(const uint8_t *b, size_t len, uint8_t *out_msg_type);
 
 #ifdef __cplusplus
