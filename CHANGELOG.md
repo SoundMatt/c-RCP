@@ -34,6 +34,86 @@ the rationale.
 
 ## Releases
 
+### v0.438.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch: REQ-CFG-* requirement-atomicity audit)
+
+Group 3 (server/dispatch) batch of #533's requirement-atomicity audit
+(mirroring #256's pattern; convention established by #519/PR #525),
+scoped to `.fusa-reqs.json`'s `REQ-CFG-*` prefix (`src/config.c` /
+`include/rcp/config.h`).
+
+Triaged all 13 `REQ-CFG-*` requirements against `CONTRIBUTING.md`'s
+"Writing a requirement" convention, not only the 3 the tracker's own
+2+-"shall" proxy flagged. Split 6, minting `REQ-CFG-014` through
+`REQ-CFG-020` (7 new ids):
+
+- `REQ-CFG-004` -> `REQ-CFG-004`/`REQ-CFG-014`: endpoint entries'
+  missing-`byte_bus_id` vs. missing-`ep_type` rejections were one id;
+  now split the same way `REQ-CFG-001`/`REQ-CFG-002` already split
+  `hw_pin_map`'s own twin required fields.
+- `REQ-CFG-006` -> `REQ-CFG-006`/`REQ-CFG-015`: the tracker's own
+  confirmed example -- `rcp_config_parse_json()`'s "reject a `streams`
+  entry missing `rx_stream_id`" bundled with "default `configured`
+  when absent," both already independently tested, just not
+  separately id'd or tagged.
+- `REQ-CFG-007` -> `REQ-CFG-007`/`REQ-CFG-016`: server-object
+  population (`parse_server_fields()`) bundled with the
+  hw_pin_map/endpoints/streams entry-dispatch loop
+  (`parse_config_object()`) -- two different scanning mechanisms of
+  `rcp_config_parse_json()`.
+- `REQ-CFG-008` -> `REQ-CFG-008`/`REQ-CFG-017`/`REQ-CFG-018`:
+  `rcp_config_apply_to_mock()`'s vendor_id/device_id direct-copy
+  (stays one id, a compound object under one mechanism) bundled with
+  the svr_implemented_options OR-merge and the magic conditional
+  preserve-or-set -- two further mechanisms, each its own id. The test
+  that had already grown to cover the latter two clauses
+  (`test_apply_to_mock_sets_options_and_preserves_magic_when_manifest_
+  magic_is_zero`) named them "clauses" (plural) in its own doc comment
+  -- the same silent-bundling signature #519 documented for
+  `REQ-DL-001`. Split into two focused tests
+  (`test_apply_to_mock_ors_options_into_regmap`,
+  `test_apply_to_mock_magic_preserved_when_zero_else_set` -- the
+  latter now also covers the previously-untested "sets magic when
+  nonzero" branch).
+- `REQ-CFG-009` -> `REQ-CFG-009`/`REQ-CFG-019`: the main per-entry
+  registration loop bundled with its "stop on first non-OK result"
+  short-circuit clause.
+- `REQ-CFG-010` -> `REQ-CFG-010`/`REQ-CFG-020`: `rcp_config_load()`'s
+  parse-failure-propagation branch bundled with its
+  apply-success-delegation branch -- the same two-branches-of-one-
+  combinator shape #519's own `REQ-DL-001` finding described.
+
+Confirmed atomic despite compound-sounding text (no split): `REQ-CFG-
+001`/`002`/`003`/`005` (single-field, single-mechanism); `REQ-CFG-011`/
+`012` (cross-cutting TC18 §12.7.1 conformance summaries spanning all
+eleven endpoint types by design, not a bundled multi-function
+requirement -- splitting would just duplicate each endpoint's own
+already-existing requirements); `REQ-CFG-013` (three arrays freed by
+one coherent cleanup routine, a compound object joined by "and," the
+same pattern `CONTRIBUTING.md` explicitly protects).
+
+`//cfusa:req`/`//cfusa:test` tags moved off `tests/test_config.c`'s
+file-header stack (the same blind spot #519 documented for
+`REQ-DL-001`'s own test file) to sit directly above each specific
+function. Every split id's test-trace was mutation-tested: its tag
+temporarily removed, `cfusa trace --sec-tested 100` confirmed to drop
+to 99% (1095/1102) and list exactly the mutated ids under `--gaps`,
+then restored.
+
+Also surfaces a `cfusa` v0.5.54 tool-level finding, not fixed here
+(tool contract, same "tracked separately" scoping #519 used for
+`--func-coverage`): `cfusa trace`'s plain-text report silently drops
+the `--sec-tested` gate's own failure (and its "Metric 3" line) when
+`--req-coverage` is passed in the same invocation -- exactly CI's own
+combined `cfusa trace --req-coverage 100 --sec-tested 100` call
+shape. Standalone `--sec-tested 100` (no `--req-coverage`) computes
+and gates correctly; that is the invocation this batch's own
+mutation testing relied on for a trustworthy result.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags) clean; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100` and
+`trace --sec-tested 100` (run standalone, see finding above) each
+100% (1102/1102 requirements, 512/512 functions).
+
 ### v0.437.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-DL-*: requirement-atomicity audit, Group 3 server/dispatch)
 
 First `[c-RCP-18-tracker]` (#533) batch, prefix `REQ-DL-*`. Triaged all

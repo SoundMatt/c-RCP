@@ -19106,6 +19106,52 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.438.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch:
+REQ-CFG-* requirement-atomicity audit)
+
+Group 3 (server/dispatch) batch of #533's requirement-atomicity audit,
+scoped to `.fusa-reqs.json`'s `REQ-CFG-*` prefix (`src/config.c` /
+`include/rcp/config.h`). Triaged all 13 requirements against
+`CONTRIBUTING.md`'s "Writing a requirement" convention (#519/PR
+#525), not only the tracker's own 3 proxy-flagged ids. Split 6,
+minting `REQ-CFG-014`..`REQ-CFG-020`: `REQ-CFG-004` (byte_bus_id vs.
+ep_type rejection), `REQ-CFG-006` (the tracker's own confirmed
+example -- rx_stream_id-required vs. configured-defaults-true),
+`REQ-CFG-007` (server-object population vs. entry-dispatch loop),
+`REQ-CFG-008` (vendor_id/device_id direct-copy vs. options OR-merge
+vs. magic conditional preserve-or-set -- three-way, since the OR-merge
+and conditional-preserve are two further distinct mechanisms), `REQ-
+CFG-009` (registration loop vs. its short-circuit-on-error clause),
+`REQ-CFG-010` (parse-failure propagation vs. apply-success
+delegation, the same two-branch shape #519's own REQ-DL-001 finding
+described). Confirmed atomic, no split: REQ-CFG-001/002/003/005/013
+(single-field or compound-object-joined-by-"and" patterns
+CONTRIBUTING.md explicitly protects) and REQ-CFG-011/012
+(cross-cutting TC18 §12.7.1 conformance summaries by design, not
+bundled multi-function requirements).
+
+Every split id's test-trace mutation-tested (tag removed, `cfusa
+trace --sec-tested 100` confirmed to drop to 99%/list the mutated ids
+under `--gaps`, then restored) -- one split (REQ-CFG-008's magic
+clause) needed a genuinely new test covering a previously-untested
+"sets magic when nonzero" branch; the rest reused already-adequate,
+independently-testing existing tests, just moved off
+`tests/test_config.c`'s file-header tag stack onto the specific
+function each proves.
+
+Surfaces (does not fix, tracked as a tool-contract finding like
+#519's `--func-coverage` gap): pinned `cfusa` v0.5.54's plain-text
+`trace` report silently drops the `--sec-tested` gate's own failure
+when `--req-coverage` is passed in the same invocation -- exactly
+CI's own combined call shape. Standalone `--sec-tested 100`
+computes/gates correctly and is what this batch's mutation testing
+relied on.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags) clean; `cfusa
+check` 0 errors; `trace --req-coverage 100` / `trace --sec-tested
+100` (run standalone) each 100% (1102/1102 requirements, 512/512
+functions).
+
 ### v0.437.0 -- 2026-08-18 (issue #533 batch REQ-DL-*: requirement-atomicity
 audit, Group 3 server/dispatch)
 
