@@ -34,6 +34,38 @@ the rationale.
 
 ## Releases
 
+### v0.440.0 -- 2026-08-18 ([c-RCP-16 follow-up] issue #552: REQ-ISELED-028 scope corrected to retired)
+
+`REQ-ISELED-028`'s `text` already said "RETIRED" (2026-08-11,
+c-RCP-AUDIT-06, issue #256 Group I -- it's a stale duplicate of
+`REQ-ISELED-007`, which already fixed the same
+`rcp_ep_iseled_requires_isp_n()` inverted-polarity bug), and its
+`status` field already read `"retired"`, but its `scope` field was
+still `"tc18-gap"` -- surfaced during issue #548's own tc18-gap sweep,
+which correctly declined to promote it to `scope: "tc18"` (that would
+have double-counted `REQ-ISELED-007`'s own ASIL-B coverage) but left
+the actual fix as a separate item.
+
+Moved `scope` from `"tc18-gap"` to `"retired"`, matching this
+project's own convention for the other 6 `retired`-scope entries
+(dropped `tc18_master_id`, since no other retired entry carries one --
+a retired entry no longer represents an active TC18 obligation being
+traced). Text-only data-hygiene correction, no code change.
+
+Also re-synced `AUDIT_PACK.md`/`FREEDOM_FROM_INTERFERENCE.md`'s
+`.fusa-reqs.json` scope-count tables, which had drifted further stale
+from the [c-RCP-18-tracker] issue #533 Group 3 requirement-atomicity
+splits landing since the #548 pass: 1137 total (1105 `tc18` / 19
+`tc18-gap` / 7 `retired` / 6 `internal`), re-verified by direct
+enumeration, not carried forward from an earlier count.
+
+Full 67-test suite + ASan/UBSan (CI's exact flags) clean; pinned
+`cfusa` v0.5.54: `check` 0 errors; `trace --req-coverage 100` /
+`trace --sec-tested 100` (run standalone -- the combined-flag
+plain-text reporting bug the #533 REQ-CFG-* batch found is still
+present in this tool version) each 100% (1137/1137 requirements,
+512/512 functions).
+
 ### v0.439.0 -- 2026-08-18 ([c-RCP-18-tracker] issue #533 batch REQ-SRV-*: requirement-atomicity audit, Group 3 server/dispatch)
 
 Part of the `.fusa-reqs.json` requirement-atomicity audit tracked by
