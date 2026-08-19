@@ -7,6 +7,7 @@
 #include "unity.h"
 
 #include <rcp/acf.h>
+#include <rcp/alloc.h>
 #include <rcp/rcp.h>
 #include <rcp/respqueue.h>
 
@@ -62,6 +63,66 @@ static void test_pop_on_empty_queue_returns_false(void)
     TEST_ASSERT_FALSE(rcp_respqueue_pop(&q, &out));
     TEST_ASSERT_EQUAL_PTR((uint8_t *)0x1, out.data);
     TEST_ASSERT_EQUAL_UINT(42u, out.len);
+
+    rcp_respqueue_destroy(&q);
+}
+
+/* rcp_respqueue_push_seq()'s `if (frame_len != 0 && copy.data == NULL)
+ * return false;` (respqueue.c) needs both conditions independently
+ * demonstrated. Every push in this file's other tests uses a nonzero
+ * frame_len with a real successful rcp_bytes_dup() -- neither the
+ * frame_len==0 short-circuit nor a genuine allocation failure is
+ * exercised anywhere else. */
+
+//cfusa:test REQ-RMAP-085
+static void test_push_zero_length_frame_succeeds(void)
+{
+    rcp_respqueue_t q;
+    rcp_bytes_t     out;
+
+    rcp_respqueue_init(&q, 0, 0);
+
+    /* frame_len==0 short-circuits `frame_len != 0 && ...` before
+     * copy.data is even inspected -- must not be rejected as though it
+     * were an allocation failure. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, NULL, 0, 1u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    TEST_ASSERT_EQUAL_UINT(0u, out.len);
+    rcp_bytes_free(&out);
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void *always_fails_malloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+//cfusa:test REQ-RMAP-085
+static void test_push_fails_when_frame_dup_allocation_fails(void)
+{
+    rcp_respqueue_t q;
+    const uint8_t   frame[] = {1, 2, 3};
+    rcp_alloc_hooks_t hooks = {0};
+
+    rcp_respqueue_init(&q, 0, 0);
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    /* frame_len!=0 (true) with a genuine rcp_bytes_dup() allocation
+     * failure (copy.data==NULL, true) -- distinct from every other
+     * push in this file, which always succeeds. The queue must be left
+     * completely untouched. */
+    TEST_ASSERT_FALSE(rcp_respqueue_push_seq(&q, frame, sizeof(frame), 1u));
+
+    rcp_alloc_reset_hooks();
+
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_octets(&q));
 
     rcp_respqueue_destroy(&q);
 }
@@ -641,6 +702,8 @@ int main(void)
 
     RUN_TEST(test_push_pop_is_fifo);
     RUN_TEST(test_pop_on_empty_queue_returns_false);
+    RUN_TEST(test_push_zero_length_frame_succeeds);
+    RUN_TEST(test_push_fails_when_frame_dup_allocation_fails);
     RUN_TEST(test_zero_capacity_is_unbounded);
     RUN_TEST(test_push_refused_outright_when_frame_exceeds_total_capacity_octets);
     RUN_TEST(test_pop_frees_capacity_for_a_later_push);

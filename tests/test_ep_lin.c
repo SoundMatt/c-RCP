@@ -296,6 +296,46 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+/* MC/DC: reg_offset_read_only()'s OR chain (EP_LEN | RESERVED_01 |
+ * BASE_CLK | BASE_CLK+1) has its first two disjuncts (EP_LEN,
+ * RESERVED_01) independently demonstrated by
+ * test_apply_reconfig_ignores_read_only_registers() above -- but that
+ * test's write only spans offsets 0x00-0x03 (its own comment claiming to
+ * cover "both octets of base_clk" is itself in error: start_address=0,
+ * data_len=4 reaches offsets 0,1,2,3, never 4 or 5). base_clk's own two
+ * octets (offsets 0x04 and 0x05) were therefore never independently
+ * exercised at all. Isolate each one with its own single-octet write, so
+ * a corrupted-adjacent-register bug (an off-by-one in the OR chain that
+ * let 0x04/0x05 fall through to the writable path) would show up as
+ * wire_clk_divider or ep_status changing when they must not. */
+//cfusa:test REQ-LINEP-038
+static void test_apply_reconfig_ignores_base_clk_octets_individually(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     payload[3];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    /* base_clk low octet (0x04) alone. */
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_LIN_REG_BASE_CLK;
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_OK,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
+
+    /* base_clk high octet (0x05) alone. */
+    payload[1] = (uint8_t)(RCP_EP_LIN_REG_BASE_CLK + 1u);
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_OK,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
+}
+
 //cfusa:test REQ-LINEP-029
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
@@ -358,6 +398,19 @@ static void test_reconfig_request_round_trip(void)
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_lin_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* MC/DC: independently demonstrates the `data == NULL` half of
+ * `data_len == 0 || data == NULL` -- a nonzero data_len paired with a NULL
+ * data pointer, so the rejection can only be attributed to the second
+ * operand, not the first (which the empty-data test above already
+ * covers). */
+//cfusa:test REQ-LINEP-036
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_lin_encode_reconfig_request(0x00, 0, NULL, 5, 0);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -719,10 +772,12 @@ int main(void)
     RUN_TEST(test_apply_reconfig_writes_clk_divider);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_ignores_base_clk_octets_individually);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);

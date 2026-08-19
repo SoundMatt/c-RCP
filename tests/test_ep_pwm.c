@@ -389,6 +389,29 @@ static void test_out_apply_reconfig_rejects_payload_without_data(void)
                           rcp_ep_pwm_out_apply_reconfig(&cfg, addr_only, 0));
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L285:C9 indices 0 and 1): before this,
+ * nothing called rcp_ep_pwm_out_encode_reconfig_request() with either
+ * data_len == 0 or data == NULL -- only the successful round-trip call
+ * below (nonzero length, real buffer). These two new cases, paired with
+ * that success case, give both `||` operands an independent true/false
+ * swing. */
+//cfusa:test REQ-PWM-010
+static void test_out_encode_reconfig_request_rejects_zero_length_data(void)
+{
+    const uint8_t data[1] = {0x2Au};
+    rcp_bytes_t   frame   = rcp_ep_pwm_out_encode_reconfig_request(9, 0x0008u, data, 0u, 77);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+//cfusa:test REQ-PWM-010
+static void test_out_encode_reconfig_request_rejects_null_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_pwm_out_encode_reconfig_request(9, 0x0008u, NULL, 1u, 77);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
 /* Figure 18 shows the configuration request as an ordinary ACF_ABB write
  * with evt[2:0] = 111b, address prefix then data. Round-trip: encode,
  * decode as a write request, route the payload to apply_reconfig(). */
@@ -995,6 +1018,13 @@ static void test_in_trigger_rising(void)
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, false, true));
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, true, false));
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, true, true));
+    /* Added 2026-08-18 (MC/DC gap closure, L638:C48 index 1): `!prev_level
+     * && new_level` -- every prior case with !prev_level true (prev_level
+     * == false) also had new_level == true, so new_level's own
+     * contribution (independent of !prev_level) was never demonstrated.
+     * This holds !prev_level fixed true (prev_level == false) and flips
+     * new_level to false, flipping the outcome to false too. */
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, false, false));
 }
 
 //cfusa:test REQ-PWM-034
@@ -1003,6 +1033,11 @@ static void test_in_trigger_falling(void)
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, true, false));
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, false, true));
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, false, false));
+    /* Added 2026-08-18 (MC/DC gap closure, L639:C48 index 1): `prev_level &&
+     * !new_level` -- the mirror image of the RISING gap above. Holds
+     * prev_level fixed true and flips new_level to true (so !new_level
+     * flips to false), flipping the outcome to false. */
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, true, true));
 }
 
 /* ── PWM_IN: functional config ─────────────────────────────────────────────── */
@@ -1273,6 +1308,33 @@ static void test_in_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L738:C12 indices 2 and 3): despite
+ * its comment, test_in_apply_reconfig_ignores_read_only_registers above
+ * only ever reaches offsets 0x00-0x03 (start=0x00, 4 data bytes) -- it
+ * never actually reaches 0x04 or 0x05, so pwm_in_reg_offset_read_only()'s
+ * `addr == BASE_CLK` and `addr == BASE_CLK+1` arms are never independently
+ * exercised. This test targets 0x04-0x05 specifically. */
+//cfusa:test REQ-PWM-058
+static void test_in_apply_reconfig_ignores_base_clk_octets(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    /* start = 0x04 (base_clk lo), 2 data bytes -> covers 0x04 and 0x05. */
+    const uint8_t                  payload[4] = {0x00, 0x04, 0xFFu, 0xFFu};
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_OK,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_PWM_IN_EP_FUNC_LEN];
+
+        rcp_ep_pwm_in_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK]);     /* untouched */
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK + 1]); /* untouched */
+    }
+}
+
 //cfusa:test REQ-PWM-071
 static void test_in_apply_reconfig_rejects_write_past_ep_len(void)
 {
@@ -1334,6 +1396,20 @@ static void test_in_reconfig_request_round_trip(void)
 static void test_in_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_pwm_in_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* Added 2026-08-18 (MC/DC gap closure, L809:C9 index 1): the case above
+ * passes data_len == 0 AND data == NULL together, so `data == NULL` is
+ * short-circuit-masked and never independently evaluated with data_len
+ * fixed nonzero. Combined with the successful round-trip call above
+ * (nonzero length, real buffer -> false), this nonzero-length/NULL-data
+ * call gives `data == NULL` its own independent true/false swing. */
+//cfusa:test REQ-PWM-058
+static void test_in_encode_reconfig_request_rejects_null_data_with_nonzero_length(void)
+{
+    rcp_bytes_t frame = rcp_ep_pwm_in_encode_reconfig_request(0x03, 0x0006, NULL, 2u, 7u);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -1633,6 +1709,8 @@ int main(void)
     RUN_TEST(test_out_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_out_apply_reconfig_ignores_read_only_registers);
     RUN_TEST(test_out_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_out_encode_reconfig_request_rejects_zero_length_data);
+    RUN_TEST(test_out_encode_reconfig_request_rejects_null_data);
     RUN_TEST(test_out_reconfig_request_round_trip);
     RUN_TEST(test_out_render_registers_matches_table_offsets);
     RUN_TEST(test_out_reconfig_strerror_never_null);
@@ -1694,10 +1772,12 @@ int main(void)
     RUN_TEST(test_in_render_registers_matches_table_offsets);
     RUN_TEST(test_in_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_in_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_in_apply_reconfig_ignores_base_clk_octets);
     RUN_TEST(test_in_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_in_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_in_reconfig_request_round_trip);
     RUN_TEST(test_in_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_in_encode_reconfig_request_rejects_null_data_with_nonzero_length);
     RUN_TEST(test_in_reconfig_strerror_never_null);
 
     RUN_TEST(test_in_response_round_trip_untimed);

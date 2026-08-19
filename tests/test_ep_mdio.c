@@ -13,6 +13,7 @@
 #include "unity.h"
 
 #include <rcp/acf.h>
+#include <rcp/alloc.h>
 #include <rcp/ep_mdio.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
@@ -21,8 +22,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+void setUp(void) { rcp_alloc_reset_hooks(); }
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a hook across tests */
+
+/* MC/DC fault-injection helper (this project's own established idiom --
+ * see tests/test_fragment.c's own alloc-failure test): a real, portable,
+ * ASan-safe rcp_malloc() failure, used to independently demonstrate the
+ * `!payload.data` half of each encode_*_response()'s
+ * `word_count > 0 && !payload.data` allocation guard. */
+static void *always_fails_malloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
 
 static rcp_ep_mdio_addr_t clause22_addr(uint8_t prtad, uint16_t regad)
 {
@@ -559,6 +571,19 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
 }
 
 //cfusa:test REQ-MDIO-023
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    /* MC/DC independence for the `data == NULL` half of the guard's
+     * `data_len == 0 || data == NULL`: data_len is nonzero here (fixed
+     * false, same as test_reconfig_request_round_trip's data_len=2
+     * case), and only the data pointer differs -- NULL instead of a
+     * real buffer -- flipping the decision from false to true. */
+    rcp_bytes_t frame = rcp_ep_mdio_encode_reconfig_request(0x03, 0x0004, NULL, 2, 7);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+//cfusa:test REQ-MDIO-023
 static void test_reconfig_strerror_never_null(void)
 {
     rcp_ep_mdio_reconfig_errc_t codes[] = {
@@ -821,6 +846,32 @@ static void test_read_request_decode_rejects_zero_word_count(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-013
+static void test_read_request_decode_rejects_word_count_above_max(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[8] = {0}; /* mdio_mode(1) + address(5, all-zero
+                                                       Clause-22 default is valid) +
+                                                       word_count(2 BE) */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_MULTI; /* mdio_mode: burst */
+    payload[6] = (uint8_t)((RCP_EP_MDIO_MAX_BURST_WORDS + 1u) >> 8);
+    payload[7] = (uint8_t)((RCP_EP_MDIO_MAX_BURST_WORDS + 1u) & 0xFFu);
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_read_request(
+        frame.data, frame.len, 2, &out_addr, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── Read response round trip ──────────────────────────────────────────────── */
 
 //cfusa:test REQ-MDIO-014
@@ -941,6 +992,29 @@ static void test_read_response_decode_rejects_odd_payload_length(void)
         frame.data, frame.len, 2, &out_words_data, &out_word_count, &timed, &ts, &txn));
 
     rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-MDIO-014
+static void test_read_response_encode_alloc_failure(void)
+{
+    /* MC/DC independence for both halves of the `word_count > 0u &&
+     * !payload.data` guard at once: word_count is nonzero (so the first
+     * condition is fixed true, same as test_read_response_round_trip_*'s
+     * cases), and rcp_ep_mdio_pack_words()'s rcp_malloc() is forced to
+     * fail, so payload.data comes back NULL and the second condition
+     * flips true too -- the same pairing test_fragment.c's own
+     * alloc-failure test uses. */
+    rcp_alloc_hooks_t hooks       = {0};
+    uint16_t          words[1]    = {0x1234};
+    rcp_bytes_t        frame;
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    frame = rcp_ep_mdio_encode_read_response(3, words, 1, 5, false, 0);
+    TEST_ASSERT_NULL(frame.data);
+
+    rcp_alloc_reset_hooks();
 }
 
 /* ── Write request round trip ──────────────────────────────────────────────── */
@@ -1153,6 +1227,33 @@ static void test_write_request_decode_rejects_zero_words(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-017
+static void test_write_request_decode_rejects_word_count_above_max(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+    /* mdio_mode(1) + address(5, all-zero Clause-22 default is valid) +
+     * (MAX_BURST_WORDS+1) words * 2 bytes -- well under
+     * RCP_ACF_ABB_MAX_PAYLOAD (2036), so the frame encodes fine and the
+     * decoder reaches the word_count check on its own. */
+    static uint8_t payload[1 + 5 + 2 * (RCP_EP_MDIO_MAX_BURST_WORDS + 1u)] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_MULTI; /* mdio_mode: burst */
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_write_request(
+        frame.data, frame.len, 2, &out_addr, &out_words_data, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── Write response round trip ─────────────────────────────────────────────── */
 
 //cfusa:test REQ-MDIO-018
@@ -1219,6 +1320,25 @@ static void test_write_response_nothing_accepted(void)
     TEST_ASSERT_EQUAL_UINT32(0, out_word_count);
 
     rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-MDIO-018
+static void test_write_response_encode_alloc_failure(void)
+{
+    /* Same reasoning as test_read_response_encode_alloc_failure(), for
+     * encode_write_response()'s identical
+     * `accepted_word_count > 0u && !payload.data` guard. */
+    rcp_alloc_hooks_t hooks       = {0};
+    uint16_t          accepted[1] = {0xABCD};
+    rcp_bytes_t        frame;
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    frame = rcp_ep_mdio_encode_write_response(3, accepted, 1, 6, false, 0);
+    TEST_ASSERT_NULL(frame.data);
+
+    rcp_alloc_reset_hooks();
 }
 
 //cfusa:test REQ-MDIO-019
@@ -1540,6 +1660,30 @@ static void test_mms_read_request_decode_rejects_zero_word_count(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-MDIO-024
+static void test_mms_read_request_decode_rejects_word_count_above_max(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[6] = {0}; /* mdio_mode+mms(all-zero, valid)/addr(2)
+                                                       + word_count(2 BE) */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+    payload[4] = (uint8_t)((RCP_EP_MDIO_MAX_BURST_WORDS + 1u) >> 8);
+    payload[5] = (uint8_t)((RCP_EP_MDIO_MAX_BURST_WORDS + 1u) & 0xFFu);
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_mms_read_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
 /* Mirror image of test_mdio_decode_rejects_mms_mode_fails_closed()
  * (test_tc18_gaps_ep2.c) -- the MMS decoder must equally refuse to
  * misread an MMD-mode frame as if it were MMS-shaped. */
@@ -1611,6 +1755,33 @@ static void test_mms_read_response_round_trip_timed_16bit(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-024
+static void test_mms_read_response_empty_words(void)
+{
+    /* MC/DC independence for the `word_count > 0u` half of
+     * encode_mms_read_response()'s `word_count > 0u && !payload.data`
+     * guard: word_count is 0 here (the first condition false, masking
+     * the second), against test_mms_read_response_encode_alloc_failure's
+     * word_count=1/alloc-fails case (first condition true) -- mirrors
+     * test_read_response_empty_words's / test_mms_write_response_
+     * nothing_accepted's identical "nothing to encode" pairing. */
+    rcp_bytes_t    f              = rcp_ep_mdio_encode_mms_read_response(
+        0x10u, 0, NULL, 0, 3u, false, 0);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_read_response(
+        f.data, f.len, 0x10u, 0, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    TEST_ASSERT_EQUAL_size_t(0u, out_word_count);
+
+    rcp_bytes_free(&f);
+}
+
 //cfusa:test REQ-MDIO-024
 static void test_mms_read_response_decode_rejects_wrong_bus(void)
 {
@@ -1651,6 +1822,26 @@ static void test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms(v
         frame.data, frame.len, 0x10u, 0 /* MMS0: 32-bit, 3 bytes is not a multiple of 4 */,
         &out_words_data, &out_word_count, &timed, &ts, &txn));
     rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-MDIO-022
+static void test_mms_read_response_encode_alloc_failure(void)
+{
+    /* Same reasoning as test_read_response_encode_alloc_failure(), for
+     * encode_mms_read_response()'s identical `word_count > 0u &&
+     * !payload.data` guard (rcp_ep_mdio_mms_pack_words() calls the same
+     * rcp_malloc()). */
+    rcp_alloc_hooks_t hooks    = {0};
+    uint32_t          words[1] = {0x11223344};
+    rcp_bytes_t        f;
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    f = rcp_ep_mdio_encode_mms_read_response(0x10u, 0, words, 1, 3u, false, 0);
+    TEST_ASSERT_NULL(f.data);
+
+    rcp_alloc_reset_hooks();
 }
 
 /* ── MMS write request/response ───────────────────────────────────────────── */
@@ -1722,6 +1913,16 @@ static void test_mms_write_request_encode_rejects_zero_word_count(void)
 }
 
 //cfusa:test REQ-MDIO-024
+static void test_mms_write_request_encode_rejects_word_count_above_max(void)
+{
+    rcp_ep_mdio_mms_addr_t addr = mms_addr(0, 0);
+    rcp_bytes_t             f   = rcp_ep_mdio_encode_mms_write_request(
+        0x10u, addr, NULL, RCP_EP_MDIO_MAX_BURST_WORDS + 1u, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+//cfusa:test REQ-MDIO-024
 static void test_mms_write_request_decode_rejects_wrong_op(void)
 {
     const uint32_t          words[1] = {1u};
@@ -1749,6 +1950,33 @@ static void test_mms_write_request_decode_rejects_zero_words(void)
     uint8_t                       payload[4] = {0}; /* mdio_mode(1) + mms/addr(3), no words */
 
     payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_mms_write_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+//cfusa:test REQ-MDIO-024
+static void test_mms_write_request_decode_rejects_word_count_above_max(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+    /* mms=2 selects the 16-bit-word width (rcp_ep_mdio_mms_uses_32bit_words()
+     * is true only for mms 0/1), keeping this payload's size
+     * (4 + (MAX_BURST_WORDS+1)*2 bytes) well under RCP_ACF_ABB_MAX_PAYLOAD
+     * (2036) -- mms 0/1's 32-bit width would not fit. */
+    static uint8_t payload[1 + 3 + 2 * (RCP_EP_MDIO_MAX_BURST_WORDS + 1u)] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_MULTI;
+    payload[1] = 2u; /* mms = 2 -> 16-bit words, still <= RCP_EP_MDIO_MMS_MAX */
 
     hdr.byte_bus_id = 0x10u;
     hdr.op          = RCP_ACF_OP_WRITE;
@@ -1824,6 +2052,25 @@ static void test_mms_write_response_nothing_accepted(void)
     rcp_bytes_free(&f);
 }
 
+//cfusa:test REQ-MDIO-022
+static void test_mms_write_response_encode_alloc_failure(void)
+{
+    /* Same reasoning as test_read_response_encode_alloc_failure(), for
+     * encode_mms_write_response()'s identical `accepted_word_count > 0u
+     * && !payload.data` guard. */
+    rcp_alloc_hooks_t hooks       = {0};
+    uint32_t          accepted[1] = {0xAABBCCDDu};
+    rcp_bytes_t        f;
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    f = rcp_ep_mdio_encode_mms_write_response(0x10u, 2, accepted, 1, 5u, false, 0);
+    TEST_ASSERT_NULL(f.data);
+
+    rcp_alloc_reset_hooks();
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1879,21 +2126,27 @@ int main(void)
     RUN_TEST(test_mms_read_request_decode_rejects_wrong_bus);
     RUN_TEST(test_mms_read_request_decode_rejects_bad_mms_addr);
     RUN_TEST(test_mms_read_request_decode_rejects_zero_word_count);
+    RUN_TEST(test_mms_read_request_decode_rejects_word_count_above_max);
     RUN_TEST(test_mms_read_request_decode_rejects_mmd_mode);
     RUN_TEST(test_mms_read_response_round_trip_untimed_32bit);
     RUN_TEST(test_mms_read_response_round_trip_timed_16bit);
+    RUN_TEST(test_mms_read_response_empty_words);
     RUN_TEST(test_mms_read_response_decode_rejects_wrong_bus);
     RUN_TEST(test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms);
+    RUN_TEST(test_mms_read_response_encode_alloc_failure);
 
     RUN_TEST(test_mms_write_request_round_trip_single_word_32bit);
     RUN_TEST(test_mms_write_request_round_trip_burst_16bit);
     RUN_TEST(test_mms_write_request_encode_rejects_invalid_addr);
     RUN_TEST(test_mms_write_request_encode_rejects_zero_word_count);
+    RUN_TEST(test_mms_write_request_encode_rejects_word_count_above_max);
     RUN_TEST(test_mms_write_request_decode_rejects_wrong_op);
     RUN_TEST(test_mms_write_request_decode_rejects_zero_words);
+    RUN_TEST(test_mms_write_request_decode_rejects_word_count_above_max);
     RUN_TEST(test_mms_write_request_decode_rejects_mmd_mode);
     RUN_TEST(test_mms_write_response_round_trip_untimed);
     RUN_TEST(test_mms_write_response_nothing_accepted);
+    RUN_TEST(test_mms_write_response_encode_alloc_failure);
 
     RUN_TEST(test_word_encode_decode_round_trip);
     RUN_TEST(test_word_encode_is_big_endian);
@@ -1915,6 +2168,7 @@ int main(void)
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
@@ -1931,6 +2185,7 @@ int main(void)
     RUN_TEST(test_read_request_decode_rejects_short_frame);
     RUN_TEST(test_read_request_decode_rejects_bad_addr);
     RUN_TEST(test_read_request_decode_rejects_zero_word_count);
+    RUN_TEST(test_read_request_decode_rejects_word_count_above_max);
 
     RUN_TEST(test_read_response_round_trip_untimed);
     RUN_TEST(test_read_response_round_trip_timed);
@@ -1938,6 +2193,7 @@ int main(void)
     RUN_TEST(test_read_response_decode_rejects_wrong_bus);
     RUN_TEST(test_read_response_decode_rejects_short_frame);
     RUN_TEST(test_read_response_decode_rejects_odd_payload_length);
+    RUN_TEST(test_read_response_encode_alloc_failure);
 
     RUN_TEST(test_write_request_round_trip_single_word);
     RUN_TEST(test_write_request_round_trip_burst);
@@ -1950,10 +2206,12 @@ int main(void)
     RUN_TEST(test_write_request_decode_rejects_short_frame);
     RUN_TEST(test_write_request_decode_rejects_bad_addr);
     RUN_TEST(test_write_request_decode_rejects_zero_words);
+    RUN_TEST(test_write_request_decode_rejects_word_count_above_max);
 
     RUN_TEST(test_write_response_round_trip_untimed);
     RUN_TEST(test_write_response_round_trip_timed);
     RUN_TEST(test_write_response_nothing_accepted);
+    RUN_TEST(test_write_response_encode_alloc_failure);
     RUN_TEST(test_write_response_decode_rejects_wrong_bus);
     RUN_TEST(test_write_response_decode_rejects_short_frame);
 

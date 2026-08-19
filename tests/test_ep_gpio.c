@@ -522,6 +522,30 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     TEST_ASSERT_TRUE(cfg.common.ep_enable);
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L391:C12 index 3): the test above
+ * only ever reaches offsets 0x00-0x04 (its 5-byte span starting at 0x00),
+ * so reg_offset_read_only()'s `addr == BASE_CLK+1` arm (0x05, the SECOND
+ * octet of the 16-bit base_clk register) is never independently exercised
+ * -- every other arm in that 4-way OR is false at 0x05, so this is the
+ * only case that reaches it. This test targets 0x04-0x05 specifically. */
+//cfusa:test REQ-GPIO-042
+static void test_apply_reconfig_ignores_base_clk_second_octet(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    /* start = 0x04 (base_clk lo), 2 data bytes -> covers 0x04 and 0x05. */
+    const uint8_t                 write[4] = {0x00, 0x04, 0xFFu, 0xFFu};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK, rcp_ep_gpio_apply_reconfig(&cfg, write, sizeof(write)));
+
+    {
+        uint8_t block[RCP_EP_GPIO_EP_FUNC_LEN];
+        rcp_ep_gpio_render_registers(&cfg, block);
+        TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x04]); /* base_clk lo, untouched */
+        TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x05]); /* base_clk hi, untouched -- addr == BASE_CLK+1 */
+    }
+}
+
 //cfusa:test REQ-GPIO-041
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
@@ -548,6 +572,30 @@ static void test_apply_reconfig_rejects_payload_without_data(void)
                       rcp_ep_gpio_apply_reconfig(&cfg, addr_only, sizeof(addr_only)));
     TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_ERR_SHORT,
                       rcp_ep_gpio_apply_reconfig(&cfg, NULL, 0));
+}
+
+/* Added 2026-08-18 (MC/DC gap closure, L469:C9 indices 0 and 1): nothing
+ * previously called rcp_ep_gpio_encode_reconfig_request() with either
+ * data_len == 0 or data == NULL -- only the successful round-trip call
+ * below, with both a nonzero length and a real buffer. These two new
+ * cases, paired with that success case, give both `||` operands an
+ * independent true/false swing: this one holds data non-NULL and swings
+ * data_len, the next one holds data_len nonzero and swings data. */
+//cfusa:test REQ-GPIO-043
+static void test_encode_reconfig_request_rejects_zero_length_data(void)
+{
+    const uint8_t data[1] = {0x11u};
+    rcp_bytes_t   frame   = rcp_ep_gpio_encode_reconfig_request(3u, 0x0008u, data, 0u, 7u);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+//cfusa:test REQ-GPIO-043
+static void test_encode_reconfig_request_rejects_null_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_gpio_encode_reconfig_request(3u, 0x0008u, NULL, 2u, 7u);
+
+    TEST_ASSERT_NULL(frame.data);
 }
 
 //cfusa:test REQ-GPIO-043
@@ -879,6 +927,34 @@ static void test_debounce_zero_means_no_debounce(void)
     TEST_ASSERT_TRUE(changed);
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L224:C20 index 1): `prev_settled =
+ * s->has_settled && s->settled_value` is evaluated on every call, but no
+ * existing test ever entered a call with has_settled already true (index 0
+ * fixed true) while settled_value was false -- every prior call that
+ * reached a settled state had settled_value stuck at true throughout. This
+ * test settles to true, flips to false (which itself proves settled_value
+ * went true->false while has_settled stayed true, changed=true), then
+ * samples false again: this time entering with has_settled=true AND
+ * settled_value=false gives prev_settled=false, so an unchanged false
+ * sample must report changed=false, not true -- the observable flip that
+ * demonstrates settled_value's independent contribution. */
+//cfusa:test REQ-GPIO-035
+static void test_debounce_zero_prev_settled_reflects_current_settled_value(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 0u, &changed));   /* settle true */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, false, 0u, &changed)); /* settled_value: true->false */
+    TEST_ASSERT_TRUE(changed);
+    /* Now has_settled=true, settled_value=false -- prev_settled is false,
+     * not true, so a repeated "false" sample must NOT report a change. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, false, 0u, &changed));
+    TEST_ASSERT_FALSE(changed);
+}
+
 static void test_debounce_settles_after_n_consecutive_samples(void)
 {
     rcp_ep_gpio_debounce_state_t s;
@@ -959,6 +1035,37 @@ static void test_debounce_repeated_settled_value_reports_no_change(void)
     TEST_ASSERT_FALSE(changed);
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L249:C9 index 2): the `n > 0` resettle
+ * condition is `consecutive_count >= n && (!has_settled ||
+ * settled_value != candidate_value)`. The test above (repeated_settled_
+ * value_reports_no_change) reaches the third operand with it false
+ * (settled_value == candidate_value, both true). Nothing previously reached
+ * it with it true while has_settled was already true -- i.e. an
+ * already-settled value that a NEW consecutive run resettles to the
+ * OPPOSITE value. This test settles to true, then feeds n more-consecutive
+ * false samples; the run only resettles (and reports changed=true) once
+ * consecutive_count reaches n. */
+//cfusa:test REQ-GPIO-035
+static void test_debounce_resettles_to_opposite_value_reports_change(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed);
+    rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed); /* settles true */
+
+    /* First "false": starts a new candidate run, count == 1 < n -- no
+     * resettle yet, still reporting the OLD (true) settled value. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, false, 2u, &changed));
+    TEST_ASSERT_FALSE(changed);
+    /* Second consecutive "false": count == 2 >= n, and settled_value(true)
+     * != candidate_value(false) -- resettles to false, reports a change. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, false, 2u, &changed));
+    TEST_ASSERT_TRUE(changed);
+}
+
 /* ── REQ-GPIO-036: response timing ────────────────────────────────────────── */
 
 static void test_response_timing_pure_read_is_immediate(void)
@@ -1033,8 +1140,11 @@ int main(void)
     RUN_TEST(test_apply_reconfig_writes_clk_divider);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_ignores_base_clk_second_octet);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_zero_length_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_reconfig_strerror_never_null);
 
@@ -1059,11 +1169,13 @@ int main(void)
 
     RUN_TEST(test_debounce_state_init_zeroes);
     RUN_TEST(test_debounce_zero_means_no_debounce);
+    RUN_TEST(test_debounce_zero_prev_settled_reflects_current_settled_value);
     RUN_TEST(test_debounce_settles_after_n_consecutive_samples);
     RUN_TEST(test_debounce_differing_sample_resets_the_run);
     RUN_TEST(test_debounce_first_settle_is_not_reported_as_a_change);
     RUN_TEST(test_debounce_returns_false_before_first_settle);
     RUN_TEST(test_debounce_repeated_settled_value_reports_no_change);
+    RUN_TEST(test_debounce_resettles_to_opposite_value_reports_change);
 
     RUN_TEST(test_response_timing_pure_read_is_immediate);
     RUN_TEST(test_response_timing_payload_bearing_read_is_after_debounce);

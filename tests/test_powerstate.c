@@ -377,6 +377,49 @@ static void test_wake_via_pin_hot_when_handshake_complete(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+/* MC/DC: rcp_powerstate_manager_wake_response_stream_id()'s `has = e &&
+ * e->has_resp_stream_id` (src/powerstate.c) never had the `e` operand's
+ * own independent contribution demonstrated -- every existing call
+ * (this file and test_tc18_gaps_server.c) passes a registered endpoint,
+ * so `e` is always non-NULL; only `e->has_resp_stream_id` has ever
+ * varied. Calling with an address never registered with `m` makes `e ==
+ * NULL`, short-circuiting `e->has_resp_stream_id` (matching
+ * has_resp_stream_id's own doc comment: "false ... if addr was not
+ * registered with m"), paired against
+ * test_wake_via_pin_hot_when_handshake_complete()'s ADDR/true case
+ * above. */
+//cfusa:test REQ-PWRMODE-017
+static void test_wake_response_stream_id_unregistered_endpoint_returns_false(void)
+{
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
+    rcp_stream_id_t got_stream;
+
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_wake_response_stream_id(m, ADDR, &got_stream));
+
+    rcp_powerstate_manager_destroy(m);
+}
+
+/* MC/DC: the same function's `if (has && out_resp_stream_id) *out_...`
+ * never had the `out_resp_stream_id` operand's own independent
+ * contribution demonstrated -- every existing call passes a non-NULL
+ * output pointer. A caller that only wants the boolean "does addr have
+ * a recorded responder stream yet" answer (without needing the value
+ * itself) is a legitimate use of this API's own NULL-tolerant guard;
+ * this confirms it doesn't crash and still returns true. */
+//cfusa:test REQ-PWRMODE-017
+static void test_wake_response_stream_id_tolerates_null_out_param(void)
+{
+    rcp_avtp_addr_t endpoints[] = {ADDR};
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
+
+    put_to_sleep(m, ADDR, 1);
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true, RESP_STREAM));
+
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_wake_response_stream_id(m, ADDR, NULL));
+
+    rcp_powerstate_manager_destroy(m);
+}
+
 //cfusa:test REQ-PWR-008
 static void test_wake_via_pin_cold_when_handshake_not_started(void)
 {
@@ -599,6 +642,8 @@ int main(void)
     RUN_TEST(test_wake_via_network_requires_sleep);
     RUN_TEST(test_wake_via_network_unknown_endpoint);
     RUN_TEST(test_wake_via_pin_hot_when_handshake_complete);
+    RUN_TEST(test_wake_response_stream_id_unregistered_endpoint_returns_false);
+    RUN_TEST(test_wake_response_stream_id_tolerates_null_out_param);
     RUN_TEST(test_wake_via_pin_cold_when_handshake_not_started);
     RUN_TEST(test_wake_via_pin_requires_sleep);
     RUN_TEST(test_apply_wakeup_echo_wrong_txn_not_echoed);

@@ -98,6 +98,40 @@ static void test_pcp_for_fails_safe_on_out_of_range_kind(void)
                              rcp_tsn_pcp_for(&m, (rcp_sched_kind_t)99));
 }
 
+/* This test was written to demonstrate `kind < RCP_SCHED_KIND_STANDARD`'s
+ * (src/tsn.c L37) own independent contribution to `if (kind <
+ * RCP_SCHED_KIND_STANDARD || kind > RCP_SCHED_KIND_CANCELLATION)`, the
+ * same defensive/corrupted-state idiom test_pcp_for_fails_safe_on_out_
+ * of_range_kind() above uses (tests/test_power.c,
+ * tests/test_lifecycle.c). It does not close that gap -- left in
+ * because it is still a genuine, meaningful fail-safe assertion (a
+ * garbage rcp_sched_kind_t must still resolve to Standard's PCP), and
+ * the MC/DC note below explains why no test can close it.
+ *
+ * MC/DC note (not a full test): `kind < RCP_SCHED_KIND_STANDARD` (0) is
+ * structurally unreachable given rcp_sched_kind_t's actual
+ * representation. All seven enumerators (scheduler.h) are non-negative,
+ * so per C99 §6.7.2.2p4 clang is free to -- and, empirically confirmed
+ * against this exact build (`enumtest.c`, same clang/flags, in this
+ * session's own scratch investigation), does -- give rcp_sched_kind_t
+ * an unsigned underlying representation for same-enum-type comparisons.
+ * `(rcp_sched_kind_t)-1` does not read back as a negative value under
+ * `<`: its bit pattern is reinterpreted as UINT_MAX, so `kind <
+ * RCP_SCHED_KIND_STANDARD` evaluates false (confirmed: this test alone
+ * does NOT flip src/tsn.c L37's first MC/DC operand to independent --
+ * re-verified by re-running the exported .json after adding it). Every
+ * bit pattern an rcp_sched_kind_t object can actually hold compares as
+ * unsigned here, and no unsigned value is ever < 0 -- there is no
+ * legitimate (non-UB-relying) cast that produces the missing vector.
+ * No fake/whitebox test is added to force it. */
+static void test_pcp_for_fails_safe_on_negative_kind(void)
+{
+    rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
+
+    TEST_ASSERT_EQUAL_UINT8(rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_STANDARD),
+                             rcp_tsn_pcp_for(&m, (rcp_sched_kind_t)-1));
+}
+
 /* ── Frame classification ──────────────────────────────────────────────────── */
 
 static void test_classify_standard_frame(void)
@@ -113,6 +147,29 @@ static void test_classify_cancellation_frame(void)
     TEST_ASSERT_EQUAL(RCP_SCHED_KIND_CANCELLATION, rcp_tsn_classify_frame(frame.data, frame.len));
     rcp_bytes_free(&frame);
 }
+
+/* MC/DC note (not a test): rcp_tsn_classify_frame()'s `if (payload_len
+ * == 0 || rcp_acf_peek_msg_type(payload, payload_len, &acf_type) !=
+ * RCP_ACF_OK)` (src/tsn.c) has a second operand
+ * (rcp_acf_peek_msg_type(...) != RCP_ACF_OK) whose independence cannot
+ * be demonstrated -- not merely "hasn't been", but structurally cannot
+ * be, at this call site. rcp_acf_peek_msg_type() (src/acf.c) has
+ * exactly one failure condition: `if (len < 1) return
+ * RCP_ACF_ERR_SHORT_FRAME;`. It is only ever called here after the
+ * first operand (`payload_len == 0`) has already been false, i.e. only
+ * when payload_len >= 1 (payload_len is size_t, so "!= 0" and ">= 1"
+ * are the same fact) -- which is exactly the one condition under which
+ * rcp_acf_peek_msg_type()'s own `len < 1` guard can never trip. So
+ * whenever this decision's second operand is actually evaluated, it is
+ * always RCP_ACF_OK, i.e. always false: this call site can never
+ * observe rcp_acf_peek_msg_type() fail. No test (real or fault-
+ * injected) can produce the missing vector, because doing so would
+ * require calling rcp_acf_peek_msg_type() with a length that is
+ * simultaneously >= 1 (to reach it past the first operand) and < 1 (to
+ * fail it) -- a contradiction. This is genuine dead-branch defensive
+ * code (harmless, and arguably worth keeping in case
+ * rcp_acf_peek_msg_type()'s own contract ever grows a second failure
+ * mode), not a testing gap; no fake/whitebox test is added to force it. */
 
 static void test_classify_malformed_frame_fails_safe_to_standard(void)
 {
@@ -321,6 +378,7 @@ int main(void)
     RUN_TEST(test_default_pcp_map_mirrors_sched_kind_rank);
     RUN_TEST(test_cancellation_maps_to_highest_default_pcp);
     RUN_TEST(test_pcp_for_fails_safe_on_out_of_range_kind);
+    RUN_TEST(test_pcp_for_fails_safe_on_negative_kind);
     RUN_TEST(test_classify_standard_frame);
     RUN_TEST(test_classify_cancellation_frame);
     RUN_TEST(test_classify_malformed_frame_fails_safe_to_standard);

@@ -95,6 +95,32 @@ static void test_slow_rule_reports_configured_latency(void)
     rcp_faultinject_destroy(fi);
 }
 
+/* MC/DC: rcp_faultinject_evaluate()'s `if (rule.type == RCP_FI_SLOW &&
+ * out_latency_ms) *out_latency_ms = rule.latency_ms;` (src/faultinject.c)
+ * never had the `out_latency_ms` operand's own independent contribution
+ * demonstrated -- test_slow_rule_reports_configured_latency() above is
+ * the only RCP_FI_SLOW-rule test in this file, and it always passes a
+ * non-NULL `&latency_ms`. A caller of rcp_faultinject_evaluate() that
+ * only cares about *which* fault fires, not RCP_FI_SLOW's own latency
+ * value, is exactly what the NULL-tolerant `out_latency_ms` parameter
+ * exists for (mirroring every other rcp_faultinject_evaluate() call in
+ * this file, which all pass NULL for their own non-SLOW rules) -- this
+ * confirms that combination (a SLOW rule with a NULL out param) doesn't
+ * crash and still reports RCP_FI_SLOW, holding `rule.type ==
+ * RCP_FI_SLOW` at the same true value as the paired test above while
+ * only `out_latency_ms` flips from non-NULL to NULL. */
+//cfusa:test REQ-FI-004
+static void test_slow_rule_tolerates_null_out_latency_param(void)
+{
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_SLOW, 250, -1};
+
+    TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_SLOW, rcp_faultinject_evaluate(fi, NULL));
+
+    rcp_faultinject_destroy(fi);
+}
+
 //cfusa:test REQ-FI-007
 static void test_timeout_rule(void)
 {
@@ -226,6 +252,7 @@ int main(void)
     RUN_TEST(test_drop_rule);
     RUN_TEST(test_error_rule);
     RUN_TEST(test_slow_rule_reports_configured_latency);
+    RUN_TEST(test_slow_rule_tolerates_null_out_latency_param);
     RUN_TEST(test_timeout_rule);
     RUN_TEST(test_count_based_rule_expires_after_n_firings);
     RUN_TEST(test_clear_rules_removes_all_active_rules);

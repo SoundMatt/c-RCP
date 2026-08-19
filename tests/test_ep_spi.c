@@ -467,6 +467,44 @@ static void test_apply_reconfig_writes_deassert_cs_pause_bit(void)
     TEST_ASSERT_FALSE(cfg.channels[0].deassert_cs_pause);
 }
 
+/* MC/DC: mode_from_bits()'s cascading if-chain
+ *   if (!cpol && !cpha) return MODE_0;
+ *   if (!cpol &&  cpha) return MODE_1;
+ *   if ( cpol && !cpha) return MODE_2;
+ *   return MODE_3;
+ * is only ever driven through the real parse path (parse_registers(),
+ * called from rcp_ep_spi_apply_reconfig()) with cpol=0 -- every existing
+ * apply_reconfig test leaves every channel's cpol bit clear, so MODE_2
+ * and MODE_3 are only ever reached by *directly* assigning
+ * cfg.channels[i].mode in render-only tests (bypassing mode_from_bits
+ * entirely). cpol=1 was therefore never observed through this decision
+ * chain at all -- proves both remaining modes derive correctly from the
+ * cpol/cpha wire bits rather than only round-tripping whatever render()
+ * puts there. */
+static void test_apply_reconfig_derives_mode_2_and_3_from_cpol_cpha_bits(void)
+{
+    rcp_ep_spi_functional_cfg_t cfg;
+    uint8_t                     payload[3];
+
+    rcp_ep_spi_functional_cfg_init(&cfg);
+
+    /* cpol=1, cpha=0 -> MODE_2. */
+    payload[0] = 0x00;
+    payload[1] = 0x08; /* channel 0's own cfg octet */
+    payload[2] = RCP_EP_SPI_CFG_BIT_CLK_POLARITY;
+
+    TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_OK,
+        rcp_ep_spi_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_2, cfg.channels[0].mode);
+
+    /* cpol=1, cpha=1 -> MODE_3. */
+    payload[2] = RCP_EP_SPI_CFG_BIT_CLK_POLARITY | RCP_EP_SPI_CFG_BIT_CLK_PHASE;
+
+    TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_OK,
+        rcp_ep_spi_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_3, cfg.channels[0].mode);
+}
+
 static void test_apply_reconfig_writes_multi_channel_span(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
@@ -607,6 +645,18 @@ static void test_reconfig_request_round_trip(void)
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_spi_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* MC/DC: independently demonstrates the `data == NULL` half of
+ * `data_len == 0 || data == NULL` -- a nonzero data_len paired with a NULL
+ * data pointer, so the rejection can only be attributed to the second
+ * operand, not the first (which the empty-data test above already
+ * covers). */
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_spi_encode_reconfig_request(0x00, 0, NULL, 5, 0);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -1011,6 +1061,7 @@ int main(void)
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_apply_reconfig_writes_baud_rate);
     RUN_TEST(test_apply_reconfig_writes_deassert_cs_pause_bit);
+    RUN_TEST(test_apply_reconfig_derives_mode_2_and_3_from_cpol_cpha_bits);
     RUN_TEST(test_apply_reconfig_writes_multi_channel_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
     RUN_TEST(test_apply_reconfig_ignores_channel_reserved_octet);
@@ -1018,6 +1069,7 @@ int main(void)
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);

@@ -378,6 +378,85 @@ static void test_bind_failure_is_not_ok(void)
     rcp_avtp_transport_release(first);
 }
 
+/* rcp_udp_avtp_transport_port()'s `if (u->fd < 0 || getsockname(...) <
+ * 0) return 0;` (udp.c) needs the fd<0 short-circuit independently
+ * demonstrated: every OTHER caller of port() in this file only ever
+ * holds a transport that bound successfully (fd >= 0). A transport
+ * whose underlying bind() failed (same real EADDRINUSE technique as
+ * test_bind_failure_is_not_ok above) leaves u->fd == -1 internally,
+ * so port() must take the fd<0 branch and return 0 without ever
+ * reaching getsockname() -- distinct from every existing port() call,
+ * which reaches getsockname() and succeeds. */
+//cfusa:test REQ-UDP-004
+static void test_port_returns_zero_for_fd_from_failed_bind(void)
+{
+    rcp_avtp_transport_t *first;
+    rcp_avtp_transport_t *second;
+    uint16_t                 port;
+
+    first = bind_or_ignore();
+    if (!first) return;
+    port = rcp_udp_avtp_transport_port(first);
+
+    second = rcp_udp_avtp_transport_bind("127.0.0.1", port, false);
+    TEST_ASSERT_NOT_NULL(second);
+    TEST_ASSERT_FALSE(rcp_udp_avtp_transport_ok(second));
+
+    TEST_ASSERT_EQUAL_UINT16(0, rcp_udp_avtp_transport_port(second));
+
+    rcp_avtp_transport_release(second);
+    rcp_avtp_transport_release(first);
+}
+
+/* rcp_udp_avtp_transport_addr_string()'s `if (u->fd < 0 || buf_len ==
+ * 0) return 0;` (udp.c) needs BOTH conditions independently
+ * demonstrated. test_addr_string_and_port_report_bound_address above
+ * only ever exercises fd>=0 with a real buf_len -- neither the fd<0
+ * short-circuit (same failed-bind technique as the port() test above)
+ * nor the buf_len==0 short-circuit (a valid, bound transport but a
+ * zero-capacity output buffer -- a case no existing caller in this
+ * file passes) is exercised anywhere else. */
+//cfusa:test REQ-UDP-004
+static void test_addr_string_returns_zero_for_fd_from_failed_bind(void)
+{
+    rcp_avtp_transport_t *first;
+    rcp_avtp_transport_t *second;
+    uint16_t                 port;
+    char                    buf[64];
+
+    first = bind_or_ignore();
+    if (!first) return;
+    port = rcp_udp_avtp_transport_port(first);
+
+    second = rcp_udp_avtp_transport_bind("127.0.0.1", port, false);
+    TEST_ASSERT_NOT_NULL(second);
+    TEST_ASSERT_FALSE(rcp_udp_avtp_transport_ok(second));
+
+    /* fd<0 short-circuits before buf_len is even inspected -- a
+     * nonzero buf_len here (unlike the buf_len==0 test below) is what
+     * proves it's specifically the fd check doing the work. */
+    TEST_ASSERT_EQUAL_UINT(0, rcp_udp_avtp_transport_addr_string(second, buf, sizeof(buf)));
+
+    rcp_avtp_transport_release(second);
+    rcp_avtp_transport_release(first);
+}
+
+//cfusa:test REQ-UDP-004
+static void test_addr_string_returns_zero_for_zero_capacity_buffer(void)
+{
+    rcp_avtp_transport_t *srv;
+    char                    buf[1];
+
+    srv = bind_or_ignore();
+    if (!srv) return;
+
+    /* fd is valid here (unlike the test above) -- buf_len==0 alone
+     * must independently trigger the same early return. */
+    TEST_ASSERT_EQUAL_UINT(0, rcp_udp_avtp_transport_addr_string(srv, buf, 0));
+
+    rcp_avtp_transport_release(srv);
+}
+
 static void test_dial_unreachable_host_still_ok_at_construct_time(void)
 {
     /* connect() on a UDP socket only validates the address family/format,
@@ -679,6 +758,9 @@ int main(void)
     RUN_TEST(test_bind_null_addr_binds_inaddr_any);
     RUN_TEST(test_bind_empty_addr_binds_inaddr_any);
     RUN_TEST(test_bind_failure_is_not_ok);
+    RUN_TEST(test_port_returns_zero_for_fd_from_failed_bind);
+    RUN_TEST(test_addr_string_returns_zero_for_fd_from_failed_bind);
+    RUN_TEST(test_addr_string_returns_zero_for_zero_capacity_buffer);
     RUN_TEST(test_dial_unreachable_host_still_ok_at_construct_time);
     RUN_TEST(test_dial_bad_address_is_not_ok);
 

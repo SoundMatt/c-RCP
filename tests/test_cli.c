@@ -240,6 +240,59 @@ static void test_help_returns_ok(void)
     TEST_ASSERT_NOT_NULL(strstr(out, "Usage:"));
 }
 
+/* MC/DC: rcp_cli_run()'s help dispatch (src/cli.c) is a 3-condition OR --
+ * strcmp(argv[0], "--help") == 0 || strcmp(argv[0], "-h") == 0 ||
+ * strcmp(argv[0], "help") == 0 -- and test_help_returns_ok() above only
+ * ever exercises the first disjunct (paired against
+ * test_unknown_command_returns_invalid_args()'s all-false case, which
+ * shows "--help"'s own independence). Neither "-h" nor "help" was ever
+ * passed, so operand 2 and operand 3's independent contribution to the
+ * decision was undemonstrated. These two tests close that gap the same
+ * way test_help_returns_ok() does, one alternate spelling each. */
+static void test_help_short_flag_returns_ok(void)
+{
+    char *argv[] = {"-h"};
+    char out[512], err[512];
+
+    TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
+    TEST_ASSERT_NOT_NULL(strstr(out, "Usage:"));
+}
+
+static void test_help_word_returns_ok(void)
+{
+    char *argv[] = {"help"};
+    char out[512], err[512];
+
+    TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
+    TEST_ASSERT_NOT_NULL(strstr(out, "Usage:"));
+}
+
+/* MC/DC note (not a test): features_json()'s two `if (n < 0 ||
+ * (size_t)n >= buf_len - off) return;` truncation guards (src/cli.c
+ * L158, L164) each have two operands whose independence cannot be
+ * demonstrated from this file, or from any other test in this
+ * repository -- not merely "hasn't been", but structurally cannot be,
+ * given how the function is actually invoked. features_json() is
+ * `static`; its only caller is capabilities_json(), which always
+ * passes a fixed `char features[128]` buffer and always passes
+ * (uint8_t)RCP_CLI_IMPLEMENTED_OPTIONS -- a compile-time constant with
+ * all five REQ-RMAP-030 bits set, never a runtime value a test could
+ * vary. With that fixed input, the rendered string is always
+ * `["time_sync","enhanced_cancel","trigger","chained",
+ * "compound_bundles"]`, ~71 bytes -- nowhere near the 128-byte limit at
+ * either call site (L157's lone "[" or any of L163's five "%s\"%s\""
+ * writes), so `(size_t)n >= buf_len - off` is always false. And
+ * snprintf() returning negative requires either a locale/multibyte
+ * encoding error (none of these calls use anything but plain %s over
+ * static ASCII literals) or a formatted length exceeding INT_MAX
+ * (impossible for a ~71-byte result) -- so `n < 0` is always false too.
+ * Every MC/DC vector this decision could ever receive through the
+ * public API is `(false, false) -> false`; the "return early, truncated
+ * JSON" branch is unreachable dead defensive code given this file's
+ * one and only caller, not a testing gap. No fake/whitebox test is
+ * added to force these -- see the task's own guidance on honest
+ * unreachability over gamed coverage. */
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -261,6 +314,8 @@ int main(void)
     RUN_TEST(test_bad_format_value_returns_invalid_args);
     RUN_TEST(test_format_with_no_value_returns_invalid_args);
     RUN_TEST(test_help_returns_ok);
+    RUN_TEST(test_help_short_flag_returns_ok);
+    RUN_TEST(test_help_word_returns_ok);
 
     return UNITY_END();
 }

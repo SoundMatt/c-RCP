@@ -260,6 +260,33 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+/* Added 2026-08-18 (MC/DC gap closure, L162:C12 indices 2 and 3): despite
+ * its comment, test_apply_reconfig_ignores_read_only_registers above only
+ * ever reaches offsets 0x00-0x03 (start=0x00, 4 data bytes) -- it never
+ * actually reaches 0x04 or 0x05, so reg_offset_read_only()'s `addr ==
+ * BASE_CLK` and `addr == BASE_CLK+1` arms are never independently
+ * exercised. This test targets 0x04-0x05 specifically. */
+//cfusa:test REQ-I2C-021
+static void test_apply_reconfig_ignores_base_clk_octets(void)
+{
+    rcp_ep_i2c_functional_cfg_t cfg;
+    /* start = 0x04 (base_clk lo), 2 data bytes -> covers 0x04 and 0x05. */
+    const uint8_t                payload[4] = {0x00, 0x04, 0xFFu, 0xFFu};
+
+    rcp_ep_i2c_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL(RCP_EP_I2C_RECONFIG_OK,
+        rcp_ep_i2c_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_I2C_EP_FUNC_LEN];
+
+        rcp_ep_i2c_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_I2C_REG_BASE_CLK]);     /* untouched */
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_I2C_REG_BASE_CLK + 1]); /* untouched */
+    }
+}
+
 //cfusa:test REQ-I2C-022
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
@@ -322,6 +349,20 @@ static void test_reconfig_request_round_trip(void)
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_i2c_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* Added 2026-08-18 (MC/DC gap closure, L233:C9 index 1): the case above
+ * passes data_len == 0 AND data == NULL together, so `data == NULL` is
+ * short-circuit-masked and never independently evaluated with data_len
+ * fixed nonzero. Combined with the successful round-trip call above
+ * (nonzero length, real buffer -> false), this nonzero-length/NULL-data
+ * call gives `data == NULL` its own independent true/false swing. */
+//cfusa:test REQ-I2C-025
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_length(void)
+{
+    rcp_bytes_t frame = rcp_ep_i2c_encode_reconfig_request(0x03, 0x0006, NULL, 2u, 7u);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -843,10 +884,12 @@ int main(void)
     RUN_TEST(test_apply_reconfig_writes_clock_divider);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_ignores_base_clk_octets);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_length);
     RUN_TEST(test_reconfig_strerror_never_null_and_distinct);
 
     RUN_TEST(test_strerror_never_null_and_distinct);

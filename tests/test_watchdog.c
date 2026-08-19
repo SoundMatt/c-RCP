@@ -18,6 +18,42 @@
 void setUp(void) {}
 void tearDown(void) {}
 
+/* MC/DC note (not a test): the static wd_result_equal() helper in
+ * src/watchdog.c -- `a.overflowed == b.overflowed &&
+ * a.enter_safe_state == b.enter_safe_state && a.notify == b.notify` --
+ * has its second and third operands' independence undemonstrated, and
+ * that independence is structurally unreachable through
+ * evaluate_stream(), its one and only caller (grep confirms no other
+ * call site exists anywhere in this repository).
+ *
+ * evaluate_stream() always calls wd_result_equal(result,
+ * st->last_result), comparing a stream's freshly-computed
+ * rcp_e2e_wd_result_t against that *same* stream's own previous one.
+ * rcp_e2e_wd_evaluate() (src/e2e.c) derives all three result fields
+ * deterministically from one boolean and two per-stream config
+ * constants that never change after rcp_watchdog_keeper_new() (there is
+ * no reconfigure API -- see include/rcp/watchdog.h):
+ *
+ *     overflowed       = rx_wd_enable && elapsed >= rx_wd_timeout_ms
+ *     enter_safe_state = overflowed && rx_wd_safestate_enable   (const)
+ *     notify           = overflowed && rx_wd_info_enable         (const)
+ *
+ * Because rx_wd_safestate_enable/rx_wd_info_enable are the same
+ * constants in both the "a" and "b" results being compared (same
+ * stream, same cfg), `a.overflowed == b.overflowed` being true
+ * *guarantees* `a.enter_safe_state == b.enter_safe_state` and
+ * `a.notify == b.notify` are true too -- there is no way for
+ * `overflowed` to agree while either derived field disagrees. So
+ * whenever the `&&` chain reaches its second or third operand (which
+ * only happens when the first has already been true), that operand is
+ * always true as well: it can never be the operand whose value flips
+ * the overall result to false. No sequence of kick()/timeout/config
+ * calls through the public rcp_watchdog_keeper_t API (the only way
+ * anything reaches wd_result_equal()) can produce the missing vector,
+ * because doing so would require overflowed to stay equal while a
+ * *constant* derived from it changes -- a contradiction, not a gap in
+ * test effort. No fake/whitebox test is added to force it. */
+
 static void test_sleep_ms(unsigned ms)
 {
     uint64_t start = rcp_monotonic_ms();

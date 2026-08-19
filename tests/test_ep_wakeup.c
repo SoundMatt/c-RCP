@@ -581,6 +581,55 @@ static void test_sleepcmd_response_decode_shares_request_failure_modes(void)
     rcp_bytes_free(&frame);
 }
 
+/* MC/DC closure (L303:C13, `payload_len < 1u || payload[0] != ...
+ * REQUEST_CANCELED`): every existing err=1 test reaches this line via
+ * rcp_acf_build_error_response()/rcp_ep_wakeup_encode_sleepcmd_response(),
+ * both of which always emit exactly one payload octet -- so payload_len
+ * is never independently seen at 0 for the err=1 path, and the
+ * short-circuited `payload_len < 1u` condition's own independence (as
+ * opposed to the already-covered `payload[0] != ...` condition) was
+ * never demonstrated. No encoder in this codebase produces an ACF Error
+ * Response with a truly empty payload -- TC18 requires the numbered wire
+ * code -- so this is a genuine hand-crafted malformed frame: an 8-byte
+ * ACF_ABB header (rcp_acf_pack_header(), matching test_acf.c's/
+ * test_tc18_gaps_ep.c's own "packed[8]" idiom) with err=1 and
+ * acf_msg_length=2 quadlets (== RCP_ACF_ABB_HEADER_LEN, so body_len==0
+ * and pad==0), i.e. an error response whose payload was truncated to
+ * nothing before ever reaching payload[0]. */
+//cfusa:test REQ-WAKEUP-025
+static void test_sleepcmd_response_decode_empty_err_payload_is_bad_opcode(void)
+{
+    rcp_acf_byte_message_info_t hdr    = {0};
+    rcp_pwrmode_entry_result_t  result = RCP_PWRMODE_ENTRY_OK;
+    uint8_t                     tn     = 0;
+    uint8_t                     packed[8];
+
+    hdr.byte_bus_id     = BUS_ID;
+    hdr.err             = 1;
+    hdr.rsp             = 1;
+    hdr.transaction_num = 0x55u;
+    rcp_acf_pack_header(packed, RCP_ACF_MSG_TYPE_ABB, 2u /* quadlets: header only, no payload */,
+                         &hdr);
+
+    /* Confirm the fixture really does decode to payload_len == 0 before
+     * asserting on the function under test -- this is the independent
+     * (payload_len < 1u) == true case, condition B never evaluated. */
+    {
+        rcp_acf_byte_message_info_t out;
+        const uint8_t               *payload;
+        size_t                       payload_len;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                           rcp_acf_decode_abb(packed, sizeof(packed), &out, &payload, &payload_len));
+        TEST_ASSERT_EQUAL_UINT(0u, payload_len);
+        TEST_ASSERT_EQUAL_UINT8(1u, out.err);
+    }
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
+                       rcp_ep_wakeup_decode_sleepcmd_response(packed, sizeof(packed), BUS_ID,
+                                                               &result, &tn));
+}
+
 /* ── WakeUp message ────────────────────────────────────────────────────────────── */
 
 static void test_wakeup_message_round_trip(void)
@@ -715,6 +764,38 @@ static void test_render_registers_wup_status_is_a_multi_bit_mask(void)
     /* bit 0 | bit 3 == 0x0009. */
     TEST_ASSERT_EQUAL_UINT8(0x00u, out[RCP_EP_WAKEUP_REG_WUP_STATUS]);
     TEST_ASSERT_EQUAL_UINT8(0x09u, out[RCP_EP_WAKEUP_REG_WUP_STATUS + 1]);
+}
+
+/* MC/DC closure (L459:C13, `src->trigger_on_rising_edge &&
+ * src->trigger_on_falling_edge`): trigger_on_rising_edge's own
+ * independence was already demonstrated (default-zeroed cfg -> both
+ * false -> IO_SRC_INACTIVE/level rendering, contrasted with
+ * test_render_then_apply_reconfig_both_edges_round_trips's rising=true
+ * AND falling=true -> IO_SRC_BOTH_EDGES). But no existing render_registers
+ * test ever set rising=true with falling left false: every other test
+ * that reaches this decision with rising=true also has falling=true
+ * (round trip test above) or never sets rising at all (everything else),
+ * so trigger_on_falling_edge's own independence -- holding rising=true
+ * fixed and varying falling alone -- was never shown. This closes it:
+ * rising-only must render as RISING_EDGE(0x01), not BOTH_EDGES(0x03). */
+//cfusa:test REQ-WAKEUP-022
+static void test_render_registers_rising_edge_only_is_not_both_edges(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        out[RCP_EP_WAKEUP_EP_FUNC_LEN];
+    uint16_t                       reg;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[1].trigger_on_rising_edge  = true;
+    cfg.sources[1].trigger_on_falling_edge = false; /* independence: rising held true, this varies */
+    cfg.sources[1].pin_number              = 0x0009u;
+
+    rcp_ep_wakeup_render_registers(&cfg, out);
+
+    reg = (uint16_t)((out[RCP_EP_WAKEUP_REG_SOURCE_BASE + RCP_EP_WAKEUP_REG_SOURCE_SPAN] << 8) |
+                      out[RCP_EP_WAKEUP_REG_SOURCE_BASE + RCP_EP_WAKEUP_REG_SOURCE_SPAN + 1]);
+    TEST_ASSERT_EQUAL_HEX8(RCP_EP_WAKEUP_IO_SRC_RISING_EDGE, (uint8_t)(reg >> 11));
+    TEST_ASSERT_EQUAL_UINT16(0x0009u, (uint16_t)(reg & 0x07FFu));
 }
 
 //cfusa:test REQ-WAKEUP-036
@@ -1006,6 +1087,25 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+/* MC/DC closure (L629:C13, `data_len == 0 || data == NULL`):
+ * test_encode_reconfig_request_rejects_empty_data above (data_len==0,
+ * data==NULL) demonstrates data_len's own independence -- short-
+ * circuited true, paired against the round-trip test's (data_len>0,
+ * data!=NULL)==false. But data==NULL's own independence needs data_len
+ * held nonzero (so the first condition is false and the second is
+ * actually evaluated) while data alone varies -- no existing test calls
+ * this with a nonzero data_len and a NULL data pointer. This is a
+ * genuine defensive case a real caller could hit (e.g. a buffer that
+ * failed to allocate, with its length tracked separately and not yet
+ * zeroed) -- the function must reject it, not dereference NULL. */
+//cfusa:test REQ-WAKEUP-031
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_reconfig_request(BUS_ID, 0u, NULL, 3u, 1u);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1046,6 +1146,7 @@ int main(void)
     RUN_TEST(test_sleepcmd_response_round_trip_refused);
     RUN_TEST(test_sleepcmd_response_decode_unrecognized_byte_is_refused);
     RUN_TEST(test_sleepcmd_response_decode_shares_request_failure_modes);
+    RUN_TEST(test_sleepcmd_response_decode_empty_err_payload_is_bad_opcode);
 
     RUN_TEST(test_wakeup_message_round_trip);
     RUN_TEST(test_wakeup_message_opcode_distinct_from_sleepcmd);
@@ -1059,6 +1160,7 @@ int main(void)
 
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_render_registers_wup_status_is_a_multi_bit_mask);
+    RUN_TEST(test_render_registers_rising_edge_only_is_not_both_edges);
     RUN_TEST(test_apply_reconfig_writes_ep_status);
     RUN_TEST(test_apply_reconfig_wup_status_write_one_clears);
     RUN_TEST(test_apply_reconfig_wup_status_clears_only_the_named_sources);
@@ -1072,6 +1174,7 @@ int main(void)
     RUN_TEST(test_reconfig_strerror_never_null_and_distinct);
     RUN_TEST(test_encode_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
 
     return UNITY_END();
 }

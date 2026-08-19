@@ -64,6 +64,7 @@
 #include "../src/mem_bounded.h"
 
 #include <rcp/acf.h>
+#include <rcp/alloc.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/discovery.h>
@@ -81,8 +82,25 @@
 
 #include <string.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+/* rcp_alloc_reset_hooks() before AND after every test (test_fragment.c's
+ * own established convention): several MC/DC-closing tests below install
+ * a failing malloc_fn via rcp_alloc_set_hooks() to force a genuine,
+ * portable rcp_bytes_dup() allocation failure (REQ-SEQ-002's own
+ * fault-injection idiom) -- resetting on both sides means a test that
+ * aborts mid-way (TEST_ASSERT failure) never leaks a failing hook into
+ * every test that runs after it in this binary. */
+void setUp(void) { rcp_alloc_reset_hooks(); }
+void tearDown(void) { rcp_alloc_reset_hooks(); }
+
+/* A malloc_fn that always fails, exactly like test_fragment.c's own
+ * always_fails_realloc(): a real, portable, ASan-safe allocation failure
+ * with no absurd size involved (see rcp/alloc.h's own file header for why
+ * this is preferred over an oversized-request trick). */
+static void *always_fails_malloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
 
 /* ── Shared fixtures ───────────────────────────────────────────────────────── */
 
@@ -1901,6 +1919,383 @@ static void test_watchdog_overflows_despite_continuous_requests(void)
     rcp_server_endpoint_destroy(&ep);
 }
 
+/* ── MC/DC gap closure: server.c decision-coverage completion ──────────────
+ *
+ * The eight tests below close real MC/DC independence gaps the LLVM
+ * source-based coverage tool found in server.c -- each one demonstrates a
+ * specific condition's own effect on its decision's outcome, not merely
+ * "more coverage" for its own sake. Three further gaps this same pass
+ * investigated (server.c:88, :128, and one of :361's three conditions)
+ * turned out to be genuinely, provably unreachable rather than closable:
+ * all three ask for rcp_acf_unpack_header()'s own `== RCP_ACF_OK` result
+ * to be independently false, but that function (acf.c) has exactly one
+ * `return` statement -- `return RCP_ACF_OK;` at its very end, with no
+ * other exit path at all -- so the comparison can never take the value
+ * false under any input this module could construct. A fourth
+ * (server.c:532's frame_len>0 half) is unreachable for a different but
+ * equally structural reason documented at its own call site below. None
+ * of the four are gamed with a contrived test; each is left as a genuine,
+ * proven gap. */
+
+/* server.c:96 (rcp_server_endpoint_submit()) index [0]: whether
+ * rcp_acf_peek_gbb_request_type() itself returning false -- as opposed to
+ * returning true for a real (non-Compound-Wait) request_type, the case
+ * test_disabled_endpoint_executes_config_requests_immediately() above
+ * already exercises -- independently keeps a GBB frame with evt[2:0] =
+ * 111b from being fast-pathed as a configuration write. That function
+ * itself returns false for three distinct reasons (acf.c): frame_len < 9,
+ * an unpack failure (dead per this file's own header comment above), or
+ * acf_msg_type != GBB. This test hits the first: a GBB frame truncated to
+ * exactly the 8-octet byte_message_info header, with no request_type
+ * octet at all -- frame_len >= 8 (so submit()'s own outer gate still
+ * admits it to this inner check) but < 9 (so peek_gbb_request_type() muxt
+ * bail before ever reading frame[8]). No real encoder in this codebase
+ * emits a GBB frame this short (the shortest real one carries the 8-byte
+ * repurposed timestamp too, well past 9 octets) -- built by hand with the
+ * public rcp_acf_pack_header() primitive instead, matching this project's
+ * own "hand-crafted wire buffer" idiom for inputs no encoder would ever
+ * produce. */
+static void test_disabled_endpoint_queues_truncated_gbb_frame_too_short_to_peek_request_type(void)
+{
+    rcp_server_endpoint_t       ep;
+    rcp_acf_byte_message_info_t hdr = {0};
+    uint8_t                     frame[8];
+
+    hdr.byte_bus_id     = (rcp_byte_bus_id_t)5u;
+    hdr.transaction_num = 0x44u;
+    hdr.evt             = 0x07u; /* evt[2:0] = 111b: would be config-write, IF classifiable */
+    /* acf_msg_length is expressed in quadlets past the header and is
+     * irrelevant here -- rcp_acf_peek_gbb_request_type() only ever
+     * consults frame_len (the actual buffer size passed below), never
+     * this field, to decide whether frame[8] exists. */
+    rcp_acf_pack_header(frame, RCP_ACF_MSG_TYPE_GBB, 0u, &hdr);
+
+    rcp_server_endpoint_init(&ep, false);
+
+    /* Too short to peek request_type at all: conservatively queued, the
+     * same fail-safe default this function already applies to a
+     * too-short ABB frame (frame_len < 8, the outer gate this inner one
+     * sits inside). */
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame, sizeof(frame), NULL));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&ep));
+
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* server.c:274 (admit_under_tscf_gate()) indices [0] and [1]: `!slot->
+ * frame.data && frame_len > 0`. rcp_bytes_dup() (rcp.c) returns {NULL, 0}
+ * in exactly two circumstances -- len == 0 (nothing to allocate, not a
+ * failure) or a genuine malloc() failure -- so this decision's own two
+ * conditions distinguish "the store legitimately holds a zero-length
+ * frame" from "allocation actually failed and the slot must be released".
+ * Existing coverage already has data.data non-NULL with frame_len > 0
+ * (cond0=false, cond1=true -> false overall,
+ * test_tscf_standard_request_postponed_until_presentation_time() above).
+ * These two tests supply the other two corners: */
+
+/* Index [0]: malloc_fn forced to fail for a real, nonempty frame
+ * (cond0=true, cond1=true -> true overall -> REJECTED), independently
+ * demonstrating cond0's effect against the existing cond1=true, cond0=
+ * false case above. A standard (non-repurposed-GBB) request under a TSCF
+ * header reaches admit_under_tscf_gate() directly (rcp_server_endpoint_
+ * admit()'s "not a repurposed ACF_GBB at all" branch), matching this
+ * file's own established TSCF-postponement fixture. */
+static void test_tscf_gate_rejects_admission_on_frame_dup_allocation_failure(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
+    uint8_t                request_type = 0xFFu;
+    rcp_alloc_hooks_t      hooks = {0};
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&ep, true);
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, true, 5000000u,
+                                                0u, &request_type, NULL, NULL));
+
+    rcp_alloc_reset_hooks();
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* Index [1]: a genuinely zero-length frame reaching this gate with the
+ * real allocator installed (cond0=true because rcp_bytes_dup(x, 0) always
+ * yields {NULL,0} regardless of malloc, cond1=false -> false overall),
+ * independently demonstrating cond1's effect against the malloc-failure
+ * test immediately above (cond0=true, cond1=true -> true). A zero-length
+ * frame reaches admit_under_tscf_gate() the same way any too-short one
+ * does: rcp_compound_peek_request_type(frame, 0, ...) returns
+ * RCP_COMPOUND_ERR_SHORT_FRAME (len < RCP_ACF_GBB_HEADER_LEN), so
+ * rcp_server_endpoint_admit() takes its "not a repurposed ACF_GBB at
+ * all" branch and, with tv set, postpones it via this same gate -- no
+ * earlier check in admit() requires frame_len > 0 (the rsp-bit check at
+ * server.c:361 is itself gated by frame_len >= 8 and simply does not run
+ * for a shorter frame). This is a deliberately-degenerate but real input,
+ * not a rejected one: TC18 places no minimum length on the frame this
+ * layer stores before classification fails downstream. */
+static void test_tscf_gate_admits_zero_length_frame_as_a_legitimate_null_dup(void)
+{
+    rcp_server_endpoint_t ep;
+    uint8_t                dummy[1] = {0};
+    uint8_t                request_type = 0xFFu;
+    size_t                 idx = 0u;
+
+    rcp_server_endpoint_init(&ep, true);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, dummy, 0u, 0u, true, 5000000u, 0u,
+                                                &request_type, &idx, NULL));
+    TEST_ASSERT_EQUAL_UINT8(0u, request_type);
+
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* server.c:478 (rcp_server_endpoint_admit()) indices [0] and [1]:
+ * `!slot->compound_wait_target.data && payload_len > 0`, the identical
+ * shape as server.c:274 above, guarding the Compound Wait comparison
+ * target's own dup instead of the stored frame. Existing coverage (e.g.
+ * test_compound_wait_requires_the_wait_condition(),
+ * tests/test_conditional_dispatch.c) already has a real 2-byte target
+ * dup succeed (cond0=false, cond1=true -> false). These two tests supply
+ * the other corners, the same way the :274 pair above does. */
+
+/* Index [0]: malloc_fn forced to fail while admitting a Compound Wait
+ * request with a real, nonempty comparison target. */
+static void test_compound_wait_target_dup_allocation_failure_rejects_admission(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_compound_step_t   step;
+    rcp_bytes_t           frame;
+    uint8_t               request_type = 0xFFu;
+    const uint8_t         target[2]    = {0x01u, 0x02u};
+    rcp_alloc_hooks_t     hooks        = {0};
+
+    memset(&step, 0, sizeof(step));
+    step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state   = 7u;
+    /* evt = 0x0 (exact-match mode, §13.5.1): any rcp_acf_compound_wait_
+     * evt_valid() value works here -- admission-time validation, not the
+     * later comparison itself, is what this test exercises. */
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, (rcp_byte_bus_id_t)1u,
+                                         &step, 0x0u, 60u, target, sizeof(target));
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_server_endpoint_init(&ep, true);
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
+                                                &request_type, NULL, NULL));
+
+    rcp_alloc_reset_hooks();
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* Index [1]: a Compound Wait request encoded with NO comparison target at
+ * all (payload = NULL, payload_len = 0 -- rcp_compound_encode_request()'s
+ * own doc comment states this combination explicitly: "payload may be
+ * NULL iff payload_len == 0", a documented legal encoding, not a
+ * hand-crafted malformed one). Admission must still succeed: an empty
+ * target is stored as a genuine {NULL,0} rcp_bytes_t, exactly like
+ * rcp_bytes_dup()'s own zero-length convention, not mistaken for the
+ * allocation failure the test above forces. */
+static void test_compound_wait_with_empty_target_payload_admits_successfully(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_compound_step_t   step;
+    rcp_bytes_t           frame;
+    uint8_t               request_type = 0xFFu;
+    size_t                idx          = 0u;
+
+    memset(&step, 0, sizeof(step));
+    step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state   = 7u;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, (rcp_byte_bus_id_t)1u,
+                                         &step, 0x0u, 61u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_server_endpoint_init(&ep, true);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
+                                                &request_type, &idx, NULL));
+    TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND_WAIT, request_type);
+
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* server.c:532 (rcp_server_endpoint_admit()) index [0] only: `!slot->
+ * frame.data && frame_len > 0`, the shared final store-dup every
+ * successfully-decoded conditional kind (Compound, Compound Wait,
+ * Triggered, Timed, Chained) falls through to. Index [1] (frame_len > 0)
+ * is a fourth genuinely unreachable condition, not closed here: reaching
+ * this line at all requires one of rcp_compound_decode_request()/
+ * rcp_triggered_decode_request()/rcp_timed_decode_request()/
+ * rcp_chained_decode_member() to have just returned OK, and every one of
+ * those decodes via rcp_acf_decode_gbb() (or the ABB-timed equivalent),
+ * which itself requires frame_len >= RCP_ACF_GBB_HEADER_LEN (16, request.c)
+ * to succeed at all -- so frame_len is structurally always > 0 (in fact
+ * always >= 16) by the time this line runs; the len==0 corner server.c:274
+ * legitimately reaches (frame_len is checked before ANY decode is
+ * attempted there) cannot occur here, where a successful decode is a
+ * precondition of even reaching this statement. Index [0] (a genuine
+ * malloc failure on a real, successfully-decoded request) is independently
+ * demonstrable and closed here using TRIGGERED -- the simplest kind that
+ * reaches this exact line with no sequencer table or extra fixture
+ * needed. */
+static void test_triggered_request_frame_dup_allocation_failure_rejects_admission(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_triggered_step_t  step;
+    rcp_bytes_t           frame;
+    uint8_t               request_type = 0xFFu;
+    rcp_alloc_hooks_t     hooks        = {0};
+
+    memset(&step, 0, sizeof(step));
+    step.trigger_source_ep = 0u;
+    step.trigger_signal_nr = 0u;
+    frame = rcp_triggered_encode_request(RCP_REQUEST_TYPE_TRIGGERED, (rcp_byte_bus_id_t)5u, &step,
+                                          70u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_server_endpoint_init(&ep, true);
+
+    hooks.malloc_fn = always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
+                                                &request_type, NULL, NULL));
+
+    rcp_alloc_reset_hooks();
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* server.c:556 (start_condition_holds(), COMPOUND/COMPOUND_WAIT case)
+ * index [0]: `ctx->sequencers != NULL && rcp_compound_start_condition_
+ * met(...)`. Every existing test that reaches this line supplies a real
+ * (non-NULL) sequencer table -- cond1's own independence (a present table
+ * that does/doesn't satisfy the step's start_state) is already closed
+ * elsewhere (e.g. test_compound_waits_for_its_sequencer_state(),
+ * tests/test_conditional_dispatch.c). This test supplies the missing
+ * cond0=false corner directly: a Compound request admitted with a
+ * start_state that WOULD be immediately satisfied by any real table (0,
+ * "start in any state"), but selected via ctx.sequencers == NULL. Per
+ * rcp_server_tick_ctx_t's own doc comment ("may be an unsupported table,
+ * in which case no compound or compound-wait request ever becomes due"),
+ * the short-circuited right operand is never reached and the request
+ * never arms -- demonstrated here by then supplying a real table on a
+ * second call and observing it immediately becomes due, with nothing
+ * else about the request having changed. */
+static void test_compound_request_never_starts_without_a_sequencer_table(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_compound_step_t   step;
+    rcp_bytes_t           frame;
+    uint8_t               request_type = 0xFFu;
+    size_t                idx          = 0u;
+    rcp_server_tick_ctx_t ctx;
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(1u);
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 0u, 3u)); /* nonzero: enabled */
+
+    memset(&step, 0, sizeof(step));
+    step.start_state     = 0u; /* "start in any state": would fire immediately with a table */
+    step.next_state       = 4u;
+    step.sequencer_index   = 0u;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, (rcp_byte_bus_id_t)1u, &step,
+                                         0x0u, 62u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_server_endpoint_init(&ep, true);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
+                                                &request_type, &idx, NULL));
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+    ctx.sequencers     = NULL; /* cond0 = false: the right operand is never evaluated */
+
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Same slot, same start_state, nothing else changed -- only
+     * ctx.sequencers now points at a real table with sequencer 0 already
+     * enabled and in a nonzero state: cond0 = true, cond1 evaluates and
+     * is satisfied by the "any state" wildcard, so it becomes due on the
+     * very next tick. */
+    ctx.sequencers = &table;
+    TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    rcp_sequencer_table_free(&table);
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* server.c:747 (is_due()) index [1]: `!ep->ep_enable &&
+ * kind_is_gated_by_ep_enable(slot->kind)`. Every existing ep_enable=false
+ * test that reaches is_due() (this file's own submit()/admit() tests
+ * above, plus tests/test_conditional_dispatch.c's four "disabled endpoint
+ * queues X request without executing it" tests for Compound/Triggered/
+ * Timed/Chained) uses a kind kind_is_gated_by_ep_enable() returns true
+ * for, so cond1 always shows true there. This test supplies the missing
+ * cond1=false corner with cond0 held at the same true (ep disabled):
+ * REQ-TIMED-012's own STANDARD-under-TSCF-gate postponement path (this
+ * file's own test_tscf_standard_request_postponed_until_presentation_
+ * time() above, but now with the endpoint disabled) is exactly the kind
+ * kind_is_gated_by_ep_enable() returns false for (its own switch has no
+ * STANDARD case, falling to `default: return false`) -- per is_due()'s
+ * own doc comment, "no config-vs-operational distinction is needed
+ * here... every kind this gate applies to is inherently an operational
+ * request", and STANDARD is deliberately not one of them, since it has
+ * no conditional kind-specific semantics of its own to misclassify. The
+ * request becomes due purely on the envelope-level presentation gate,
+ * exactly as it would on an enabled endpoint -- ep_enable plays no part
+ * in this kind's own condition at all. */
+static void test_disabled_endpoint_still_executes_tscf_gated_standard_request_once_due(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
+    uint8_t               request_type = 0xFFu;
+    size_t                idx = 0u;
+    rcp_server_tick_ctx_t ctx;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&ep, false); /* disabled -- cond0 = !ep->ep_enable = true */
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, true, 5000000u,
+                                                0u, &request_type, &idx, NULL));
+    TEST_ASSERT_EQUAL_UINT8(0u, request_type); /* standard: kind_is_gated_by_ep_enable() = false */
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+
+    /* Not yet due: the presentation gate itself, not ep_enable, is what's
+     * withholding it. */
+    ctx.gptp_locked = true;
+    ctx.gptp_now     = 4999999u;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Presentation gate open: due, despite the endpoint remaining
+     * disabled the entire time -- the ep_enable gate this test targets
+     * simply never applies to a STANDARD-kind slot. */
+    ctx.gptp_now = 5000000u;
+    TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1956,6 +2351,15 @@ int main(void)
     RUN_TEST(test_tscf_pending_standard_request_no_acknowledge_when_evt3_clear);
     RUN_TEST(test_timed_encode_request_tscf_produces_a_real_abb_message);
     RUN_TEST(test_watchdog_overflows_despite_continuous_requests);
+
+    RUN_TEST(test_disabled_endpoint_queues_truncated_gbb_frame_too_short_to_peek_request_type);
+    RUN_TEST(test_tscf_gate_rejects_admission_on_frame_dup_allocation_failure);
+    RUN_TEST(test_tscf_gate_admits_zero_length_frame_as_a_legitimate_null_dup);
+    RUN_TEST(test_compound_wait_target_dup_allocation_failure_rejects_admission);
+    RUN_TEST(test_compound_wait_with_empty_target_payload_admits_successfully);
+    RUN_TEST(test_triggered_request_frame_dup_allocation_failure_rejects_admission);
+    RUN_TEST(test_compound_request_never_starts_without_a_sequencer_table);
+    RUN_TEST(test_disabled_endpoint_still_executes_tscf_gated_standard_request_once_due);
 
     return UNITY_END();
 }

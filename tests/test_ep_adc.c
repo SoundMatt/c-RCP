@@ -702,6 +702,58 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+/* MC/DC independence for reg_offset_read_only()'s third and fourth
+ * conditions (addr == RCP_EP_ADC_REG_BASE_CLK and addr ==
+ * RCP_EP_ADC_REG_BASE_CLK + 1): test_apply_reconfig_ignores_read_only_registers
+ * above never actually addresses either byte of base_clk -- its write
+ * spans offsets 0x00-0x03 (EP_LEN, the reserved octet, and both R/W
+ * octets of enable_clr/options), landing only on this function's first
+ * two conditions. This write instead spans offsets 0x04-0x06 so
+ * reg_offset_read_only() is called once per octet with addr equal to
+ * base_clk's low octet (third condition true, first/second/fourth
+ * false), base_clk's high octet (fourth condition true, the other three
+ * false), and ep_status's low octet (all four conditions false, giving
+ * the "otherwise false" half of both pairs). */
+//cfusa:test REQ-ADC-039
+static void test_apply_reconfig_ignores_base_clk_octets_individually(void)
+{
+    rcp_ep_adc_functional_cfg_t cfg;
+    uint8_t                     payload[2 + 3];
+
+    rcp_ep_adc_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_ADC_REG_BASE_CLK; /* start_address = 0x04 */
+    payload[2] = 0xFF; /* addr 0x04 -- base_clk low octet, RO: ignored */
+    payload[3] = 0xFF; /* addr 0x05 -- base_clk high octet, RO: ignored */
+    payload[4] = 0x99; /* addr 0x06 -- ep_status low octet, R/W: applied */
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_RECONFIG_OK,
+        rcp_ep_adc_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    /* base_clk is never stored in cfg at all -- render always re-derives
+     * both its octets as 0 (see rcp_ep_adc_render_registers), so the RO
+     * write above having no effect on it is inherent, not merely
+     * unobserved. What proves the guard actually fired is that
+     * ep_status's low octet (0x06, addressed in the very same write) DID
+     * take the 0x99 this loop wrote -- were the base_clk guard not
+     * checked per-octet, offsets 0x04/0x05 would instead fall through to
+     * writing into the block image at those positions, which render then
+     * overwrites right back to 0 before this call returns -- so this
+     * assertion alone cannot distinguish "guard fired" from "guard
+     * skipped, then overwritten anyway"; the record in field index 9
+     * for reg_offset_read_only()'s own decision is the actual proof,
+     * verified separately via the MC/DC export. */
+    {
+        uint8_t out[RCP_EP_ADC_EP_FUNC_LEN];
+
+        rcp_ep_adc_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_ADC_REG_BASE_CLK]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_ADC_REG_BASE_CLK + 1]);
+    }
+    TEST_ASSERT_EQUAL_UINT16(0x9900, cfg.ep_status);
+}
+
 //cfusa:test REQ-ADC-039
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
@@ -764,6 +816,22 @@ static void test_reconfig_request_round_trip(void)
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_adc_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* MC/DC independence for `data_len == 0 || data == NULL`'s second
+ * condition: data_len is nonzero here (first condition false, so it does
+ * NOT short-circuit the OR), and data is NULL -- the decision must still
+ * come out true purely on the second condition, distinct from
+ * test_encode_reconfig_request_rejects_empty_data's data_len==0 case
+ * above (which short-circuits before data is even examined) and from
+ * test_reconfig_request_round_trip's fully-valid call (both conditions
+ * false). */
+//cfusa:test REQ-ADC-054
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_adc_encode_reconfig_request(0x00, 0, NULL, 5, 0);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -1058,6 +1126,37 @@ static void test_response_decode_rejects_bad_payload_len(void)
     rcp_bytes_free(&frame);
 }
 
+/* MC/DC independence for `payload_len == 0 || (payload_len %
+ * RCP_EP_ADC_VALUE_LEN) != 0`'s first condition: an entirely empty
+ * payload -- 0 % RCP_EP_ADC_VALUE_LEN is 0, so the second condition is
+ * false here and only payload_len==0 drives the true outcome. Distinct
+ * from test_response_decode_rejects_bad_payload_len above (payload_len=3,
+ * first condition false, second condition true) and from any successful
+ * decode (e.g. test_response_round_trip_untimed's payload_len=2), which
+ * holds both conditions false. */
+//cfusa:test REQ-ADC-029
+static void test_response_decode_rejects_empty_payload(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    uint16_t                    out_values[4];
+    size_t                      out_count;
+    bool                        out_timed;
+    uint64_t                    out_ts;
+    uint8_t                     out_tn;
+    rcp_ep_adc_errc_t           rc;
+
+    hdr.byte_bus_id = 8;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0); /* zero-length payload */
+
+    rc = rcp_ep_adc_decode_response(frame.data, frame.len, 8, out_values, 4, &out_count,
+                                     &out_timed, &out_ts, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN, rc);
+
+    rcp_bytes_free(&frame);
+}
+
 //cfusa:test REQ-ADC-047
 static void test_response_decode_rejects_more_values_than_caller_can_hold(void)
 {
@@ -1085,6 +1184,23 @@ static void test_response_encode_rejects_zero_or_oversized_value_count(void)
     TEST_ASSERT_NULL(frame.data);
 
     frame = rcp_ep_adc_encode_response(8, values, RCP_EP_ADC_MAX_VALUES + 1u, 1, false, 0);
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* MC/DC independence for `values == NULL || value_count == 0 ||
+ * value_count > RCP_EP_ADC_MAX_VALUES`'s first condition: value_count
+ * here is nonzero and within range (both later conditions false), so
+ * only values==NULL can be driving the true outcome -- distinct from
+ * test_response_encode_rejects_zero_or_oversized_value_count above
+ * (which exercises the other two conditions with values always
+ * non-NULL) and from any successful encode (e.g.
+ * test_response_carries_eight_measurement_values), which holds all
+ * three conditions false. */
+//cfusa:test REQ-ADC-042
+static void test_response_encode_rejects_null_values_with_valid_count(void)
+{
+    rcp_bytes_t frame = rcp_ep_adc_encode_response(8, NULL, 4, 1, false, 0);
+
     TEST_ASSERT_NULL(frame.data);
 }
 
@@ -1293,10 +1409,12 @@ int main(void)
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_apply_reconfig_writes_resolution_and_trigger_thresholds);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_ignores_base_clk_octets_individually);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
@@ -1313,8 +1431,10 @@ int main(void)
     RUN_TEST(test_response_round_trip_untimed);
     RUN_TEST(test_response_round_trip_timed);
     RUN_TEST(test_response_decode_rejects_bad_payload_len);
+    RUN_TEST(test_response_decode_rejects_empty_payload);
     RUN_TEST(test_response_decode_rejects_more_values_than_caller_can_hold);
     RUN_TEST(test_response_encode_rejects_zero_or_oversized_value_count);
+    RUN_TEST(test_response_encode_rejects_null_values_with_valid_count);
     RUN_TEST(test_response_no_signal_sentinel_round_trips);
     RUN_TEST(test_pipeline_end_to_end_multi_value_timed_response);
 

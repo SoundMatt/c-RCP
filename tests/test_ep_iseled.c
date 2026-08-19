@@ -204,6 +204,37 @@ static void test_bitframe_decode_rejects_bad_symbol(void)
     rcp_bytes_free(&framed);
 }
 
+/* MC/DC: the byte-decode loop's
+ * `!rcp_ep_iseled_symbol_decode(hi) || !rcp_ep_iseled_symbol_decode(lo)`
+ * has the hi-symbol operand's independence already shown by
+ * test_bitframe_decode_rejects_bad_symbol() above (it corrupts
+ * framed.data[0], the hi-nibble symbol) -- but that always short-circuits
+ * before the lo-symbol operand is ever evaluated, so the lo operand's own
+ * independent effect on the outcome was never demonstrated. Corrupt only
+ * framed.data[1] (the lo-nibble symbol) instead, leaving the hi symbol
+ * valid, so a bug that dropped the second `||` operand entirely (e.g. an
+ * accidental `&&`, or the lo decode call being skipped) would surface as
+ * a bad low-nibble symbol silently decoding as if it were good. */
+static void test_bitframe_decode_rejects_bad_lo_symbol_with_valid_hi_symbol(void)
+{
+    uint8_t     data[1] = {0x42};
+    rcp_bytes_t framed = rcp_ep_iseled_encode_bitframe(data, sizeof(data), false);
+    rcp_bytes_t decoded = {0};
+
+    TEST_ASSERT_NOT_NULL(framed.data);
+    framed.data[1] = (uint8_t)(framed.data[1] ^ 0x10u); /* flip the lo
+                                                             symbol's parity
+                                                             bit; hi symbol
+                                                             (data[0]) stays
+                                                             valid */
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_BAD_SYMBOL,
+        rcp_ep_iseled_decode_bitframe(framed.data, framed.len, false, &decoded));
+    TEST_ASSERT_NULL(decoded.data);
+
+    rcp_bytes_free(&framed);
+}
+
 static void test_bitframe_decode_rejects_crc_mismatch(void)
 {
     uint8_t     data[2] = {0x11, 0x22};
@@ -587,6 +618,41 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
     }
 }
 
+/* MC/DC: iseled_reg_offset_read_only()'s OR chain (EP_LEN | RESERVED_01 |
+ * BASE_CLK | BASE_CLK+1) has its first two disjuncts independently
+ * demonstrated by test_apply_reconfig_ignores_read_only_registers() above
+ * -- but that test's write only spans offsets 0x00-0x03 (its own comment
+ * claiming to cover "both octets of base_clk" is in error: start_address=0,
+ * data_len=4 reaches offsets 0,1,2,3, never 4 or 5). base_clk's own two
+ * octets were therefore never independently exercised at all. Isolate
+ * each one with its own single-octet write. */
+static void test_apply_reconfig_ignores_base_clk_octets_individually(void)
+{
+    rcp_ep_iseled_functional_cfg_t cfg;
+    uint8_t                        payload[3];
+
+    rcp_ep_iseled_functional_cfg_init(&cfg);
+
+    /* base_clk low octet (0x04) alone. */
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_ISELED_REG_BASE_CLK;
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_RECONFIG_OK,
+        rcp_ep_iseled_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.base_clk);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
+
+    /* base_clk high octet (0x05) alone. */
+    payload[1] = (uint8_t)(RCP_EP_ISELED_REG_BASE_CLK + 1u);
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_RECONFIG_OK,
+        rcp_ep_iseled_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.base_clk);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
+}
+
 static void test_apply_reconfig_rejects_write_past_ep_len(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
@@ -645,6 +711,18 @@ static void test_reconfig_request_round_trip(void)
 static void test_encode_reconfig_request_rejects_empty_data(void)
 {
     rcp_bytes_t frame = rcp_ep_iseled_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+/* MC/DC: independently demonstrates the `data == NULL` half of
+ * `data_len == 0 || data == NULL` -- a nonzero data_len paired with a NULL
+ * data pointer, so the rejection can only be attributed to the second
+ * operand, not the first (which the empty-data test above already
+ * covers). */
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_iseled_encode_reconfig_request(0x00, 0, NULL, 5, 0);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -1242,6 +1320,7 @@ int main(void)
     RUN_TEST(test_bitframe_empty_no_crc);
     RUN_TEST(test_bitframe_decode_rejects_odd_symbol_count);
     RUN_TEST(test_bitframe_decode_rejects_bad_symbol);
+    RUN_TEST(test_bitframe_decode_rejects_bad_lo_symbol_with_valid_hi_symbol);
     RUN_TEST(test_bitframe_decode_rejects_crc_mismatch);
     RUN_TEST(test_bitframe_decode_rejects_short_frame_when_crc_expected);
 
@@ -1272,10 +1351,12 @@ int main(void)
     RUN_TEST(test_render_registers_ignores_crc_enable);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_ignores_base_clk_octets_individually);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
