@@ -487,7 +487,15 @@ static void test_addr_string_returns_zero_for_zero_capacity_buffer(void)
  * reused by something else entirely in the process (double-close on a
  * stale number is a real footgun) -- so a filler socket re-claims the
  * same number first (same lowest-available guarantee), giving
- * destroy()'s close() a harmless target of our own instead. */
+ * destroy()'s close() a harmless target of our own instead.
+ *
+ * POSIX-only, matching bind_or_ignore()'s own platform gating (this
+ * file's udp.c has no real Windows transport at all -- see its own
+ * header) -- and the fd-stealing technique itself relies on POSIX's
+ * lowest-numbered-descriptor guarantee for socket(), which Windows
+ * doesn't make and whose raw socket()/close() calls this file doesn't
+ * even declare on that platform. */
+#if !defined(_WIN32)
 //cfusa:test REQ-UDP-004
 static void test_port_returns_zero_when_fd_invalid_underneath_transport(void)
 {
@@ -520,6 +528,7 @@ static void test_port_returns_zero_when_fd_invalid_underneath_transport(void)
     TEST_ASSERT_TRUE(filler >= 0);
     rcp_avtp_transport_release(srv);
 }
+#endif /* !_WIN32 */
 
 static void test_dial_unreachable_host_still_ok_at_construct_time(void)
 {
@@ -825,7 +834,9 @@ int main(void)
     RUN_TEST(test_port_returns_zero_for_fd_from_failed_bind);
     RUN_TEST(test_addr_string_returns_zero_for_fd_from_failed_bind);
     RUN_TEST(test_addr_string_returns_zero_for_zero_capacity_buffer);
+#if !defined(_WIN32)
     RUN_TEST(test_port_returns_zero_when_fd_invalid_underneath_transport);
+#endif
     RUN_TEST(test_dial_unreachable_host_still_ok_at_construct_time);
     RUN_TEST(test_dial_bad_address_is_not_ok);
 
