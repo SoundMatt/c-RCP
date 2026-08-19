@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.474.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-E2E-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged `REQ-E2E-*` (46, `src/e2e.c`/`src/mock.c`) plus `REQ-WIREERR-003` (`src/e2e.c`, claimed by the same test file) -- 9 proxy-flagged.
+
+**All 9 flagged ids confirmed atomic, except `REQ-E2E-023`, which needed a text trim (no split).** `REQ-E2E-008`/`REQ-E2E-031`/`REQ-E2E-038`/`REQ-E2E-039`/`REQ-E2E-040`/`REQ-E2E-041`/`REQ-E2E-042` each bundle one function's (or one matched TC18-coupled function pair's) complete contract via multiple "shall"s for completeness, the same pattern established throughout this audit. `REQ-E2E-036` is the matched `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` +1/-1-quadlet encode/decode round-trip pair, already tested together as one causal scenario, matching the `REQ-SEQ-001` precedent. `REQ-E2E-023`'s text redundantly narrated `rcp_e2e_stream_fault_is_faulted()`'s own general true/false reporting contract -- already `REQ-E2E-044`'s own separate requirement -- as part of `rcp_e2e_stream_fault_reset()`'s own contract; trimmed to just the reset contract itself, keeping the id, no split, no test-tag changes to `REQ-E2E-023` or `REQ-E2E-044`.
+
+**File-header tagging fixed in both test files.** `tests/test_e2e.c` (`REQ-E2E-001`..`027`/`043`/`044`/`046`, `REQ-WIREERR-003`, plus a `//cfusa:sec-test` block for CYBERSECURITY.md §1.3 Layer 3) had its stacked header removed and per-function tags applied across all 60 real test functions -- several tests (the `stream_fault`/`stream_status` families) already carried correct per-function tags coexisting with the redundant header from an earlier partial pass; those were extended in place with the additional ids their bodies genuinely demonstrate (e.g. the stream-fault-latch/reset pair also carries `REQ-E2E-021`/`REQ-E2E-022`/`REQ-E2E-023` alongside their existing `REQ-E2E-043`/`REQ-E2E-044`) rather than duplicated. `tests/test_tc18_gaps_e2e.c` is a large integration-test file (74 real test functions) whose header bundled `REQ-E2E-021`/`028`/`029`/`031`..`042` together with `REQ-TIMED-012`/`013`; only the `REQ-E2E-*` header lines were touched and relocated per-function, leaving the `REQ-TIMED-012`/`013` lines untouched per the established `REQ-WDG-010`-batch precedent. Its own already-correct `REQ-WDG-010` per-function tag was likewise left untouched.
+
+**One cross-requirement gap closed within scope: `REQ-E2E-045`.** Neither file's header claimed it despite `test_tc18_gaps_e2e.c` already containing its own citing text's two proof functions (`test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings`, `test_crc_error_does_not_broadcast_without_an_ep_id_map`); both now carry the tag directly.
+
+**MC/DC-closure, fault-injection, and roadmap-integration tests left deliberately untagged** (no requirement's own text describes the specific branch/edge-case/allocator-failure/malformed-input scenario each demonstrates): four MC/DC-labeled guard tests in `test_e2e.c` (`test_wrap_null_frame_with_zero_length_is_rejected`, `test_unwrap_leaves_already_zero_acf_msg_length_unadapted`, `test_unwrap_malloc_failure_still_reports_crc_verdict`, `test_unwrap_crc_only_frame_yields_empty_body`); one sequencer-specific edge case whose real subject is the out-of-scope `REQ-SEQ-012` (`test_endpoint_in_safe_state_fails_closed_when_sequencer_disabled`); one full end-to-end roadmap scenario whose every constituent behavior already has its own dedicated primary test (`test_watchdog_overflow_drives_the_full_purge_and_survive_flow`); in `test_tc18_gaps_e2e.c`, the two `REQ-WDG-010`-domain watchdog-kick edge cases, three `REQ-TIMED-012`/`013`-domain presentation-time postponement/regression tests times their TSCF/fragment/frame variants (7 total), two malformed-input rejection tests, eight allocator-failure-injection tests, and two explicitly-named `_mcdc` classifier-closure tests.
+
+**Verification:** full clean rebuild + 67/67 test suite passing; ASan/UBSan clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 100` both pass -- 1274/1274 traced (unchanged, no split), 512/512 functions annotated.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.473.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-PWRMODE-*: requirement-atomicity audit, Group 4 residual)
 
 Triaged `REQ-PWRMODE-*` (28, `src/power.c`/`src/powerstate.c`/`src/ep_wakeup.c`/`src/server.c`/`src/mock.c`) -- 6 proxy-flagged.

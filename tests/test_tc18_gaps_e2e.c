@@ -1,19 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-E2E-031
-//cfusa:test REQ-E2E-032
-//cfusa:test REQ-E2E-033
-//cfusa:test REQ-E2E-034
-//cfusa:test REQ-E2E-035
-//cfusa:test REQ-E2E-036
-//cfusa:test REQ-E2E-037
-//cfusa:test REQ-E2E-038
-//cfusa:test REQ-E2E-039
-//cfusa:test REQ-E2E-040
-//cfusa:test REQ-E2E-041
-//cfusa:test REQ-E2E-042
-//cfusa:test REQ-E2E-021
-//cfusa:test REQ-E2E-028
-//cfusa:test REQ-E2E-029
 //cfusa:test REQ-TIMED-012
 //cfusa:test REQ-TIMED-013
 
@@ -192,6 +177,7 @@ static void counting_handler(const uint8_t *request, size_t request_len, rcp_byt
  * at its default (plain mode) executes an unprotected request exactly as
  * rcp_mock_server_dispatch() would; the same endpoint switched to safe
  * mode does not. */
+//cfusa:test REQ-E2E-031
 static void test_dispatch_e2e_plain_mode_executes_unprotected_request(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -218,6 +204,7 @@ static void test_dispatch_e2e_plain_mode_executes_unprotected_request(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-E2E-031
 static void test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -253,6 +240,8 @@ static void test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request(void)
  * SAME endpoint after it is switched into safe mode: rejected, not
  * executed -- exactly the gate the pre-fix version of this test pinned
  * as missing. */
+//cfusa:test REQ-E2E-031
+//cfusa:test REQ-E2E-041
 static void test_dispatch_e2e_safe_mode_rejects_an_unprotected_request(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -281,6 +270,8 @@ static void test_dispatch_e2e_safe_mode_rejects_an_unprotected_request(void)
 /* Both catalogued "implemented": safe command mode alters nothing but the
  * appended trailer and the length accounting, and one identical scheme
  * serves requests and responses (no direction parameter exists). */
+//cfusa:test REQ-E2E-032
+//cfusa:test REQ-E2E-040
 static void test_safe_mode_changes_only_trailer_and_length(void)
 {
     const uint8_t pl[4] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -327,6 +318,7 @@ static void test_safe_mode_changes_only_trailer_and_length(void)
  * of the ACF frame. Asserted against a hand-built concatenation, plus
  * two negative controls that would pass if the width or the byte order
  * were wrong. */
+//cfusa:test REQ-E2E-034
 static void test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4(void)
 {
     const uint8_t body[4] = {0xAA, 0xBB, 0xCC, 0xDD};
@@ -371,6 +363,7 @@ static void test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4(void)
  * a caller that already knows a message's framing passes is_ntscf_framed
  * instead of pre-zeroing avtp_timestamp itself, and the wrapper enforces
  * the zero contribution regardless of what avtp_timestamp it was given. */
+//cfusa:test REQ-E2E-035
 static void test_ntscf_framed_wrapper_forces_zero_timestamp(void)
 {
     const uint8_t pl[4]   = {0x5A, 0x5B, 0x5C, 0x5D};
@@ -432,6 +425,7 @@ static void test_ntscf_framed_wrapper_forces_zero_timestamp(void)
 
 /* Catalogued "implemented": +1 quadlet on wrap (before the CRC is
  * computed), -1 on unwrap, fail-safe at both ends of the 9-bit field. */
+//cfusa:test REQ-E2E-036
 static void test_acf_msg_length_adaptation_and_reversal(void)
 {
     const uint8_t pl[4]      = {0x10, 0x20, 0x30, 0x40};
@@ -484,6 +478,7 @@ static void test_acf_msg_length_adaptation_and_reversal(void)
  * rcp_mock_server_dispatch_e2e() independently, so corrupting only the
  * second member's trailer produces one successful execution and one
  * RCP_MOCK_DISPATCH_CRC_ERROR, not an all-or-nothing frame-wide verdict. */
+//cfusa:test REQ-E2E-033
 static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
 {
     const uint8_t a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
@@ -534,6 +529,8 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
  * safe-mode endpoint (make_abb() always targets byte_bus_id 0x11), one
  * with a valid trailer and one corrupted, dispatched together as a single
  * frame via rcp_mock_server_dispatch_frame_e2e(). */
+//cfusa:test REQ-E2E-033
+//cfusa:test REQ-E2E-041
 static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
 {
     rcp_mock_server_t             *srv = rcp_mock_server_new();
@@ -590,6 +587,7 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
  * already right as long as the caller wrapped every protected member
  * first. As of the REQ-E2E-037 fix, that rule now also has its own named,
  * pure, directly-testable expression: rcp_e2e_data_length_for_protected_members(). */
+//cfusa:test REQ-E2E-037
 static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
 {
     const uint8_t             p[4] = {0xC1, 0xC2, 0xC3, 0xC4};
@@ -637,6 +635,7 @@ static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
 }
 
 /* Direct tests of rcp_e2e_data_length_for_protected_members() itself. */
+//cfusa:test REQ-E2E-037
 static void test_data_length_for_protected_members_is_pure_arithmetic(void)
 {
     TEST_ASSERT_EQUAL_UINT(0u, rcp_e2e_data_length_for_protected_members(0u));
@@ -664,6 +663,7 @@ static void test_data_length_for_protected_members_is_pure_arithmetic(void)
  * because c-RCP still has no caller anywhere that wires the new
  * primitive into an actual fragmented encode/decode path -- see the
  * function's own doc comment for why). */
+//cfusa:test REQ-E2E-038
 static void test_fragmented_crc_covers_only_the_last_fragment(void)
 {
     const uint8_t p0[4] = {0xF0, 0xF1, 0xF2, 0xF3};
@@ -712,6 +712,7 @@ static void test_fragmented_crc_covers_only_the_last_fragment(void)
  * concatenating header ++ payload and calling rcp_e2e_compute_crc() once
  * (the technique it uses internally to avoid the allocation), and
  * sensitive to a change anywhere in either region. */
+//cfusa:test REQ-E2E-038
 static void test_compute_fragmented_crc_matches_manual_concatenation(void)
 {
     const uint8_t hdr[8]     = {0x0Eu, 0x00, 0x11, 0x22, 0x00, 0x00, 0x00, 0x10};
@@ -756,6 +757,7 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
  * in src/, and rcp_e2e_wrap() never reads ms: it appends a trailer to an
  * ms=1 (non-final) fragment just as readily. A conforming implementation
  * would refuse to protect a fragment whose ms bit is set. */
+//cfusa:test REQ-E2E-039
 static void test_ms_bit_to_carries_crc_binding_is_not_enforced(void)
 {
     const uint8_t               pl[4] = {0x71, 0x72, 0x73, 0x74};
@@ -804,6 +806,7 @@ static void test_ms_bit_to_carries_crc_binding_is_not_enforced(void)
  * *out_response is a genuine TC18 sec. 12.9.6 Error Response -- err=1,
  * rsp=1, payload = RCP_ERROR_POCI_FAILURE -- built via
  * rcp_acf_build_error_response(), not a diagnostic echo of the request. */
+//cfusa:test REQ-E2E-041
 static void test_crc_mismatch_skips_execution_without_error_response(void)
 {
     const uint8_t               pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
@@ -828,6 +831,7 @@ static void test_crc_mismatch_skips_execution_without_error_response(void)
 /* The real server-facing half: the same corrupted-trailer frame, through
  * rcp_mock_server_dispatch_e2e() against a registered, safe-mode
  * endpoint. */
+//cfusa:test REQ-E2E-041
 static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
 {
     rcp_mock_server_t          *srv  = rcp_mock_server_new();
@@ -885,6 +889,7 @@ static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
  * stream via EP_ID_config (rcp_mock_server_set_ep_id_map(), issue #335)
  * -- 0x12 was never the endpoint whose own CRC failed, and never even had
  * req_crc_enable set on it. */
+//cfusa:test REQ-E2E-045
 static void test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings(void)
 {
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
@@ -955,6 +960,7 @@ static void test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_sibli
  * (e.g. as a byproduct of the fault-tracker latch, or unconditionally for
  * every registered endpoint). Without a bound-endpoint table, 0x12's own
  * pending request survives. */
+//cfusa:test REQ-E2E-045
 static void test_crc_error_does_not_broadcast_without_an_ep_id_map(void)
 {
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
@@ -1027,6 +1033,7 @@ static void set_up_seq_stream(rcp_mock_server_t *srv, bool rx_enforce_seq,
  * a REPLAY of that same sequence_num on the very next frame is then
  * correctly rejected: every member of the second frame comes back
  * RCP_MOCK_DISPATCH_SEQ_ERROR, byte_bus_id 0, response zeroed. */
+//cfusa:test REQ-E2E-028
 static void test_dispatch_frame_rejects_replayed_sequence_num(void)
 {
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
@@ -1059,6 +1066,7 @@ static void test_dispatch_frame_rejects_replayed_sequence_num(void)
 
 /* RFC 1982 wraparound: 0xFF -> 0x00 is a valid single increment, not a
  * replay -- see rcp_e2e_seq_evaluate()'s own doc comment (e2e.h). */
+//cfusa:test REQ-E2E-028
 static void test_dispatch_frame_accepts_wrapped_sequence_num(void)
 {
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
@@ -1092,6 +1100,7 @@ static void test_dispatch_frame_accepts_wrapped_sequence_num(void)
  * admitted -- a per-member evaluate() would spuriously reject the second
  * one (its own prev_seq already advanced by the first member's own
  * call). */
+//cfusa:test REQ-E2E-028
 static void test_dispatch_frame_seq_gate_evaluates_once_not_per_member(void)
 {
     rcp_mock_server_t             *srv    = rcp_mock_server_new();
@@ -1131,6 +1140,7 @@ static void test_dispatch_frame_seq_gate_evaluates_once_not_per_member(void)
  * rcp_mock_server_broadcast_safe_state() escalation already proven for
  * REQ-E2E-030 (overflow) and REQ-E2E-045 (CRC error, above), reached
  * through a materially different trigger this time. */
+//cfusa:test REQ-E2E-029
 static void test_dispatch_frame_discontinuity_broadcasts_safe_state_without_rejecting(void)
 {
     rcp_mock_server_t             *srv       = rcp_mock_server_new();
@@ -1194,6 +1204,7 @@ static void test_dispatch_frame_discontinuity_broadcasts_safe_state_without_reje
  * watchdog() directly, since a watchdog is this codebase's one TIME-based
  * cause (see that function's own doc comment, mock.h) rather than a
  * per-frame content check reachable through dispatch_frame() itself. */
+//cfusa:test REQ-E2E-046
 static void test_watchdog_overflow_broadcasts_safe_state_to_stream_siblings(void)
 {
     rcp_mock_server_t              *srv       = rcp_mock_server_new();
@@ -1247,6 +1258,7 @@ static void test_watchdog_overflow_broadcasts_safe_state_to_stream_siblings(void
  * all -- resolve_index() returns 0, the gate is skipped entirely (fail-
  * toward-no-action), and dispatch proceeds regardless of any sequence_num
  * pattern -- the exact same seq value twice in a row, unrejected. */
+//cfusa:test REQ-E2E-028
 static void test_dispatch_frame_seq_gate_skipped_for_unresolvable_stream(void)
 {
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
@@ -1280,6 +1292,7 @@ static void test_dispatch_frame_seq_gate_skipped_for_unresolvable_stream(void)
  * req_crc_enable set (so the E2E-specific code path is genuinely
  * exercised, not just the plain per-member dispatch it delegates to when
  * req_crc_enable is unset). */
+//cfusa:test REQ-E2E-028
 static void test_dispatch_frame_e2e_rejects_replayed_sequence_num(void)
 {
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
@@ -1475,6 +1488,7 @@ static void test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally(vo
  * reaching CRC validation -- until the tracker is reset. This is the
  * exact gap REQ-E2E-021 used to pin: before this fix, the second request
  * below would have been admitted and executed normally. */
+//cfusa:test REQ-E2E-021
 static void test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_stream(void)
 {
     rcp_mock_server_t         *srv = rcp_mock_server_new();
@@ -1550,6 +1564,8 @@ static void test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_str
  * mismatch test in this file) but does NOT latch the stream -- a
  * subsequent valid request on the same stream succeeds normally. Matches
  * rcp_e2e_crc_error_action()'s own RCP_E2E_CRC_ACTION_DROP_REQUEST. */
+//cfusa:test REQ-E2E-021
+//cfusa:test REQ-E2E-022
 static void test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_the_stream(void)
 {
     rcp_mock_server_t         *srv = rcp_mock_server_new();
@@ -1600,6 +1616,7 @@ static void test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_th
 /* No stream fault tracker set (rcp_mock_server_new()'s own default) --
  * dispatch_e2e() must not crash or otherwise misbehave; it just has
  * nothing to check or record against. */
+//cfusa:test REQ-E2E-021
 static void test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normally(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1637,6 +1654,7 @@ static void test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normal
  * stream_status[]'s own CRC cause -- independent of whether
  * rx_enforce_e2e/stream_fault_tracker are configured at all (this is
  * the readable Table 24 bit, not the blocking mechanism). */
+//cfusa:test REQ-E2E-046
 static void test_dispatch_e2e_crc_error_latches_stream_status(void)
 {
     rcp_mock_server_t              *srv   = rcp_mock_server_new();
@@ -1678,6 +1696,7 @@ static void test_dispatch_e2e_crc_error_latches_stream_status(void)
 
 /* A replayed sequence_num on an rx_enforce_seq-configured stream latches
  * stream_status[]'s own sequence cause. */
+//cfusa:test REQ-E2E-046
 static void test_dispatch_frame_seq_error_latches_stream_status(void)
 {
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
@@ -1717,6 +1736,7 @@ static void test_dispatch_frame_seq_error_latches_stream_status(void)
  * call for it) reads as not-blocked -- the same fail-toward-not-blocked
  * disposition every other unresolvable-stream case in this module
  * already uses; not a crash or an error. */
+//cfusa:test REQ-E2E-046
 static void test_stream_status_rx_blocked_false_for_unresolvable_stream(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1773,6 +1793,8 @@ static void set_up_frag_stream(rcp_mock_server_t *srv, rcp_mock_endpoint_handler
  * rcp_mock_server_dispatch_e2e() directly -- the doc comment's own
  * documented fallback for an ms=0 fragment arriving while the
  * reassembler is not collecting. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e(void)
 {
     rcp_mock_server_t *srv     = rcp_mock_server_new();
@@ -1807,6 +1829,8 @@ static void test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e(void
  * nonzero avtp_timestamp) deliberately, so this test cannot pass by
  * accident of the NTSCF-forces-zero rule the dedicated test below pins
  * separately. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
 {
     rcp_mock_server_t *srv        = rcp_mock_server_new();
@@ -1890,6 +1914,8 @@ static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
  * pad_octets), mirroring exactly where rcp_e2e_wrap() itself would put
  * it -- this test does not depend on the bug under test to construct its
  * own wire frame. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok(void)
 {
     rcp_mock_server_t *srv        = rcp_mock_server_new();
@@ -1959,6 +1985,9 @@ static void test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok(voi
  * mismatch, not merely an absent one. Rejected, not executed, and
  * latches the same three consequences rcp_mock_server_dispatch_e2e()'s
  * own CRC-mismatch branch already does. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
+//cfusa:test REQ-E2E-041
 static void test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2017,6 +2046,9 @@ static void test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches(void
  * function's own effective_ts forcing were missing, it would instead
  * verify against rcp_e2e_compute_fragmented_crc(..., TEST_TS, ...) and
  * this call would come back RCP_MOCK_DISPATCH_CRC_ERROR. */
+//cfusa:test REQ-E2E-035
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2076,6 +2108,8 @@ static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
  * sequence's own segment 0) is rejected and abandons the in-progress
  * reassembly -- a fresh, correctly-ordered sequence afterward succeeds,
  * proving the reassembler was actually reset rather than left wedged. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2126,6 +2160,8 @@ static void test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_rese
  * reassembler()'s own documented escape hatch for a caller wanting a
  * tighter bound than RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN,
  * exercised here to keep the test cheap (no 64KiB payload needed). */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_too_large_reassembly_is_rejected(void)
 {
     rcp_mock_server_t          *srv    = rcp_mock_server_new();
@@ -2156,6 +2192,8 @@ static void test_dispatch_e2e_fragment_too_large_reassembly_is_rejected(void)
  * fallback delegates to rcp_mock_server_dispatch_e2e() unchanged rather
  * than rejecting outright, exactly as if the fragment-aware entry point
  * had never been called at all. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2203,6 +2241,7 @@ static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatc
  * stream is rejected outright as RCP_MOCK_DISPATCH_STREAM_FAULTED with a
  * genuine Error Response -- never reaching find_slot_on_stream(), let
  * alone reassembly. */
+//cfusa:test REQ-E2E-021
 static void test_dispatch_e2e_fragment_already_faulted_stream_is_rejected(void)
 {
     rcp_mock_server_t             *srv = rcp_mock_server_new();
@@ -2248,6 +2287,7 @@ static void test_dispatch_e2e_fragment_already_faulted_stream_is_rejected(void)
  * rcp_mock_server_dispatch_e2e()'s identical branch, but this function's
  * OWN copy of the check (find_slot_on_stream()+!req_crc_enable, ahead of
  * any fragment-reassembly bookkeeping) had never been exercised. */
+//cfusa:test REQ-E2E-031
 static void test_dispatch_e2e_fragment_plain_command_mode_falls_back_to_dispatch_plain(void)
 {
     rcp_mock_server_t               *srv = rcp_mock_server_new();
@@ -2304,6 +2344,8 @@ static void test_dispatch_e2e_fragment_too_short_header_is_rejected(void)
  * dispatches exactly once through the real rcp_acf_decode_gbb()/
  * rcp_acf_encode_gbb() pair, with the real fragmented CRC over the
  * concatenated payload. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_gbb_two_fragment_round_trip_succeeds(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2363,6 +2405,10 @@ static void test_dispatch_e2e_fragment_gbb_two_fragment_round_trip_succeeds(void
  * the same three consequences the ABB CRC-mismatch test above already
  * pins for the ABB branch, now proven for GBB's own separate code path
  * too. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
+//cfusa:test REQ-E2E-041
+//cfusa:test REQ-E2E-045
 static void test_dispatch_e2e_fragment_gbb_crc_mismatch_broadcasts_safe_state(void)
 {
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
@@ -2507,6 +2553,8 @@ static void test_dispatch_e2e_tscf_safe_mode_with_tv_true_postpones_a_standard_r
  * fault-injection coverage; tv=false here deliberately, to isolate this
  * CRC path from the tv=true postponement gate the two tests above
  * already cover. */
+//cfusa:test REQ-E2E-041
+//cfusa:test REQ-E2E-045
 static void test_dispatch_e2e_tscf_crc_mismatch_broadcasts_safe_state(void)
 {
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
@@ -2610,6 +2658,8 @@ static void test_dispatch_e2e_fragment_tscf_with_tv_true_postpones_a_standard_re
 
 /* A single, never-actually-fragmented message behaves byte-identically
  * to calling rcp_mock_server_dispatch_e2e_tscf() directly. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_single_fragment_matches_dispatch_e2e_tscf(void)
 {
     rcp_mock_server_t *srv     = rcp_mock_server_new();
@@ -2638,6 +2688,8 @@ static void test_dispatch_e2e_fragment_tscf_single_fragment_matches_dispatch_e2e
 
 /* A genuine 3-fragment ABB message, CRC-protected via the real
  * fragmented-CRC formula, reassembles and dispatches exactly once. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_three_fragment_round_trip_succeeds(void)
 {
     rcp_mock_server_t *srv        = rcp_mock_server_new();
@@ -2700,6 +2752,8 @@ static void test_dispatch_e2e_fragment_tscf_three_fragment_round_trip_succeeds(v
 
 /* A genuine 2-fragment ACF_GBB message -- the OTHER acf_msg_type branch,
  * previously entirely unexercised for this function. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_gbb_two_fragment_round_trip_succeeds(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2752,6 +2806,10 @@ static void test_dispatch_e2e_fragment_tscf_gbb_two_fragment_round_trip_succeeds
  * executed, latches the stream, and (rx_enforce_e2e set) broadcasts safe
  * state to a stream sibling -- same three consequences as
  * dispatch_e2e_fragment()'s own equivalent test. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
+//cfusa:test REQ-E2E-041
+//cfusa:test REQ-E2E-045
 static void test_dispatch_e2e_fragment_tscf_crc_mismatch_broadcasts_safe_state(void)
 {
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
@@ -2822,6 +2880,8 @@ static void test_dispatch_e2e_fragment_tscf_crc_mismatch_broadcasts_safe_state(v
 /* An out-of-order intermediate fragment is rejected and abandons the
  * in-progress reassembly; a fresh, correctly-ordered sequence afterward
  * succeeds. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_out_of_order_segment_is_rejected_and_resets(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2868,6 +2928,8 @@ static void test_dispatch_e2e_fragment_tscf_out_of_order_segment_is_rejected_and
 
 /* A reassembly that would exceed the stream's own configured
  * max_total_len is rejected outright. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_too_large_reassembly_is_rejected(void)
 {
     rcp_mock_server_t          *srv    = rcp_mock_server_new();
@@ -2896,6 +2958,8 @@ static void test_dispatch_e2e_fragment_tscf_too_large_reassembly_is_rejected(voi
 
 /* An unresolvable stream_id falls back to rcp_mock_server_dispatch_e2e_
  * tscf() unchanged. */
+//cfusa:test REQ-E2E-038
+//cfusa:test REQ-E2E-039
 static void test_dispatch_e2e_fragment_tscf_unresolvable_stream_falls_back_to_dispatch_e2e_tscf(void)
 {
     rcp_mock_server_t *srv    = rcp_mock_server_new();
@@ -2928,6 +2992,7 @@ static void test_dispatch_e2e_fragment_tscf_unresolvable_stream_falls_back_to_di
 
 /* A stream already latched faulted (stream_fault_tracker) rejects a
  * fragment outright as RCP_MOCK_DISPATCH_STREAM_FAULTED. */
+//cfusa:test REQ-E2E-021
 static void test_dispatch_e2e_fragment_tscf_already_faulted_stream_is_rejected(void)
 {
     rcp_mock_server_t             *srv = rcp_mock_server_new();
@@ -3112,6 +3177,7 @@ static void test_dispatch_frame_e2e_still_ignores_presentation_time_after_462(vo
  * the very end of the wire frame. The quadlet-alignment rejection this
  * test used to cover is unaffected by the fix and is still asserted
  * below. */
+//cfusa:test REQ-E2E-042
 static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(void)
 {
     const uint8_t                pl[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
