@@ -1,21 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-LIFECYCLE-022
-//cfusa:test REQ-LIFECYCLE-023
-//cfusa:test REQ-LIFECYCLE-024
-//cfusa:test REQ-LIFECYCLE-025
-//cfusa:test REQ-LIFECYCLE-026
-//cfusa:test REQ-LIFECYCLE-027
-//cfusa:test REQ-LIFECYCLE-028
-//cfusa:test REQ-LIFECYCLE-029
-//cfusa:test REQ-LIFECYCLE-030
-//cfusa:test REQ-LIFECYCLE-031
-//cfusa:test REQ-LIFECYCLE-032
-//cfusa:test REQ-LIFECYCLE-033
-//cfusa:test REQ-LIFECYCLE-034
-//cfusa:test REQ-LIFECYCLE-035
-//cfusa:test REQ-LIFECYCLE-036
-//cfusa:test REQ-LIFECYCLE-037
-//cfusa:test REQ-LIFECYCLE-038
 //cfusa:test REQ-SRV-015
 //cfusa:test REQ-SRV-016
 //cfusa:test REQ-SRV-017
@@ -136,6 +119,7 @@ static rcp_bytes_t standard_abb_with_evt(rcp_byte_bus_id_t bus, uint8_t transact
  * rcp_lifecycle_transition() now takes an all_other_eps_idle input and
  * refuses an otherwise-authorized demotion while it is false, rather
  * than tearing down in-flight requests unconditionally. */
+//cfusa:test REQ-LIFECYCLE-022
 static void test_transition_now_requires_idle_for_demotion(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -156,6 +140,7 @@ static void test_transition_now_requires_idle_for_demotion(void)
  * longer describes a gap, so RCP_LIFECYCLE_ERR_UNAUTHORIZED's own
  * strerror() case is asserted directly instead of a still-unknown-error-
  * code probe (rcp_lifecycle_errc_t now covers 0-4, not 0-3). */
+//cfusa:test REQ-LIFECYCLE-031
 static void test_transition_now_rejects_unauthorized_writer(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -199,6 +184,8 @@ static void test_transition_now_rejects_unauthorized_writer(void)
  * exact denial with RCP_ERROR_LOCKED_MEM_ACCESS, the closest numbered
  * wire code to Figure 17's own diagram-only "LOCKED_CONFIG_ACCESS"
  * name. */
+//cfusa:test REQ-LIFECYCLE-023
+//cfusa:test REQ-LIFECYCLE-024
 static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response(void)
 {
     rcp_lifecycle_writer_ctx_t root      = {true, true};
@@ -231,6 +218,8 @@ static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_respo
  * stream_id and consults no association table or writer identity at
  * all, so an endpoint no configured request stream maps is still
  * admitted once RCP_CONFIGURED). */
+//cfusa:test REQ-LIFECYCLE-032
+//cfusa:test REQ-LIFECYCLE-034
 static void test_hw_configured_admits_only_ep0(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
@@ -249,6 +238,7 @@ static void test_hw_configured_admits_only_ep0(void)
  * state, no stream_id, and no writer identity at all, so an operational
  * request executes immediately regardless of whether the endpoint it
  * targets has any configured stream association or who sent it. */
+//cfusa:test REQ-LIFECYCLE-025
 static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
 {
     rcp_server_endpoint_t ep;
@@ -278,6 +268,7 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
  * stream passed as plausible); it now asserts the conforming rejection,
  * per this file's own documented convention that a gap-pinning test
  * failing after a fix means "rewrite it to the conforming expectation." */
+//cfusa:test REQ-LIFECYCLE-038
 static void test_rcp_cfg_inconsistent_catches_an_orphaned_stream(void)
 {
     rcp_lifecycle_request_stream_plausibility_t streams[1] = {
@@ -304,6 +295,7 @@ static void test_rcp_cfg_inconsistent_catches_an_orphaned_stream(void)
  * snapshot is plausible (matching test_rcp_cfg_consistent_when_satisfied's
  * own single-stream shape, but exercising this specific field to prove
  * it is actually consulted, not merely present). */
+//cfusa:test REQ-LIFECYCLE-038
 static void test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
@@ -330,6 +322,7 @@ static void test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two(void
 /* Two configured streams; only one has a bound endpoint. The unbound
  * stream is still caught, even in the presence of an otherwise-plausible
  * sibling stream -- bullet 2 is evaluated per-stream, not in aggregate. */
+//cfusa:test REQ-LIFECYCLE-038
 static void test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among_several(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
@@ -454,6 +447,7 @@ static void test_rcp_cfg_inconsistent_ignores_stream_index_without_stream_assoc(
  * above (ep_used == true, masked by bullet 1's own earlier check), this
  * endpoint passes bullet 1 trivially (skipped) and reaches bullet 2 with
  * has_stream_assoc == true, so only the ep_used check can catch it. */
+//cfusa:test REQ-LIFECYCLE-038
 static void test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
@@ -493,6 +487,9 @@ static void test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream
  * authorization. The full pipeline still correctly refuses B's actual
  * configuration WRITE, demonstrated below by composing the claim query
  * into a writer_ctx exactly as discovery.h's own file header describes. */
+//cfusa:test REQ-LIFECYCLE-026
+//cfusa:test REQ-LIFECYCLE-033
+//cfusa:test REQ-LIFECYCLE-035
 static void test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated(void)
 {
     rcp_discovery_claim_t      claim;
@@ -535,6 +532,9 @@ static void test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gat
  * open gap are now closed -- renamed and rewritten to assert the
  * corrected behavior directly, rather than left stale documenting a bug
  * that no longer exists. */
+//cfusa:test REQ-LIFECYCLE-027
+//cfusa:test REQ-LIFECYCLE-030
+//cfusa:test REQ-LIFECYCLE-036
 static void test_hw_configured_write_access_now_requires_unicast_and_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t stranger    = {false, false, false, false};
@@ -596,6 +596,7 @@ static void test_hw_configured_write_access_now_requires_unicast_and_authorizati
  * same rule c-RCP already implemented for HW_UNCONFIGURED -- neither
  * state has the validated stream/byte_bus_id mapping and response queues
  * TSCF's presentation-time semantics presuppose. */
+//cfusa:test REQ-LIFECYCLE-028
 static void test_hw_configured_drops_tscf(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
@@ -621,6 +622,8 @@ static void test_hw_configured_drops_tscf(void)
  * EP0-scoped override that governs here. See rcp_lifecycle_should_accept()'s
  * own header doc comment for the full reconciliation. REQ-LIFECYCLE-029's
  * own `.fusa-reqs.json` text updated to record this resolution. */
+//cfusa:test REQ-LIFECYCLE-029
+//cfusa:test REQ-LIFECYCLE-033
 static void test_hw_configured_rejects_gbb_addressed_to_ep0(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
@@ -648,6 +651,7 @@ static void test_hw_configured_rejects_gbb_addressed_to_ep0(void)
  * translates into actual write authority once RCP_CONFIGURED, since the
  * two real gates above now both close that door independently of
  * whether the claim primitive itself still says "held". */
+//cfusa:test REQ-LIFECYCLE-037
 static void test_discovery_write_authority_survives_rcp_configured(void)
 {
     rcp_discovery_claim_t claim;

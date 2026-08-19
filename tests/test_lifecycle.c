@@ -1,37 +1,15 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-LIFECYCLE-001
-//cfusa:test REQ-LIFECYCLE-002
-//cfusa:test REQ-LIFECYCLE-003
-//cfusa:test REQ-LIFECYCLE-004
-//cfusa:test REQ-LIFECYCLE-005
-//cfusa:test REQ-LIFECYCLE-006
-//cfusa:test REQ-LIFECYCLE-007
-//cfusa:test REQ-LIFECYCLE-008
-//cfusa:test REQ-LIFECYCLE-009
-//cfusa:test REQ-LIFECYCLE-010
-//cfusa:test REQ-LIFECYCLE-011
-//cfusa:test REQ-LIFECYCLE-012
-//cfusa:test REQ-LIFECYCLE-013
-//cfusa:test REQ-LIFECYCLE-014
-//cfusa:test REQ-LIFECYCLE-015
-//cfusa:test REQ-LIFECYCLE-016
-//cfusa:test REQ-LIFECYCLE-017
-//cfusa:test REQ-LIFECYCLE-018
-//cfusa:test REQ-LIFECYCLE-019
-//cfusa:test REQ-LIFECYCLE-020
-//cfusa:test REQ-LIFECYCLE-021
-// Security-relevant subset (CYBERSECURITY.md §1.5, Layer 5 —
-// Register-Map Write Authorization): FUNCTIONAL_W_STAR field-locking
-// once RCP_CONFIGURED, paired with regmap.c's writer-authority check.
-// See CYBERSECURITY.md; formally verified via
-// tla/LifecycleStateMachine.tla's FieldLockMonotonicWhileConfigured.
-//cfusa:sec-test REQ-LIFECYCLE-018
-//cfusa:sec-test REQ-LIFECYCLE-019
-//cfusa:sec-test REQ-LIFECYCLE-020
-//cfusa:test REQ-LIFECYCLE-039
 //cfusa:test REQ-WIREERR-004
 //cfusa:test REQ-RMAP-025
 //cfusa:test REQ-AVTP-029
+// Security-relevant subset (CYBERSECURITY.md §1.5, Layer 5 —
+// Register-Map Write Authorization): HW_GENERIC/FUNCTIONAL_W/
+// FUNCTIONAL_W_STAR field-locking by lifecycle state, paired with
+// regmap.c's writer-authority check. See CYBERSECURITY.md; formally
+// verified via tla/LifecycleStateMachine.tla's
+// FieldLockMonotonicWhileConfigured. Each test function below carries
+// its own security-test marker alongside its regular test marker where
+// relevant, placed at that function instead of listed here.
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -46,6 +24,7 @@ void tearDown(void) {}
 
 /* ── Lifecycle wire values ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-LIFECYCLE-001
 static void test_lifecycle_wire_values(void)
 {
     TEST_ASSERT_EQUAL_HEX8(0x00, RCP_LIFECYCLE_HW_UNCONFIGURED);
@@ -55,6 +34,7 @@ static void test_lifecycle_wire_values(void)
 
 /* ── HW_CFG_INCONSISTENT plausibility check ────────────────────────────────── */
 
+//cfusa:test REQ-LIFECYCLE-002
 static void test_hw_cfg_inconsistent_missing_pin_mapping(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[2] = {
@@ -69,6 +49,7 @@ static void test_hw_cfg_inconsistent_missing_pin_mapping(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT, rcp_lifecycle_check_hw_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-003
 static void test_hw_cfg_inconsistent_missing_request_stream(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = {
@@ -82,6 +63,7 @@ static void test_hw_cfg_inconsistent_missing_request_stream(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT, rcp_lifecycle_check_hw_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-004
 static void test_hw_cfg_consistent_when_satisfied(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[2] = {
@@ -96,6 +78,7 @@ static void test_hw_cfg_consistent_when_satisfied(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_hw_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-004
 static void test_hw_cfg_null_snapshot_is_inconsistent(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT, rcp_lifecycle_check_hw_cfg(NULL));
@@ -103,6 +86,7 @@ static void test_hw_cfg_null_snapshot_is_inconsistent(void)
 
 /* ── RCP_CFG_INCONSISTENT plausibility check ───────────────────────────────── */
 
+//cfusa:test REQ-LIFECYCLE-005
 static void test_rcp_cfg_inconsistent_missing_stream_assoc(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = {
@@ -116,6 +100,7 @@ static void test_rcp_cfg_inconsistent_missing_stream_assoc(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-006
 static void test_rcp_cfg_inconsistent_missing_response_stream(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = {
@@ -134,6 +119,7 @@ static void test_rcp_cfg_inconsistent_missing_response_stream(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-007
 static void test_rcp_cfg_consistent_when_satisfied(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = {
@@ -184,6 +170,7 @@ static void test_rcp_cfg_inconsistent_endpoint_lacks_stream_assoc_despite_matchi
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
+//cfusa:test REQ-LIFECYCLE-007
 static void test_rcp_cfg_null_snapshot_is_inconsistent(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(NULL));
@@ -207,6 +194,7 @@ static rcp_lifecycle_plausibility_snapshot_t plausible_snapshot(rcp_lifecycle_en
     return snap;
 }
 
+//cfusa:test REQ-LIFECYCLE-008
 static void test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plausible(void)
 {
     rcp_lifecycle_endpoint_plausibility_t ep;
@@ -233,6 +221,7 @@ static void test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plaus
  * the OLD, misapplied gate is gone: a request with all_other_eps_idle
  * false now SUCCEEDS for this specific transition, where it previously,
  * incorrectly, failed with RCP_LIFECYCLE_ERR_EPS_NOT_IDLE. */
+//cfusa:test REQ-LIFECYCLE-008
 static void test_transition_hw_unconfigured_to_hw_configured_not_idle_gated(void)
 {
     rcp_lifecycle_endpoint_plausibility_t ep;
@@ -246,6 +235,7 @@ static void test_transition_hw_unconfigured_to_hw_configured_not_idle_gated(void
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
+//cfusa:test REQ-LIFECYCLE-008
 static void test_transition_hw_unconfigured_to_hw_configured_fails_when_implausible(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = { { true, false, true, false } };
@@ -261,6 +251,7 @@ static void test_transition_hw_unconfigured_to_hw_configured_fails_when_implausi
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state); /* unchanged */
 }
 
+//cfusa:test REQ-LIFECYCLE-009
 static void test_transition_hw_configured_to_rcp_configured_succeeds_when_plausible(void)
 {
     rcp_lifecycle_endpoint_plausibility_t ep;
@@ -274,6 +265,7 @@ static void test_transition_hw_configured_to_rcp_configured_succeeds_when_plausi
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 }
 
+//cfusa:test REQ-LIFECYCLE-009
 static void test_transition_hw_configured_to_rcp_configured_fails_when_implausible(void)
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1] = { { true, true, true, false } };
@@ -329,6 +321,7 @@ static void test_transition_hw_configured_to_rcp_configured_accepts_valid_stream
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 }
 
+//cfusa:test REQ-LIFECYCLE-010
 static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
@@ -358,6 +351,7 @@ static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_on
  * meaningful defensive case, matching this project's own established
  * (rcp_pwrmode_t)99 idiom (tests/test_power.c) for the identical
  * situation in a sibling module. */
+//cfusa:test REQ-LIFECYCLE-012
 static void test_transition_from_corrupted_state_to_hw_unconfigured_is_rejected(void)
 {
     rcp_lifecycle_state_t state = (rcp_lifecycle_state_t)0x99;
@@ -391,6 +385,7 @@ static void test_transition_hw_configured_to_hw_unconfigured_accepts_valid_strea
  * requires writer.via_root_client_ep0 specifically; via_discovery_stream
  * alone -- previously sufficient, the REQ-LIFECYCLE-037 gap this test
  * used to pin -- is now rejected with RCP_LIFECYCLE_ERR_UNAUTHORIZED. */
+//cfusa:test REQ-LIFECYCLE-011
 static void test_transition_rcp_configured_to_hw_unconfigured_requires_root_client(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -422,6 +417,7 @@ static void test_transition_rcp_configured_to_hw_unconfigured_requires_root_clie
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
+//cfusa:test REQ-LIFECYCLE-012
 static void test_transition_rejects_skipping_hw_configured(void)
 {
     rcp_lifecycle_endpoint_plausibility_t ep;
@@ -446,6 +442,7 @@ static void test_transition_rejects_skipping_hw_configured(void)
  * falling through unconditionally to RCP_LIFECYCLE_ERR_INVALID_
  * TRANSITION regardless of writer or idleness. Root client via EP0,
  * idle, succeeds. */
+//cfusa:test REQ-LIFECYCLE-039
 static void test_transition_rcp_configured_to_hw_configured_succeeds_for_root_client(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -465,6 +462,7 @@ static void test_transition_rcp_configured_to_hw_configured_succeeds_for_root_cl
  * this arrow names only EP0-routed access, consistent with
  * REQ-LIFECYCLE-037's finding that the discovery stream no longer
  * authorizes a configuration change once already RCP_CONFIGURED. */
+//cfusa:test REQ-LIFECYCLE-039
 static void test_transition_rcp_configured_to_hw_configured_requires_correct_gate(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -494,6 +492,7 @@ static void test_transition_rcp_configured_to_hw_configured_requires_correct_gat
  * REQ-LIFECYCLE-022's real home for this label (issue #455 corrected
  * its prior misattribution to the HW_UNCONFIGURED -> HW_CONFIGURED
  * advance, see that transition's own test above). */
+//cfusa:test REQ-LIFECYCLE-039
 static void test_transition_rcp_configured_to_hw_configured_requires_idle(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
@@ -508,6 +507,7 @@ static void test_transition_rcp_configured_to_hw_configured_requires_idle(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
+//cfusa:test REQ-LIFECYCLE-013
 static void test_transition_same_state_is_noop_success(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
@@ -526,6 +526,7 @@ static void test_transition_same_state_is_noop_success(void)
  * relying on implicit truthiness (RCP_LIFECYCLE_ACCEPT == 0 would
  * otherwise read as C-false, inverting every TEST_ASSERT_TRUE/FALSE
  * call that predates this fix). */
+//cfusa:test REQ-LIFECYCLE-014
 static void test_hw_unconfigured_accepts_discovery_abb_under_ntscf(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
@@ -542,6 +543,7 @@ static void test_hw_unconfigured_accepts_discovery_abb_under_ntscf(void)
  * unrecognized AVTP subtype (neither NTSCF nor TSCF) while
  * HW_UNCONFIGURED must be dropped outright, matching every other
  * addressed-wrong case here. */
+//cfusa:test REQ-LIFECYCLE-015
 static void test_hw_unconfigured_drops_unrecognized_avtp_subtype(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -549,6 +551,7 @@ static void test_hw_unconfigured_drops_unrecognized_avtp_subtype(void)
         (uint8_t)0x7Fu, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
+//cfusa:test REQ-LIFECYCLE-015
 static void test_hw_unconfigured_drops_wrong_byte_bus_id(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -563,6 +566,7 @@ static void test_hw_unconfigured_drops_wrong_byte_bus_id(void)
  * addressed_to_ep0 below, which pins the corrected behavior explicitly;
  * this one now pins the wrong-byte-bus_id-AND-non-ABB combination, which
  * is still a DROP (byte_bus_id mismatch checked first). */
+//cfusa:test REQ-LIFECYCLE-015
 static void test_hw_unconfigured_drops_non_abb_message_type(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -573,6 +577,7 @@ static void test_hw_unconfigured_drops_non_abb_message_type(void)
 /* REQ-LIFECYCLE-033 (TC18 §12.7): a GBB-framed request correctly
  * addressed to EP0 on the discovery byte_bus_id while HW_UNCONFIGURED is
  * REJECTed with an error response, not silently dropped. */
+//cfusa:test REQ-LIFECYCLE-015
 static void test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(
@@ -580,6 +585,7 @@ static void test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0(v
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
+//cfusa:test REQ-LIFECYCLE-016
 static void test_hw_unconfigured_drops_tscf_even_with_time_sync_supported(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -587,6 +593,7 @@ static void test_hw_unconfigured_drops_tscf_even_with_time_sync_supported(void)
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
+//cfusa:test REQ-LIFECYCLE-016
 static void test_hw_unconfigured_drops_tscf_without_time_sync(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -651,6 +658,7 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
  * always-unconditional rules), so ACCEPT is this rule's own directly
  * observable effect. */
 //cfusa:test REQ-AVTP-029
+//cfusa:test REQ-LIFECYCLE-017
 static void test_rcp_configured_accepts_tscf_without_time_sync_when_policy_is_ignore(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
@@ -664,6 +672,7 @@ static void test_rcp_configured_accepts_tscf_without_time_sync_when_policy_is_ig
  * RCP_AVTP_TSCF_FALLBACK_IGNORE only ever suppresses the general
  * time-sync check at the top of rcp_lifecycle_should_accept(), never the
  * separate, state-specific rules below it. */
+//cfusa:test REQ-LIFECYCLE-016
 static void test_hw_unconfigured_still_drops_tscf_when_policy_is_ignore(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
@@ -691,6 +700,8 @@ static void test_hw_configured_still_drops_tscf_when_policy_is_ignore(void)
  * stream assigned due to a discovery request is feasible"). none (no
  * discovery-stream bit set) is no longer writable there; only a writer
  * that is the discovery claimant is. */
+//cfusa:test REQ-LIFECYCLE-018
+//cfusa:sec-test REQ-LIFECYCLE-018
 static void test_hw_generic_writable_only_in_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t none      = {0};
@@ -712,6 +723,8 @@ static void test_hw_generic_writable_only_in_hw_unconfigured(void)
  * require the same root-client/owning-stream authorization RCP_CONFIGURED
  * already applies, plus a discovery-stream alternative neither state
  * modeled before this fix. */
+//cfusa:test REQ-LIFECYCLE-019
+//cfusa:sec-test REQ-LIFECYCLE-019
 static void test_functional_w_not_writable_in_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t none = {0};
@@ -720,6 +733,8 @@ static void test_functional_w_not_writable_in_hw_unconfigured(void)
         RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, none));
 }
 
+//cfusa:test REQ-LIFECYCLE-019
+//cfusa:sec-test REQ-LIFECYCLE-019
 static void test_functional_w_hw_configured_requires_authorization_or_discovery_stream(void)
 {
     rcp_lifecycle_writer_ctx_t none          = {0};
@@ -741,6 +756,8 @@ static void test_functional_w_hw_configured_requires_authorization_or_discovery_
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, via_discovery));
 }
 
+//cfusa:test REQ-LIFECYCLE-019
+//cfusa:sec-test REQ-LIFECYCLE-019
 static void test_functional_w_requires_authorized_writer_once_rcp_configured(void)
 {
     rcp_lifecycle_writer_ctx_t none         = {0};
@@ -755,6 +772,8 @@ static void test_functional_w_requires_authorized_writer_once_rcp_configured(voi
         RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root_client));
 }
 
+//cfusa:test REQ-LIFECYCLE-020
+//cfusa:sec-test REQ-LIFECYCLE-020
 static void test_functional_w_star_permanently_locked_once_rcp_configured(void)
 {
     rcp_lifecycle_writer_ctx_t everyone = { true, true }; /* root client AND owning stream */
@@ -876,6 +895,7 @@ static void test_read_only_never_writable_in_any_state_by_any_writer(void)
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-LIFECYCLE-021
 static void test_lifecycle_strerror_unique_nonempty(void)
 {
     const rcp_lifecycle_errc_t codes[] = {
