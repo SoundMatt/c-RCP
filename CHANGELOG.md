@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.472.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-FI-*/REQ-RL-*/REQ-PLATFORM-*/REQ-UDP-*/REQ-PWR-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged `REQ-FI-*` (12, `src/faultinject.c`), `REQ-RL-*` (11, `src/ratelimit.c`), `REQ-PLATFORM-*` (3, `src/platform.c`/`src/clock.c`), `REQ-UDP-*` (19, `src/udp.c`), `REQ-PWR-*` (15, `src/powerstate.c`) -- 60 requirements, 8 proxy-flagged.
+
+**One genuine split: `REQ-UDP-018`.** Its text bundled two different functions' behavior under one id -- `recv()`'s own strip-and-drop-short-datagram contract and `rcp_udp_avtp_transport_last_recv_seq()`'s own reporting contract -- joined only by both belonging to the same "Annex J sequence number" feature area, each already independently tested by its own dedicated test function. Split into `REQ-UDP-018` (kept for `recv()`) and new `REQ-UDP-020` (for `last_recv_seq()`), mutation-tested (forced `last_recv_seq()` to always report a bogus value -- exactly and only the one test tagged `REQ-UDP-020` failed; every other test, including `REQ-UDP-018`'s own, passed unaffected), then reverted byte-identical.
+
+**Every other flagged id (7 of 8) confirmed atomic** -- each bundles one function's complete main-path-plus-edge-case behavior (`REQ-PWR-001/005/008/011/013/014/015`), the same pattern established throughout this audit.
+
+**File-header tagging fixed in all 5 test files.** `test_faultinject.c` and `test_ratelimit.c` were already fully per-function tagged (only the redundant header needed removal); `test_ratelimit.c` also carried a `//cfusa:sec-test` block (CYBERSECURITY.md §1.6 Layer 6 rate limiting) with the same anti-pattern, relocated per-function. `test_platform.c`, `test_udp.c`, and `test_powerstate.c` needed real per-function tag mapping; `test_powerstate.c` in particular had several already-correct per-function tags coexisting with the redundant header, plus five genuinely untagged tests found and mapped to their actual covering requirement (`test_wake_via_pin_requires_sleep`, `test_apply_wakeup_echo_unknown_endpoint`, `test_handshake_resume_queues_unknown_endpoint`, `test_manager_destroy_null_is_a_safe_no_op`, `test_handshake_begin_unknown_endpoint`) -- each already had an inline comment naming its own requirement, the tag itself was just missing.
+
+**Verification:** full clean rebuild + 67/67 test suite passing; ASan/UBSan clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 2` both pass -- 1274/1274 traced (1273 + the new split id), 512/512 functions annotated, sec-tested unchanged at 37 requirements.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.471.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-DISC-*/REQ-CMP-*/REQ-TIMED-*: requirement-atomicity audit, Group 4 residual)
 
 Triaged `REQ-DISC-*` (29 requirements, `src/discovery.c`), `REQ-CMP-*` (29, `src/request_compound.c`), `REQ-TIMED-*` (13, `src/request_timed.c`) -- 71 requirements, 13 proxy-flagged.

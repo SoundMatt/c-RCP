@@ -9919,7 +9919,7 @@
     {
       "id": "REQ-UDP-018",
       "title": "recv() strips the Annex J encapsulation sequence number automatically",
-      "text": "A UDP AVTP transport's recv() shall strip the leading Annex J encapsulation sequence number (via rcp_udp_annexj_unwrap()) before returning a received AVTPDU to the caller, dropping (and continuing to wait for the next datagram on) any received datagram shorter than the sequence number field itself; rcp_udp_avtp_transport_last_recv_seq() shall report the sequence number of the most recently successfully received datagram, or 0 if none has been received yet.",
+      "text": "A UDP AVTP transport's recv() shall strip the leading Annex J encapsulation sequence number (via rcp_udp_annexj_unwrap()) before returning a received AVTPDU to the caller, dropping (and continuing to wait for the next datagram on) any received datagram shorter than the sequence number field itself. Split 2026-08-19 (issue #533) from this id's own last_recv_seq()-half -- see REQ-UDP-020 for that.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9936,6 +9936,17 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented"
+    },
+    {
+      "id": "REQ-UDP-020",
+      "title": "last_recv_seq() reports the most recently received sequence number",
+      "text": "rcp_udp_avtp_transport_last_recv_seq() shall report the sequence number of the most recently successfully received datagram, or 0 if none has been received yet. Split 2026-08-19 (issue #533) from REQ-UDP-018 -- see that id for the split rationale.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§10.1 (\"Encapsulation of 1722 frames in IP/UDP and port usage is described .in Annex J - IP Encapsulation of the IEEE Draft Std 1722™ P1722-2016-Rev/D9.\"), TC18.txt L1076-1077"
     },
     {
       "id": "REQ-L2-001",

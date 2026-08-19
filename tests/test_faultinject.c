@@ -1,16 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-FI-001
-//cfusa:test REQ-FI-002
-//cfusa:test REQ-FI-003
-//cfusa:test REQ-FI-004
-//cfusa:test REQ-FI-005
-//cfusa:test REQ-FI-006
-//cfusa:test REQ-FI-007
-//cfusa:test REQ-FI-008
-//cfusa:test REQ-FI-009
-//cfusa:test REQ-FI-010
-//cfusa:test REQ-FI-011
-//cfusa:test REQ-FI-012
 #include "unity.h"
 
 #include <rcp/faultinject.h>
