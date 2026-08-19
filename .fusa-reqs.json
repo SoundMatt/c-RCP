@@ -7648,7 +7648,7 @@
     {
       "id": "REQ-E2E-023",
       "title": "rcp_e2e_stream_fault_reset() clears a latched fault",
-      "text": "rcp_e2e_stream_fault_reset() shall set f->faulted to false, and rcp_e2e_stream_fault_is_faulted() shall report false immediately afterward.",
+      "text": "rcp_e2e_stream_fault_reset() shall set f->faulted to false. (Verified via rcp_e2e_stream_fault_is_faulted(), whose own general true/false reporting contract is REQ-E2E-044's separate requirement.)",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

@@ -1,53 +1,12 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-E2E-001
-//cfusa:test REQ-E2E-002
-//cfusa:test REQ-E2E-003
-//cfusa:test REQ-E2E-004
-//cfusa:test REQ-E2E-005
-//cfusa:test REQ-E2E-006
-//cfusa:test REQ-E2E-007
-//cfusa:test REQ-E2E-008
-//cfusa:test REQ-E2E-009
-//cfusa:test REQ-E2E-010
-//cfusa:test REQ-E2E-011
-//cfusa:test REQ-E2E-012
-//cfusa:test REQ-E2E-013
-//cfusa:test REQ-E2E-014
-//cfusa:test REQ-E2E-015
-//cfusa:test REQ-E2E-016
-//cfusa:test REQ-E2E-017
-//cfusa:test REQ-E2E-018
-//cfusa:test REQ-E2E-019
-//cfusa:test REQ-E2E-020
-//cfusa:test REQ-E2E-021
-//cfusa:test REQ-E2E-022
-//cfusa:test REQ-E2E-023
-//cfusa:test REQ-E2E-043
-//cfusa:test REQ-E2E-044
-//cfusa:test REQ-E2E-024
-//cfusa:test REQ-E2E-025
-//cfusa:test REQ-E2E-026
-//cfusa:test REQ-E2E-027
-//cfusa:test REQ-WIREERR-003
-//cfusa:test REQ-E2E-046
 // Security-relevant subset (CYBERSECURITY.md §1.3, Layer 3 — E2E Safe
 // Points and Safety-Request Execution Gating): CRC32 frame integrity,
 // safety-tagged execution gating, and per-stream watchdog behavior.
 // See CYBERSECURITY.md and tara.md TS-002 (replay is explicitly NOT
 // covered here -- no requirement in this subset claims replay
-// mitigation).
-//cfusa:sec-test REQ-E2E-011
-//cfusa:sec-test REQ-E2E-012
-//cfusa:sec-test REQ-E2E-014
-//cfusa:sec-test REQ-E2E-015
-//cfusa:sec-test REQ-E2E-020
-//cfusa:sec-test REQ-E2E-021
-//cfusa:sec-test REQ-E2E-022
-//cfusa:sec-test REQ-E2E-023
-//cfusa:sec-test REQ-E2E-024
-//cfusa:sec-test REQ-E2E-025
-//cfusa:sec-test REQ-E2E-026
-//cfusa:sec-test REQ-E2E-027
+// mitigation). Each test function below carries its own security-test
+// marker alongside its regular test marker where relevant, placed at
+// that function instead of listed here.
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -63,6 +22,7 @@ void tearDown(void) {}
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-001
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a   = rcp_e2e_strerror(RCP_E2E_OK);
@@ -81,12 +41,14 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── wire error code mapping (c-RCP-04) ───────────────────────────────────── */
 
+//cfusa:test REQ-WIREERR-003
 static void test_wire_error_crc_mismatch_maps_to_poci_failure(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_ERROR_POCI_FAILURE,
                            rcp_e2e_wire_error(RCP_E2E_ERR_CRC_MISMATCH));
 }
 
+//cfusa:test REQ-WIREERR-003
 static void test_wire_error_ok_and_short_frame_map_to_none(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_ERROR_NONE, rcp_e2e_wire_error(RCP_E2E_OK));
@@ -95,6 +57,7 @@ static void test_wire_error_ok_and_short_frame_map_to_none(void)
 
 /* ── CRC32 known-answer test ───────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-002
 static void test_crc32_known_answer_vector(void)
 {
     /* CRC-32/AUTOSAR's published check value -- this module's parameter
@@ -104,12 +67,14 @@ static void test_crc32_known_answer_vector(void)
     TEST_ASSERT_EQUAL_HEX32(0x1697D06Au, rcp_e2e_crc32(vec, 9));
 }
 
+//cfusa:test REQ-E2E-002
 static void test_crc32_empty_input(void)
 {
     /* CRC of nothing is init XORed with final XOR, i.e. 0. */
     TEST_ASSERT_EQUAL_HEX32(0u, rcp_e2e_crc32(NULL, 0));
 }
 
+//cfusa:test REQ-E2E-002
 static void test_crc32_differs_for_different_data(void)
 {
     const uint8_t a[] = {0x01, 0x02, 0x03};
@@ -119,6 +84,7 @@ static void test_crc32_differs_for_different_data(void)
 
 /* ── compute_crc coverage span ────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_matches_manual_concatenation(void)
 {
     /* issue #465: the coverage span now leads with avtp_subtype +
@@ -146,6 +112,7 @@ static void test_compute_crc_matches_manual_concatenation(void)
                                                      sizeof(acf_frame)));
 }
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_zero_stream_and_timestamp_ntscf_standin(void)
 {
     /* The all-zero StreamID/avtp_timestamp stand-in an NTSCF-framed
@@ -171,6 +138,7 @@ static void test_compute_crc_zero_stream_and_timestamp_ntscf_standin(void)
         rcp_e2e_compute_crc(avtp_subtype, header_octet1, false, 0, 0, acf_frame, 3));
 }
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_timestamp_is_4_octets_not_8(void)
 {
     /* c-RCP-01: the CRC must fold avtp_timestamp in as exactly 4
@@ -222,6 +190,7 @@ static void test_compute_crc_timestamp_is_4_octets_not_8(void)
  * proving each one is actually being fed into the running CRC, not
  * silently ignored (the pre-fix defect this issue reported). */
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_avtp_subtype_changes_result(void)
 {
     uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
@@ -232,6 +201,7 @@ static void test_compute_crc_avtp_subtype_changes_result(void)
     TEST_ASSERT_NOT_EQUAL(tscf_crc, ntscf_crc);
 }
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_header_octet1_changes_result(void)
 {
     uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
@@ -240,6 +210,7 @@ static void test_compute_crc_header_octet1_changes_result(void)
     TEST_ASSERT_NOT_EQUAL(a, b);
 }
 
+//cfusa:test REQ-E2E-003
 static void test_compute_crc_tu_bit_changes_result(void)
 {
     uint8_t acf_frame[4] = {0x10, 0x20, 0x30, 0x40};
@@ -252,12 +223,14 @@ static void test_compute_crc_tu_bit_changes_result(void)
 
 /* ── length_with_crc ───────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-004
 static void test_length_with_crc_adds_trailer_size(void)
 {
     TEST_ASSERT_EQUAL_UINT((size_t)0 + RCP_E2E_CRC_LEN, rcp_e2e_length_with_crc(0));
     TEST_ASSERT_EQUAL_UINT((size_t)100 + RCP_E2E_CRC_LEN, rcp_e2e_length_with_crc(100));
 }
 
+//cfusa:test REQ-E2E-004
 static void test_length_with_crc_saturates(void)
 {
     TEST_ASSERT_EQUAL_UINT((size_t)-1, rcp_e2e_length_with_crc((size_t)-1));
@@ -297,6 +270,7 @@ static void make_test_acf_frame(uint8_t *out, size_t out_len)
 
 /* ── issue #465: rcp_e2e_wrap_framed()/_unwrap_framed() NTSCF tu stand-in ─── */
 
+//cfusa:test REQ-E2E-035
 static void test_wrap_framed_forces_tu_false_under_ntscf(void)
 {
     /* Mirrors this file's existing avtp_timestamp-is-zeroed-under-NTSCF
@@ -339,6 +313,7 @@ static void test_wrap_framed_forces_tu_false_under_ntscf(void)
     rcp_bytes_free(&tscf_tu_false);
 }
 
+//cfusa:test REQ-E2E-005
 static void test_wrap_appends_crc_len_bytes(void)
 {
     /* Must be quadlet-aligned (a multiple of 4) -- REQ-E2E-042's fix
@@ -356,6 +331,7 @@ static void test_wrap_appends_crc_len_bytes(void)
     rcp_bytes_free(&out);
 }
 
+//cfusa:test REQ-E2E-006
 static void test_wrap_null_frame_nonzero_len_fails_safe(void)
 {
     rcp_bytes_t out = rcp_e2e_wrap(0x05u, 0x00u, false, 1, 1, NULL, 4);
@@ -363,6 +339,7 @@ static void test_wrap_null_frame_nonzero_len_fails_safe(void)
     TEST_ASSERT_EQUAL_UINT(0, out.len);
 }
 
+//cfusa:test REQ-E2E-036
 static void test_wrap_too_short_for_length_field_fails_safe(void)
 {
     /* c-RCP-02: the adaptation needs at least 2 octets (acf_msg_length
@@ -381,6 +358,7 @@ static void test_wrap_too_short_for_length_field_fails_safe(void)
  * appending the trailer, and unwrap() must adapt it back down -- this
  * is the actual defect this test targets, distinct from the
  * "round-trips at all" check below. */
+//cfusa:test REQ-E2E-036
 static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
 {
     /* Must be quadlet-aligned -- see test_wrap_appends_crc_len_bytes()'s
@@ -417,6 +395,7 @@ static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
     rcp_bytes_free(&wrapped);
 }
 
+//cfusa:test REQ-E2E-009
 static void test_wrap_unwrap_round_trip_ok(void)
 {
     /* Must be quadlet-aligned -- see test_wrap_appends_crc_len_bytes()'s
@@ -559,6 +538,7 @@ static void test_unwrap_crc_only_frame_yields_empty_body(void)
     TEST_ASSERT_EQUAL_UINT(0u, body.len);
 }
 
+//cfusa:test REQ-E2E-007
 static void test_unwrap_short_frame(void)
 {
     uint8_t buf[3] = {0};
@@ -569,6 +549,7 @@ static void test_unwrap_short_frame(void)
     TEST_ASSERT_NULL(body.data);
 }
 
+//cfusa:test REQ-E2E-008
 static void test_unwrap_crc_mismatch_on_corruption(void)
 {
     uint8_t acf_frame[8];
@@ -590,6 +571,7 @@ static void test_unwrap_crc_mismatch_on_corruption(void)
     rcp_bytes_free(&body);
 }
 
+//cfusa:test REQ-E2E-008
 static void test_unwrap_crc_mismatch_on_wrong_stream_id(void)
 {
     uint8_t acf_frame[8];
@@ -612,6 +594,7 @@ static void test_unwrap_crc_mismatch_on_wrong_stream_id(void)
 
 /* ── fragmentation/CRC interaction rule ───────────────────────────────────── */
 
+//cfusa:test REQ-E2E-010
 static void test_fragment_carries_crc_only_when_last(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_fragment_carries_crc(true));
@@ -620,6 +603,8 @@ static void test_fragment_carries_crc_only_when_last(void)
 
 /* ── safety-tagged request classification ─────────────────────────────────── */
 
+//cfusa:test REQ-E2E-011
+//cfusa:sec-test REQ-E2E-011
 static void test_is_safety_request(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_is_safety_request(0x8Fu));  /* compound, safety */
@@ -631,12 +616,15 @@ static void test_is_safety_request(void)
     TEST_ASSERT_FALSE(rcp_e2e_is_safety_request(0x00u)); /* standard */
 }
 
+//cfusa:test REQ-E2E-012
+//cfusa:sec-test REQ-E2E-012
 static void test_request_may_execute_safety_gated_on_safe_state(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_request_may_execute(0x8Fu, true));
     TEST_ASSERT_FALSE(rcp_e2e_request_may_execute(0x8Fu, false));
 }
 
+//cfusa:test REQ-E2E-013
 static void test_request_may_execute_non_safety_always_permitted(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_request_may_execute(0x0Fu, true));
@@ -645,6 +633,8 @@ static void test_request_may_execute_non_safety_always_permitted(void)
 
 /* ── watchdog-purge-vs-safety-survive ─────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-014
+//cfusa:sec-test REQ-E2E-014
 static void test_watchdog_purge_should_keep_only_safety_tagged(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_watchdog_purge_should_keep(0x8Fu));
@@ -656,6 +646,8 @@ static void test_watchdog_purge_should_keep_only_safety_tagged(void)
     TEST_ASSERT_FALSE(rcp_e2e_watchdog_purge_should_keep(0x00u));
 }
 
+//cfusa:test REQ-E2E-015
+//cfusa:sec-test REQ-E2E-015
 static void test_watchdog_purge_classify_matches_per_entry_rule(void)
 {
     const uint8_t types[6] = {0x00u, 0x8Fu, 0x0Bu, 0x8Bu, 0x0Eu, 0x8Eu};
@@ -671,6 +663,7 @@ static void test_watchdog_purge_classify_matches_per_entry_rule(void)
     TEST_ASSERT_TRUE(keep[5]);
 }
 
+//cfusa:test REQ-E2E-015
 static void test_watchdog_purge_classify_zero_count_is_noop(void)
 {
     rcp_e2e_watchdog_purge_classify(NULL, 0, NULL);
@@ -679,6 +672,7 @@ static void test_watchdog_purge_classify_zero_count_is_noop(void)
 
 /* ── configured safe state ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-016
 static void test_measure_valid(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_measure_valid((uint8_t)RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE));
@@ -687,12 +681,14 @@ static void test_measure_valid(void)
     TEST_ASSERT_FALSE(rcp_e2e_measure_valid(0xFFu));
 }
 
+//cfusa:test REQ-E2E-017
 static void test_endpoint_in_safe_state_force_high_impedance_always_true(void)
 {
     TEST_ASSERT_TRUE(rcp_e2e_endpoint_in_safe_state(
         (uint8_t)RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE, NULL, 0, 0));
 }
 
+//cfusa:test REQ-E2E-018
 static void test_endpoint_in_safe_state_sequencer_matches_target_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -710,17 +706,20 @@ static void test_endpoint_in_safe_state_sequencer_matches_target_state(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-E2E-019
 static void test_endpoint_in_safe_state_fails_closed_on_bad_measure(void)
 {
     TEST_ASSERT_FALSE(rcp_e2e_endpoint_in_safe_state(0xFFu, NULL, 0, 0));
 }
 
+//cfusa:test REQ-E2E-019
 static void test_endpoint_in_safe_state_fails_closed_on_null_table(void)
 {
     TEST_ASSERT_FALSE(rcp_e2e_endpoint_in_safe_state(
         (uint8_t)RCP_E2E_MEASURE_SEQUENCER, NULL, 0, 1));
 }
 
+//cfusa:test REQ-E2E-019
 static void test_endpoint_in_safe_state_fails_closed_on_invalid_index(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -756,14 +755,19 @@ static void test_endpoint_in_safe_state_fails_closed_when_sequencer_disabled(voi
 
 /* ── rx_enforce_e2e: drop vs. latch ────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-020
+//cfusa:sec-test REQ-E2E-020
 static void test_crc_error_action_maps_rx_enforce_e2e(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_E2E_CRC_ACTION_DROP_REQUEST, rcp_e2e_crc_error_action(false));
     TEST_ASSERT_EQUAL_INT(RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT, rcp_e2e_crc_error_action(true));
 }
 
+//cfusa:test REQ-E2E-021
+//cfusa:test REQ-E2E-022
 //cfusa:test REQ-E2E-043
 //cfusa:test REQ-E2E-044
+//cfusa:sec-test REQ-E2E-022
 static void test_stream_fault_drop_request_never_latches(void)
 {
     rcp_e2e_stream_fault_t f;
@@ -776,8 +780,12 @@ static void test_stream_fault_drop_request_never_latches(void)
     TEST_ASSERT_FALSE(rcp_e2e_stream_fault_is_faulted(&f));
 }
 
+//cfusa:test REQ-E2E-021
+//cfusa:test REQ-E2E-023
 //cfusa:test REQ-E2E-043
 //cfusa:test REQ-E2E-044
+//cfusa:sec-test REQ-E2E-021
+//cfusa:sec-test REQ-E2E-023
 static void test_stream_fault_latches_and_stays_latched_until_reset(void)
 {
     rcp_e2e_stream_fault_t f;
@@ -978,6 +986,8 @@ static void test_stream_status_causes_are_independent_of_one_another(void)
 
 /* ── per-stream watchdog ───────────────────────────────────────────────────── */
 
+//cfusa:test REQ-E2E-024
+//cfusa:sec-test REQ-E2E-024
 static void test_wd_evaluate_disabled_never_overflows(void)
 {
     rcp_e2e_wd_result_t r = rcp_e2e_wd_evaluate(false, 10, true, true, 1000000);
@@ -986,6 +996,7 @@ static void test_wd_evaluate_disabled_never_overflows(void)
     TEST_ASSERT_FALSE(r.notify);
 }
 
+//cfusa:test REQ-E2E-025
 static void test_wd_evaluate_below_timeout_no_overflow(void)
 {
     rcp_e2e_wd_result_t r = rcp_e2e_wd_evaluate(true, 100, true, true, 99);
@@ -994,6 +1005,8 @@ static void test_wd_evaluate_below_timeout_no_overflow(void)
     TEST_ASSERT_FALSE(r.notify);
 }
 
+//cfusa:test REQ-E2E-025
+//cfusa:sec-test REQ-E2E-025
 static void test_wd_evaluate_at_and_beyond_timeout_overflows(void)
 {
     rcp_e2e_wd_result_t r1 = rcp_e2e_wd_evaluate(true, 100, true, true, 100);
@@ -1002,6 +1015,10 @@ static void test_wd_evaluate_at_and_beyond_timeout_overflows(void)
     TEST_ASSERT_TRUE(r2.overflowed);
 }
 
+//cfusa:test REQ-E2E-026
+//cfusa:test REQ-E2E-027
+//cfusa:sec-test REQ-E2E-026
+//cfusa:sec-test REQ-E2E-027
 static void test_wd_evaluate_enter_safe_state_and_notify_are_independent(void)
 {
     rcp_e2e_wd_result_t both = rcp_e2e_wd_evaluate(true, 10, true, true, 50);
