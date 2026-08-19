@@ -24,7 +24,6 @@
 //cfusa:test REQ-MOCK-032
 //cfusa:test REQ-MOCK-033
 //cfusa:test REQ-RMAP-084
-//cfusa:test REQ-WDG-010
 //cfusa:test REQ-AVTP-030
 //cfusa:test REQ-AVTP-032
 //cfusa:test REQ-AVTP-033
@@ -410,6 +409,7 @@ static void wdg_busy_wait_ms(unsigned ms)
  * continuous_requests()) remains deliberately out of scope -- it has no
  * stream_id concept at all to key a kick by; see
  * rcp_mock_server_set_watchdog_keeper()'s own doc comment. */
+//cfusa:test REQ-WDG-010
 static void test_dispatch_kicks_the_watchdog_on_every_admitted_request(void)
 {
     rcp_mock_server_t         *srv = rcp_mock_server_new();

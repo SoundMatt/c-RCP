@@ -40,7 +40,6 @@
 //cfusa:test REQ-SEQ-014
 //cfusa:test REQ-TIMED-012
 //cfusa:test REQ-TIMED-013
-//cfusa:test REQ-WDG-010
 
 /*
  * test_tc18_gaps_server.c -- spec-literal conformance-and-deviation suite
@@ -1883,6 +1882,19 @@ static void busy_wait_ms(unsigned ms)
     }
 }
 
+/* Not tagged REQ-WDG-010: this exercises rcp_server_endpoint_submit()
+ * (server.h's own lower-level path), which that requirement's own text
+ * explicitly excludes ("deliberately out of scope, not a remaining gap
+ * in this request-reception path... a caller reaching an endpoint
+ * through that primitive directly... is already bypassing every other
+ * stream-scoped RC-Client behavior along with the watchdog"). This test
+ * demonstrates that excluded path still overflows -- the contrast the
+ * requirement's own note describes -- not the requirement's own positive
+ * claim, which is covered by test_mock.c's/test_tc18_gaps_e2e.c's own
+ * dispatch()-level tests instead (issue #533 atomicity audit: this
+ * REQ-WDG-010 tag was misplaced here as part of a file-header block,
+ * removed 2026-08-19; found the actual coverage was already correct in
+ * the other two files, so nothing to relocate here, only to remove). */
 static void test_watchdog_overflows_despite_continuous_requests(void)
 {
     rcp_watchdog_stream_cfg_t stream = {7u, true, 40u, true, true};

@@ -19106,6 +19106,58 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.467.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
+REQ-WDG-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged all 12 REQ-WDG-* requirements (src/watchdog.c, plus src/mock.c's
+dispatch-level watchdog kicking).
+
+No splits needed -- all 12 confirmed atomic. REQ-WDG-003/-007/-012 (the 3
+proxy-flagged ids) each map to exactly one function's complete contract
+(rcp_watchdog_keeper_kick(), _close(), _destroy()), same "one function's
+complete input-domain behavior" pattern established throughout this audit.
+
+Real findings beyond tagging, both in scope for this batch:
+
+1. File-header tagging in tests/test_watchdog.c (all 12 ids stacked at the
+top) -- relocated to per-function. REQ-WDG-004 ("status() returns the most
+recently computed result") had no per-function test at all despite the
+header claiming it -- traced to
+test_overflow_detected_within_recorded_ftti(), the one test that actually
+shows status() tracking a changing result over successive background re-
+evaluations (distinct from REQ-WDG-009's own "non-stale initial result"
+claim, already correctly tagged elsewhere).
+
+2. A genuinely mistagged (not just misplaced) REQ-WDG-010 reference in
+tests/test_tc18_gaps_server.c's own file-header block: that file's
+test_watchdog_overflows_despite_continuous_requests() deliberately exercises
+rcp_server_endpoint_submit() -- the lower-level path REQ-WDG-010's own
+requirement text explicitly excludes from its scope. The test demonstrates
+the excluded path still overflows, not the requirement's positive claim --
+tagging it would have been actively wrong, not merely disorganized. Removed
+the tag (with an explanatory comment at the test itself) rather than
+relocating it; REQ-WDG-010's real coverage was already correctly present in
+tests/test_mock.c/tests/test_tc18_gaps_e2e.c (also de-file-headered here,
+since both carried the same anti-pattern for many other, out-of-this-
+batch's-scope requirement prefixes -- only their own REQ-WDG-010 line was
+touched).
+
+3. Stale requirement text: REQ-WDG-012's text described
+rcp_watchdog_keeper_destroy() as separately freeing "states, callbacks, and
+callback_ctx arrays" -- true before the [c-RCP-17] fix, stale since: those
+are now fixed-capacity arrays embedded directly in the keeper struct, so
+freeing k itself already covers them. Corrected the text to match current
+reality.
+
+Verification: full clean rebuild + 67/67 test suite passing (test-tag/doc-
+text-only edit, no test behavior changed); ASan/UBSan clean, 67/67; pinned
+cfusa v0.6.2: check 0 errors, trace --req-coverage 100/--sec-tested 2 each
+unchanged (1272/1272 traced, 512/512 functions -- confirming the mistagged-
+reference removal didn't drop real coverage, since the requirement remains
+correctly covered by its two legitimate test sites).
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.466.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
 REQ-CLI-*/REQ-WIREERR-*/REQ-SCHED-*/REQ-TSN-*/REQ-LOAN-*: requirement-
 atomicity audit, Group 4 residual)
