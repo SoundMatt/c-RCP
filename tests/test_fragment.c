@@ -1,22 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-FRAG-001
-//cfusa:test REQ-FRAG-002
-//cfusa:test REQ-FRAG-003
-//cfusa:test REQ-FRAG-004
-//cfusa:test REQ-FRAG-005
-//cfusa:test REQ-FRAG-006
-//cfusa:test REQ-FRAG-007
-//cfusa:test REQ-FRAG-008
-//cfusa:test REQ-FRAG-009
-//cfusa:test REQ-FRAG-010
-//cfusa:test REQ-FRAG-011
-//cfusa:test REQ-FRAG-012
-//cfusa:test REQ-FRAG-013
-//cfusa:test REQ-FRAG-014
-//cfusa:test REQ-FRAG-015
-//cfusa:test REQ-FRAG-016
-//cfusa:test REQ-FRAG-017
-//cfusa:test REQ-FRAG-018
 #include "unity.h"
 
 #include <rcp/alloc.h>
@@ -30,6 +12,7 @@ void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a hook across tes
 
 /* ── strerror / result_string ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-FRAG-001
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a   = rcp_fragment_strerror(RCP_FRAGMENT_OK);
@@ -49,6 +32,7 @@ static void test_strerror_never_null_and_distinct(void)
     TEST_ASSERT_TRUE(strcmp(c, d) != 0);
 }
 
+//cfusa:test REQ-FRAG-007
 static void test_reasm_result_string_never_null_and_distinct(void)
 {
     const char *a = rcp_fragment_reasm_result_string(RCP_FRAGMENT_REASM_CONTINUE);
@@ -73,34 +57,40 @@ static void test_reasm_result_string_never_null_and_distinct(void)
 
 /* ── plan_count ────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-FRAG-002
 static void test_plan_count_empty_payload_always_one_segment(void)
 {
     TEST_ASSERT_EQUAL_UINT(1, rcp_fragment_plan_count(0, 0));
     TEST_ASSERT_EQUAL_UINT(1, rcp_fragment_plan_count(0, 10));
 }
 
+//cfusa:test REQ-FRAG-002
 static void test_plan_count_fits_in_one_fragment(void)
 {
     TEST_ASSERT_EQUAL_UINT(1, rcp_fragment_plan_count(10, 10));
     TEST_ASSERT_EQUAL_UINT(1, rcp_fragment_plan_count(5, 10));
 }
 
+//cfusa:test REQ-FRAG-003
 static void test_plan_count_disabled_when_payload_exceeds_zero_cap(void)
 {
     TEST_ASSERT_EQUAL_UINT(0, rcp_fragment_plan_count(1, 0));
 }
 
+//cfusa:test REQ-FRAG-002
 static void test_plan_count_exact_multiple(void)
 {
     TEST_ASSERT_EQUAL_UINT(3, rcp_fragment_plan_count(30, 10));
 }
 
+//cfusa:test REQ-FRAG-002
 static void test_plan_count_remainder(void)
 {
     TEST_ASSERT_EQUAL_UINT(4, rcp_fragment_plan_count(31, 10));
     TEST_ASSERT_EQUAL_UINT(2, rcp_fragment_plan_count(11, 10));
 }
 
+//cfusa:test REQ-FRAG-003
 static void test_plan_count_too_many_segments(void)
 {
     /* RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2 fragments of 1 byte each
@@ -113,6 +103,7 @@ static void test_plan_count_too_many_segments(void)
         RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2, 1));
 }
 
+//cfusa:test REQ-FRAG-003
 static void test_plan_count_exactly_at_max_intermediate_boundary(void)
 {
     /* RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 1 fragments of 1 byte:
@@ -124,6 +115,7 @@ static void test_plan_count_exactly_at_max_intermediate_boundary(void)
 
 /* ── plan ──────────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-FRAG-004
 static void test_plan_single_segment_no_fragmentation_needed(void)
 {
     rcp_fragment_segment_t seg;
@@ -136,6 +128,7 @@ static void test_plan_single_segment_no_fragmentation_needed(void)
     TEST_ASSERT_FALSE(seg.ms);
 }
 
+//cfusa:test REQ-FRAG-004
 static void test_plan_empty_payload(void)
 {
     rcp_fragment_segment_t seg;
@@ -148,6 +141,7 @@ static void test_plan_empty_payload(void)
     TEST_ASSERT_FALSE(seg.ms);
 }
 
+//cfusa:test REQ-FRAG-005
 static void test_plan_multi_segment_layout_and_numbering(void)
 {
     rcp_fragment_segment_t segs[3];
@@ -179,6 +173,7 @@ static void test_plan_multi_segment_layout_and_numbering(void)
  * now plans and round-trips correctly. 300 fragments of 1 byte each: 299
  * intermediate (segment_num 0..298, well past the old 8-bit ceiling) plus
  * 1 final. */
+//cfusa:test REQ-FRAG-005
 static void test_plan_segment_num_above_255_does_not_truncate(void)
 {
     static rcp_fragment_segment_t segs[300];
@@ -196,6 +191,7 @@ static void test_plan_segment_num_above_255_does_not_truncate(void)
     TEST_ASSERT_FALSE(segs[299].ms);
 }
 
+//cfusa:test REQ-FRAG-005
 static void test_plan_covers_entire_payload_contiguously(void)
 {
     rcp_fragment_segment_t segs[7];
@@ -223,6 +219,7 @@ static void test_plan_covers_entire_payload_contiguously(void)
     TEST_ASSERT_EQUAL_UINT(payload_len, covered);
 }
 
+//cfusa:test REQ-FRAG-006
 static void test_plan_disabled(void)
 {
     rcp_fragment_segment_t seg;
@@ -230,6 +227,7 @@ static void test_plan_disabled(void)
     TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_ERR_DISABLED, rc);
 }
 
+//cfusa:test REQ-FRAG-006
 static void test_plan_too_many_segments(void)
 {
     /* rcp_fragment_plan_count() returns 0 (hence ERR_TOO_MANY_SEGMENTS)
@@ -244,6 +242,7 @@ static void test_plan_too_many_segments(void)
     TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_ERR_TOO_MANY_SEGMENTS, rc);
 }
 
+//cfusa:test REQ-FRAG-006
 static void test_plan_bad_segment_count(void)
 {
     rcp_fragment_segment_t segs[3];
@@ -251,8 +250,30 @@ static void test_plan_bad_segment_count(void)
     TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_ERR_BAD_SEGMENT_COUNT, rc);
 }
 
+/* REQ-FRAG-008: init()'s own not-collecting/empty-buffer postcondition,
+ * checked before any feed() call at all -- every other test in this file
+ * inits a reassembler and then immediately feeds it, so none of them
+ * observe this raw post-init state on its own. */
+//cfusa:test REQ-FRAG-008
+static void test_reassembler_init_starts_empty_and_not_collecting(void)
+{
+    rcp_fragment_reassembler_t r;
+    const uint8_t               *out;
+    size_t                       out_len = 0xFFu; /* deliberately non-zero sentinel */
+
+    rcp_fragment_reassembler_init(&r, 1024);
+    TEST_ASSERT_FALSE(rcp_fragment_reassembler_is_collecting(&r));
+
+    rcp_fragment_reassembler_get(&r, &out, &out_len);
+    TEST_ASSERT_EQUAL_UINT(0, out_len);
+
+    rcp_fragment_reassembler_destroy(&r);
+}
+
 /* ── reassembler: single-segment (never fragmented) messages ─────────────── */
 
+//cfusa:test REQ-FRAG-010
+//cfusa:test REQ-FRAG-011
 static void test_reassembler_single_segment_completes_immediately(void)
 {
     rcp_fragment_reassembler_t r;
@@ -273,6 +294,7 @@ static void test_reassembler_single_segment_completes_immediately(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-011
 static void test_reassembler_empty_single_segment(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -292,6 +314,9 @@ static void test_reassembler_empty_single_segment(void)
 
 /* ── reassembler: multi-segment sequences ─────────────────────────────────── */
 
+//cfusa:test REQ-FRAG-013
+//cfusa:test REQ-FRAG-014
+//cfusa:test REQ-FRAG-018
 static void test_reassembler_multi_segment_round_trips_plan(void)
 {
     uint8_t                     payload[67];
@@ -329,6 +354,7 @@ static void test_reassembler_multi_segment_round_trips_plan(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-012
 static void test_reassembler_out_of_order_first_segment(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -343,6 +369,7 @@ static void test_reassembler_out_of_order_first_segment(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-013
 static void test_reassembler_out_of_order_mid_sequence(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -362,6 +389,7 @@ static void test_reassembler_out_of_order_mid_sequence(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-014
 static void test_reassembler_final_ms0_segment_num_field_ignored(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -389,6 +417,7 @@ static void test_reassembler_final_ms0_segment_num_field_ignored(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-015
 static void test_reassembler_too_large_rejects_and_preserves_state(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -430,6 +459,7 @@ static void *always_fails_realloc(void *ptr, size_t size)
     return NULL;
 }
 
+//cfusa:test REQ-FRAG-016
 static void test_reassembler_alloc_failure_is_distinct_and_preserves_state(void)
 {
     rcp_alloc_hooks_t            hooks = {0};
@@ -477,6 +507,7 @@ static void test_reassembler_alloc_failure_is_distinct_and_preserves_state(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-015
 static void test_reassembler_exactly_at_max_total_len_succeeds(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -501,6 +532,8 @@ static void test_reassembler_exactly_at_max_total_len_succeeds(void)
 
 /* ── reassembler: reset/reuse across messages ─────────────────────────────── */
 
+//cfusa:test REQ-FRAG-009
+//cfusa:test REQ-FRAG-017
 static void test_reassembler_reset_allows_reuse(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -530,6 +563,7 @@ static void test_reassembler_reset_allows_reuse(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+//cfusa:test REQ-FRAG-011
 static void test_reassembler_completed_then_reused_for_next_message(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -599,6 +633,7 @@ int main(void)
     RUN_TEST(test_plan_too_many_segments);
     RUN_TEST(test_plan_bad_segment_count);
 
+    RUN_TEST(test_reassembler_init_starts_empty_and_not_collecting);
     RUN_TEST(test_reassembler_single_segment_completes_immediately);
     RUN_TEST(test_reassembler_empty_single_segment);
 

@@ -8,14 +8,6 @@
  * CAP_NET_RAW/root) -- a real send()/recv() round trip over a live veth
  * pair is instead exercised by this project's own Linux-only,
  * elevated-privilege CI job (see ci.yml and l2.h's own file header). */
-//cfusa:test REQ-L2-001
-//cfusa:test REQ-L2-002
-//cfusa:test REQ-L2-003
-//cfusa:test REQ-L2-004
-//cfusa:test REQ-L2-005
-//cfusa:test REQ-L2-009
-//cfusa:test REQ-L2-010
-//cfusa:test REQ-L2-011
 #include "unity.h"
 
 #include <rcp/avtp.h>
@@ -30,6 +22,7 @@ void tearDown(void) {}
 static const uint8_t k_dst_mac[6] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 static const uint8_t k_src_mac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
 
+//cfusa:test REQ-L2-001
 static void test_ethertype_constant_value(void)
 {
     /* 0x22F0, per the public IEEE 1722-2016 base standard's own subtype/
@@ -39,6 +32,7 @@ static void test_ethertype_constant_value(void)
     TEST_ASSERT_EQUAL_UINT(14u, RCP_L2_HEADER_LEN);
 }
 
+//cfusa:test REQ-L2-001
 static void test_frame_encode_byte_layout(void)
 {
     static const uint8_t avtpdu[4] = {0x11, 0x22, 0x33, 0x44};
@@ -58,6 +52,8 @@ static void test_frame_encode_byte_layout(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-L2-001
+//cfusa:test REQ-L2-002
 static void test_frame_encode_decode_roundtrip(void)
 {
     static const uint8_t avtpdu[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -80,6 +76,8 @@ static void test_frame_encode_decode_roundtrip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-L2-001
+//cfusa:test REQ-L2-002
 static void test_frame_encode_empty_avtpdu(void)
 {
     rcp_bytes_t frame = rcp_l2_frame_encode(k_dst_mac, k_src_mac, NULL, 0);
@@ -98,6 +96,7 @@ static void test_frame_encode_empty_avtpdu(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-L2-002
 static void test_frame_decode_rejects_short_frame(void)
 {
     static const uint8_t too_short[13] = {0}; /* one octet short of RCP_L2_HEADER_LEN */
@@ -112,6 +111,7 @@ static void test_frame_decode_rejects_short_frame(void)
     TEST_ASSERT_EQUAL_UINT(0xFFu, payload_len);
 }
 
+//cfusa:test REQ-L2-002
 static void test_frame_decode_rejects_wrong_ethertype(void)
 {
     static const uint8_t avtpdu[2] = {0xAB, 0xCD};
@@ -144,6 +144,7 @@ static void test_frame_decode_rejects_wrong_ethertype(void)
  * this classifier -- the I/G bit is the least-significant bit of the
  * first octet: 0 == unicast, 1 == multicast (broadcast is the all-ones
  * special case of multicast). */
+//cfusa:test REQ-L2-011
 static void test_mac_is_unicast_classifies_unicast_multicast_broadcast(void)
 {
     static const uint8_t unicast[6]   = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01}; /* locally
@@ -162,6 +163,10 @@ static void test_mac_is_unicast_classifies_unicast_multicast_broadcast(void)
     TEST_ASSERT_TRUE(rcp_l2_mac_is_unicast(all_zero));
 }
 
+//cfusa:test REQ-L2-003
+//cfusa:test REQ-L2-004
+//cfusa:test REQ-L2-005
+//cfusa:test REQ-L2-010
 static void test_transport_new_ok_or_gracefully_unavailable(void)
 {
     rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("lo", k_dst_mac, false);
@@ -184,6 +189,8 @@ static void test_transport_new_ok_or_gracefully_unavailable(void)
     rcp_avtp_transport_release(t);
 }
 
+//cfusa:test REQ-L2-003
+//cfusa:test REQ-L2-004
 static void test_transport_new_bad_interface_is_not_ok(void)
 {
     rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("no-such-if-9999", k_dst_mac, false);
@@ -209,6 +216,7 @@ static void test_transport_new_bad_interface_is_not_ok(void)
  * repo's own macOS and Windows CI jobs, where the stub's
  * "ok()==false implies RCP_ERR_CLOSED" contract is unconditionally
  * true (no privilege check needed at all -- see l2_stub_send/recv). */
+//cfusa:test REQ-L2-009
 static void test_transport_send_recv_closed_when_not_ok(void)
 {
     rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("lo", k_dst_mac, false);
