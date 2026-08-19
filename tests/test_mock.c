@@ -38,6 +38,7 @@
 #include "../src/mem_bounded.h"
 
 #include <rcp/acf.h>
+#include <rcp/alloc.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/e2e.h>
@@ -2597,6 +2598,830 @@ static void test_new_server_seeds_ep_id_map_default_row_for_ep0(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+ * MC/DC gap-closing tests (mock.c batch). Each test below targets one
+ * specific decision's own previously-undemonstrated condition
+ * independence, found against a real LLVM MC/DC export. A recurring
+ * structural fact worth stating once instead of at each of its several
+ * call sites: rcp_acf_unpack_header() (src/acf.c) has no error path at
+ * all -- it unconditionally returns RCP_ACF_OK -- so at EVERY
+ * `request_len >= 8 && rcp_acf_unpack_header(...) == RCP_ACF_OK`-shaped
+ * (or the OR-negated `len < 8 || unpack(...) != RCP_ACF_OK`-shaped)
+ * guard in this file, the unpack-outcome condition can never
+ * independently be demonstrated false/true respectively -- it is always
+ * true whenever it is even reached. Every test below that closes one
+ * of these guards closes only its OWN length condition and leaves that
+ * fact noted, not re-derived. ══════════════════════════════════════ */
+
+/* ── L551: rcp_mock_server_wakeup_repetition_interval_us()'s own second
+ * range check (resp_stream_index == 0u) -- resp_stream_index comes from
+ * the resolved request stream's own rx_resp_stream_index field, which
+ * every existing test leaves at its REQ-RMAP-049 power-on default (1,
+ * never 0), so this condition's own TRUE side was never demonstrated. */
+static void test_wakeup_repetition_interval_resp_stream_index_zero_fails(void)
+{
+    rcp_mock_server_t              *srv = heartbeat_fixture(5000u);
+    rcp_regmap_request_stream_cfg_t req[1];
+    uint32_t                        interval = 0xEEEEEEEEu;
+
+    rcp_regmap_request_stream_cfg_init(&req[0]);
+    req[0].rx_resp_stream_index = 0u; /* override the power-on default */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, req, 1));
+
+    TEST_ASSERT_FALSE(rcp_mock_server_wakeup_repetition_interval_us(srv, 1u, &interval));
+    TEST_ASSERT_EQUAL_UINT32(0u, interval);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L756: find_slot_on_stream_const()'s own 4-condition match test,
+ * exercised ONLY through rcp_mock_server_pending_count_on_stream() --
+ * every existing caller's own registered slot happens to match on the
+ * very first array index it checks, so in_use/byte_bus_id/!stream_scoped
+ * never independently show their own FALSE-then-TRUE (or TRUE-then-
+ * FALSE) effect within this function's own call sites. Four separate
+ * servers below, each engineered to make exactly one condition the
+ * reason a given loop iteration's match fails or succeeds. */
+static void test_pending_count_on_stream_mcdc_independence(void)
+{
+    /* in_use: an entirely empty server has no match anywhere in the
+     * array -- every iteration's own in_use is false, closing this
+     * condition's FALSE side (its TRUE side is any of the pairing
+     * servers below, or any of this file's many other successful
+     * pending_count_on_stream() calls). */
+    rcp_mock_server_t *empty = rcp_mock_server_new();
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(empty, STREAM_A, 5));
+    rcp_mock_server_destroy(empty);
+
+    /* byte_bus_id: one unscoped endpoint registered at bus 9 (in_use
+     * true) is walked past -- byte_bus_id mismatches the queried bus 5
+     * -- before the loop runs out of slots. */
+    {
+        rcp_mock_server_t *srv = rcp_mock_server_new();
+        TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 9, 1, true, NULL, NULL));
+        TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+        rcp_mock_server_destroy(srv);
+    }
+
+    /* !stream_scoped: an UNSCOPED endpoint (add_endpoint(), not
+     * add_endpoint_on_stream()) matches unconditionally regardless of
+     * the queried stream_id -- true via !stream_scoped alone, never
+     * even reaching the stream_id comparison. */
+    {
+        rcp_mock_server_t *srv = rcp_mock_server_new();
+        TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 8, 1, true, NULL, NULL));
+        TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 8));
+        rcp_mock_server_destroy(srv);
+    }
+
+    /* Pairs with the case above for !stream_scoped's own FALSE side: a
+     * SCOPED endpoint at the same byte_bus_id (a different server -- the
+     * two registration kinds can never coexist at one byte_bus_id, see
+     * find_slot_on_stream()'s own doc comment), queried under a
+     * DIFFERENT stream_id than the one it was registered on, so
+     * stream_scoped is true (!stream_scoped false) and the stream_id
+     * comparison itself is what makes the match fail. */
+    {
+        rcp_mock_server_t *srv = rcp_mock_server_new();
+        TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+            rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 8, 1, true, NULL, NULL));
+        TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_C, 8));
+        rcp_mock_server_destroy(srv);
+    }
+}
+
+/* ── L972: rcp_mock_server_apply_ep_generic_cfg()'s own scatter loop
+ * (`i < RCP_MOCK_MAX_ENDPOINTS && taken < count`) -- every existing
+ * caller's own count is small, so the loop always exits via `taken <
+ * count` going false long before `i` ever reaches the array's own
+ * capacity. Filling every one of the RCP_MOCK_MAX_ENDPOINTS slots (a
+ * legitimate, if extreme, real caller state) puts the LAST matching
+ * slot at the last array index: `taken` reaches `count` on the very
+ * same iteration `i` reaches its own final in-bounds value, so the
+ * loop's own re-check at the top next time round is what closes `i <
+ * RCP_MOCK_MAX_ENDPOINTS` to false -- the first time this condition's
+ * own FALSE side is ever exercised in this file. */
+static void test_apply_ep_generic_cfg_at_full_capacity(void)
+{
+    rcp_mock_server_t        *srv = rcp_mock_server_new();
+    rcp_regmap_ep_generic_cfg_t entries[RCP_MOCK_MAX_ENDPOINTS];
+    size_t                      i;
+
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+            rcp_mock_server_add_endpoint(srv, (rcp_byte_bus_id_t)i, 1, true, NULL, NULL));
+        rcp_regmap_ep_generic_cfg_init(&entries[i]);
+    }
+
+    TEST_ASSERT_TRUE(rcp_mock_server_apply_ep_generic_cfg(srv, entries, RCP_MOCK_MAX_ENDPOINTS));
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1816: rcp_mock_server_dispatch_tscf()'s own TSCF-reserved-bytes
+ * rule gate (`avtp_subtype == RCP_AVTP_SUBTYPE_TSCF && tscf_reserved_
+ * all_zero`) -- every existing caller of this specific entry point
+ * always passes RCP_AVTP_SUBTYPE_TSCF (naturally, given the function's
+ * own name), so avtp_subtype's own FALSE side was never exercised here,
+ * even though the doc comment right above this line explicitly says
+ * the function's own signature "does not forbid" an NTSCF-headed call
+ * through it. tscf_reserved_all_zero's own both-values pairing already
+ * exists (test_dispatch_tscf_drops_when_reserved_all_zero_and_policy_is_
+ * drop() / test_dispatch_tscf_with_tv_false_behaves_like_plain_
+ * dispatch()). */
+static void test_dispatch_tscf_ntscf_subtype_ignores_reserved_bytes_rule(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+
+    /* tscf_reserved_all_zero=true would drop this frame outright under
+     * the default DROP policy if avtp_subtype were really TSCF -- an
+     * NTSCF-headed call through this same entry point ignores it
+     * entirely and executes normally instead. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       false, 0u, true /* tscf_reserved_all_zero */, 0u, req,
+                                       sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1728: suppress_response_per_stream_cfg()'s own `out->len < 8u ||
+ * rcp_acf_unpack_header(...) != RCP_ACF_OK` guard -- every existing
+ * dispatched response this file builds is a real, full ACF frame (>= 8
+ * octets), so out->len < 8u's own TRUE side was never exercised. A
+ * handler whose own response happens to be shorter than one ACF header
+ * (legal -- mock.h's own handler contract places no length floor on
+ * *out_response) reaches this guard with exactly that shape. */
+static void test_response_shorter_than_acf_header_is_not_classified(void)
+{
+    rcp_mock_server_t               *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    const uint8_t                    req[3] = {0x01, 0x02, 0x03};
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+
+    to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, echo_handler, NULL));
+
+    /* A real, resolvable request stream -- stream_index must be nonzero
+     * to reach this guard at all (the line just above it returns early
+     * otherwise, an already-covered decision). */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u, req,
+                                  sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    /* echo_handler() dups the request verbatim -- 3 octets, well under
+     * the 8-octet ACF header floor. Not suppressed (too short to even
+     * classify), so it survives untouched. */
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_size_t(3, resp.len);
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2872/L2887: rcp_mock_server_take_deferred_response()/_on_stream()'s
+ * own `!slot || ...` guard -- every existing test calls these against a
+ * byte_bus_id/stream_id it has already registered an endpoint at, so
+ * `!slot`'s own TRUE side (no such endpoint at all) was never
+ * exercised at either call site. */
+static void test_take_deferred_response_unregistered_bus_returns_false(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response(srv, 42u, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_take_deferred_response_on_stream_unregistered_bus_returns_false(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_A, 42u, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L3510: rcp_mock_server_set_sequencer_count()'s own `ok = count ==
+ * 0u || srv->sequencers.state != NULL` -- every existing caller's own
+ * rcp_sequencer_table_new() call succeeds, so state != NULL's own FALSE
+ * side (a genuine allocation failure for a nonzero count) was never
+ * exercised. Fault-injection idiom per this project's own
+ * tests/test_fragment.c precedent. */
+static void *always_fails_malloc_mock(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+static void test_set_sequencer_count_alloc_failure_reports_false(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_alloc_hooks_t   hooks = {0};
+
+    hooks.malloc_fn = always_fails_malloc_mock;
+    rcp_alloc_set_hooks(&hooks);
+
+    TEST_ASSERT_FALSE(rcp_mock_server_set_sequencer_count(srv, 4u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_mock_server_regmap(srv)->svr_sequencers_max);
+
+    rcp_alloc_reset_hooks();
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1403: finish_admission()'s own admission-REJECTED response guard
+ * (`request_len >= 8 && rcp_acf_unpack_header(...) == RCP_ACF_OK`) --
+ * PROVEN STRUCTURALLY UNREACHABLE for BOTH conditions, not just the
+ * already-file-wide-unreachable unpack==OK half. This guard is only
+ * even reached when `error != RCP_ERROR_NONE` (the enclosing `if`, one
+ * level up). Tracing every site in rcp_server_endpoint_admit_with_ack()
+ * (src/server.c) that can leave *out_error non-NONE on a REJECTED
+ * return:
+ *   - the rsp-bit-set rejection (INVALID_PARAMETER) is itself gated on
+ *     `frame_len >= 8` before it even runs (src/server.c ~L361);
+ *   - the general request-store-overflow rejection (STORAGE_OVERFLOW)
+ *     is reached only for a frame already classified into COMPOUND/
+ *     COMPOUND_WAIT/TRIGGERED/TIMED/CHAINED via rcp_compound_peek_
+ *     request_type(), which itself requires `len >=
+ *     RCP_ACF_GBB_HEADER_LEN` (16) to return anything but SHORT_FRAME
+ *     (src/request.c);
+ *   - the COMPOUND_WAIT reserved-evt rejection (UNSUPPORTED_CMD) is
+ *     reached only after that same >= 16-byte classification succeeds.
+ * admit_under_tscf_gate() (the tv=true STANDARD/CANCELLATION path) has
+ * no out_error parameter at all -- a claim_slot() failure there leaves
+ * *out_error at its RCP_ERROR_NONE initial value, so that REJECTED
+ * never even satisfies finish_admission()'s own outer `error !=
+ * RCP_ERROR_NONE` gate and never reaches this guard in the first place.
+ * So every real way to reach this exact line with error != NONE already
+ * guarantees request_len >= 8 (in most cases >= 16) -- request_len >=
+ * 8's own FALSE side is exactly as unreachable here as unpack==OK's own
+ * FALSE side already is file-wide. No test added for this decision;
+ * forcing one would mean fabricating a request-store shape this
+ * codebase's own admission logic cannot actually produce. */
+
+/* ── L1496/L1862 (cond0)/L2095/L2098/L2133/L2197/L2520: dispatch_plain_
+ * inner()'s/dispatch_multi_response()'s/dispatch_e2e_tscf()'s own
+ * lifecycle-REJECT response guards, and the E2E fragment variants' own
+ * CRC/unwrap-error guards -- all share the identical `request_len >= 8
+ * && unpack(...) == RCP_ACF_OK` shape this file's own header comment
+ * already names. This one server/trigger (HW_UNCONFIGURED, NTSCF,
+ * ACF_GBB, addressed to the discovery bus -- REQ-LIFECYCLE-033's own
+ * REJECT rule) drives the plain and multi-response variants with a raw
+ * request under 8 octets, closing request_len >= 8's own FALSE side at
+ * both. */
+static void test_lifecycle_rejected_short_frame_builds_no_response(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new(); /* HW_UNCONFIGURED */
+    rcp_bytes_t         resp = {0};
+    const uint8_t       short_req[3] = {0x11, 0x22, 0x33};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
+                                  RCP_ACF_MSG_TYPE_GBB, false, 1u, short_req, sizeof(short_req),
+                                  &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* L1862 also gates on a 3rd, independent condition (`out_cap > 0u`) --
+ * never demonstrated at all (no test drives dispatch_multi_response()'s
+ * own REJECT path). One server, three calls: short frame (closes
+ * request_len >= 8's FALSE side against the other two below), a full
+ * frame with out_cap > 0 (builds a response), and a full frame with
+ * out_cap == 0 (closes out_cap > 0's own FALSE side). */
+static void test_dispatch_multi_response_rejected_guard_mcdc(void)
+{
+    rcp_mock_server_t           *srv = rcp_mock_server_new(); /* HW_UNCONFIGURED */
+    rcp_bytes_t                  responses[2] = {{0}, {0}};
+    size_t                       response_count;
+    const uint8_t                short_req[3] = {0x11, 0x22, 0x33};
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  full_req;
+
+    hdr.byte_bus_id     = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    hdr.transaction_num = 55;
+    full_req = rcp_acf_encode_abb(&hdr, NULL, 0); /* >= 8 octets */
+    TEST_ASSERT_NOT_NULL(full_req.data);
+
+    response_count = 0xEEu;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch_multi_response(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID,
+                                                 RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, false,
+                                                 1u, short_req, sizeof(short_req), responses, 2u,
+                                                 &response_count));
+    TEST_ASSERT_EQUAL_size_t(0, response_count);
+    TEST_ASSERT_NULL(responses[0].data);
+
+    response_count = 0xEEu;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch_multi_response(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID,
+                                                 RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, false,
+                                                 1u, full_req.data, full_req.len, responses, 2u,
+                                                 &response_count));
+    TEST_ASSERT_EQUAL_size_t(1, response_count);
+    TEST_ASSERT_NOT_NULL(responses[0].data);
+    rcp_bytes_free(&responses[0]);
+
+    response_count = 0xEEu;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch_multi_response(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID,
+                                                 RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, false,
+                                                 1u, full_req.data, full_req.len, responses, 0u,
+                                                 &response_count));
+    TEST_ASSERT_EQUAL_size_t(0, response_count);
+
+    rcp_bytes_free(&full_req);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1881: rcp_mock_server_dispatch_multi_response()'s own outer
+ * suppression loop (`i < *out_response_count && i < out_cap`) -- every
+ * existing multi_handler this codebase's own tests supply is well-
+ * behaved (its own *out_count never exceeds the out_cap it was handed),
+ * so `i < out_cap`'s own FALSE side (the defensive half of this double
+ * bound) never independently stops the loop. A deliberately
+ * misbehaving handler that reports more responses than the buffer it
+ * was given can actually hold exercises mock.c's own defensive guard
+ * against exactly that -- a real caller-contract violation, not just a
+ * coverage contrivance. */
+static void misbehaving_multi_handler(const uint8_t *request, size_t request_len,
+                                       rcp_bytes_t *out_responses, size_t out_cap,
+                                       size_t *out_count, void *user_data)
+{
+    (void)request;
+    (void)request_len;
+    (void)user_data;
+    /* Writes only within out_cap (no real buffer overrun), but LIES
+     * about how many are actually valid -- out_cap + 1. */
+    if (out_cap >= 1) out_responses[0] = rcp_bytes_dup((const uint8_t *)"A", 1);
+    *out_count = out_cap + 1u;
+}
+
+static void test_dispatch_multi_response_defends_against_over_reporting_handler(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         responses[1] = {{0}};
+    size_t              response_count = 0;
+
+    to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint_multi_response(
+                                        srv, 5u, 1u, true, misbehaving_multi_handler, NULL));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_multi_response(srv, 5u, RCP_AVTP_SUBTYPE_NTSCF,
+                                                 RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                                 (const uint8_t *)"x", 1, responses, 1u,
+                                                 &response_count));
+    /* The handler claimed 2 (out_cap(1) + 1) -- the outer loop's own
+     * `i < out_cap` half stopped it from touching responses[1], which
+     * does not exist. */
+    TEST_ASSERT_EQUAL_size_t(2, response_count);
+    TEST_ASSERT_NOT_NULL(responses[0].data);
+    rcp_bytes_free(&responses[0]);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1948/L2113/L2207/L2530: dispatch_e2e()/_e2e_tscf()/_e2e_fragment()/
+ * _e2e_fragment_tscf()'s own `!slot || !slot->req_crc_enable` delegation
+ * guards -- every existing test for each of these four sibling
+ * functions dispatches to a byte_bus_id it has already registered (with
+ * req_crc_enable either set or clear), so `!slot`'s own TRUE side (no
+ * such endpoint at all, on this stream, at this byte_bus_id) was never
+ * exercised at any of the four call sites. A single bare, endpoint-free
+ * server run through all four closes it at every one -- each one falls
+ * back to dispatch_plain(), which in turn (correctly) reports
+ * ERR_UNKNOWN_BUS since there is truly no matching slot anywhere. */
+static void test_e2e_dispatch_variants_with_no_registered_endpoint(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch_e2e(srv, 5u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                      0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5u, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           1u, false, 0u, 0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch_e2e_fragment(srv, 5u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                               true, 1u, 0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5u, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, 1u, false, 0u, 0u,
+                                                     req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2020: dispatch_e2e()'s own `crc_stream_index != 0u &&
+ * rcp_e2e_crc_error_should_enter_safe_state(rx_enforce_e2e)` broadcast
+ * gate. rx_enforce_e2e's own FALSE side (should_enter_safe_state's own
+ * FALSE side) has never been paired against a genuinely RESOLVABLE
+ * crc_stream_index at this call site: this file's own existing
+ * rx_enforce_e2e=false pairing test (test_set_endpoint_rx_enforce_e2e_
+ * on_stream_targets_correct_slot(), above) never configures a
+ * request_stream_cfg row at all, so crc_stream_index stays 0 there --
+ * masked, not FALSE via should_enter_safe_state's own value. A real
+ * request-stream row for STREAM_A, rx_enforce_e2e left at its power-on
+ * (clear) default, closes that. rcp_e2e_stream_fault_on_crc_error()'s
+ * own doc comment (e2e.c) is the reason this must ALSO leave the
+ * tracker itself un-latched: it only sets `faulted` when the crc-error
+ * action is LATCH_STREAM_FAULT, which rx_enforce_e2e clear never
+ * selects -- so is_faulted() staying false here is the CORRECT
+ * consequence of rx_enforce_e2e being clear, not a test bug. */
+static void test_dispatch_e2e_crc_stream_index_resolvable_rx_enforce_clear_no_broadcast(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 60);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    /* >= RCP_E2E_CRC_LEN(4), so unwrap_framed() reports a genuine CRC
+     * mismatch (POCI_FAILURE) rather than SHORT_FRAME -- SHORT_FRAME
+     * maps to RCP_ERROR_NONE (rcp_e2e_wire_error(), e2e.c), which skips
+     * this target guard ENTIRELY rather than evaluating it false, so a
+     * frame under 4 octets could never close this condition. Still < 8,
+     * so cond0 is still false at the target line. */
+    const uint8_t                    short_req[6] = {0};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    /* rx_enforce_e2e left clear (the power-on default) on purpose --
+     * clear throughout this whole test, so no dispatch below ever
+     * latches the tracker (e2e.c's own rcp_e2e_stream_fault_on_crc_
+     * error()), letting the SAME never-faulted STREAM_A be re-used to
+     * demonstrate L1965's own request_len >= 8 condition's BOTH sides
+     * (a short request here, first; the already-established full-length
+     * `plain` request right after) without the outer is_faulted guard
+     * (L1926, already independently covered) short-circuiting either
+     * one. */
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = STREAM_A;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* L1965's own request_len >= 8 FALSE side: a short (<8 byte) raw
+     * request also fails to unwrap, but can't recover a
+     * transaction_num to build a response from. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_A, 0, short_req, sizeof(short_req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_A, 0, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    /* rx_enforce_e2e clear: the crc-error action never latches the
+     * tracker (e2e.c's own rcp_e2e_stream_fault_on_crc_error()). */
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+    /* ...and never broadcasts safe-state either -- STREAM_B's own
+     * sibling slot still runs a normal dispatch untouched. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_B, 0, plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L1929: dispatch_e2e()'s own inner `request_len >= 8 &&
+ * unpack(...) == RCP_ACF_OK` response-building guard, reachable only
+ * once the tracker already reports this stream faulted -- request_len <
+ * 8 was never exercised there. rx_enforce_e2e=true this time (unlike
+ * the test above) so the first CRC error genuinely latches the tracker,
+ * matching REQ-E2E-046's own required LATCH_STREAM_FAULT precondition. */
+static void test_dispatch_e2e_faulted_stream_short_frame(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 61);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    const uint8_t                    short_req[2] = {0x01, 0x02};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_A, 0, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    /* STREAM_A is now latched faulted -- a short (<8 byte) raw request
+     * on it hits the STREAM_FAULTED response-building guard with
+     * request_len < 8. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_A, 0, short_req, sizeof(short_req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2095/L2098/L2133: dispatch_e2e_tscf()'s own copy of the same
+ * stream-fault-tracker inner guard as L1929/L1965 -- identical triggers,
+ * through the _tscf entry point instead. Both inner guards (L2098's own
+ * STREAM_FAULTED response guard, and L2133's own unwrap-error CRC_ERROR
+ * response guard) need their own request_len >= 8 FALSE side exercised
+ * at THIS call site specifically -- coverage at the plain dispatch_e2e()
+ * call sites above does not carry over to this sibling function's own,
+ * separate source lines. */
+static void test_dispatch_e2e_tscf_faulted_stream_short_frame(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 61);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    const uint8_t                    short_req[2] = {0x01, 0x02};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_A, false, 0u, 0u, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    /* Now faulted: a FULL-length raw request closes L2098's own
+     * request_len >= 8 TRUE side (a real error response IS built). */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_A, false, 0u, 0u, plain.data, plain.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    rcp_bytes_free(&resp);
+
+    /* ...and a short one closes L2098's own request_len >= 8 FALSE side. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_A, false, 0u, 0u, short_req, sizeof(short_req),
+                                           &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2194/L2197 (dispatch_e2e_fragment) and L2517/L2520 (dispatch_e2e_
+ * fragment_tscf): each function's own outer stream-fault-tracker check
+ * (`tracker != NULL && is_faulted(...)`) and its inner `fragment_len >=
+ * 8 && unpack(...) == RCP_ACF_OK` response-building guard. Neither
+ * fragment entry point has any existing stream-fault-tracker test of
+ * its own at all, so is_faulted's own both-values pairing (outer guard)
+ * is closed here for the first time too, not just the inner guard's
+ * own length condition. */
+static void test_dispatch_e2e_fragment_faulted_stream_mcdc(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 62);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    const uint8_t                    short_req[2] = {0x01, 0x02};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = STREAM_A;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* is_faulted() false (tracker set, stream not yet faulted): a plain
+     * single-segment (ms=0, not collecting) dispatch falls back to
+     * dispatch_e2e() and is admitted normally through this entry point. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e_fragment(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                               true, STREAM_A, 0u, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    /* That CRC error is what latches it faulted for the calls below. */
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    /* is_faulted() true, request_len >= 8: STREAM_FAULTED with a real
+     * error response built. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_fragment(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                               true, STREAM_A, 0u, plain.data, plain.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    rcp_bytes_free(&resp);
+
+    /* is_faulted() true, request_len < 8: STREAM_FAULTED with no
+     * response built -- closes the inner guard's own length condition. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_fragment(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                               true, STREAM_A, 0u, short_req, sizeof(short_req),
+                                               &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_e2e_fragment_tscf_faulted_stream_mcdc(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 63);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    const uint8_t                    short_req[2] = {0x01, 0x02};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = STREAM_A;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, STREAM_A, false, 0u,
+                                                     0u, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, STREAM_A, false, 0u,
+                                                     0u, plain.data, plain.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, STREAM_A, false, 0u,
+                                                     0u, short_req, sizeof(short_req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2152: dispatch_e2e_tscf()'s own copy of L2020's crc_stream_index/
+ * rx_enforce_e2e broadcast gate -- rx_enforce_e2e's own FALSE side, with
+ * a genuinely RESOLVABLE crc_stream_index, has never been exercised at
+ * THIS call site (only at dispatch_e2e()'s own L2020, above). */
+static void test_dispatch_e2e_tscf_crc_stream_index_resolvable_rx_enforce_clear_no_broadcast(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      plain = make_plain_abb(5, 70);
+    rcp_e2e_stream_fault_tracker_t   tracker;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    /* >= RCP_E2E_CRC_LEN(4), so unwrap_framed() reports a genuine CRC
+     * mismatch (POCI_FAILURE) rather than SHORT_FRAME -- SHORT_FRAME
+     * maps to RCP_ERROR_NONE (rcp_e2e_wire_error(), e2e.c), which skips
+     * this target guard ENTIRELY rather than evaluating it false, so a
+     * frame under 4 octets could never close this condition. Still < 8,
+     * so cond0 is still false at the target line. */
+    const uint8_t                    short_req[6] = {0};
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    /* rx_enforce_e2e left clear (the power-on default) on purpose --
+     * see this function's own non-tscf sibling's identical comment for
+     * why STREAM_A can be safely reused across both L2133 closures
+     * below without ever tripping the (already-covered) outer
+     * is_faulted guard. */
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = STREAM_A;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* L2133's own request_len >= 8 FALSE side. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_A, false, 0u, 0u, short_req, sizeof(short_req),
+                                           &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_A, false, 0u, 0u, plain.data, plain.len, &resp));
+    rcp_bytes_free(&resp);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_e2e_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                           STREAM_B, false, 0u, 0u, plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2530: dispatch_e2e_fragment_tscf()'s own `!slot || !slot->req_crc_
+ * enable` delegation guard -- `!slot`'s own TRUE side is already closed
+ * (test_e2e_dispatch_variants_with_no_registered_endpoint(), above);
+ * `!slot->req_crc_enable`'s own TRUE side (a real, registered slot in
+ * PLAIN command mode) has never been exercised at this specific call
+ * site. */
+static void test_dispatch_e2e_fragment_tscf_plain_command_mode_delegates(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    to_rcp_configured(srv);
+    /* req_crc_enable left clear (the power-on default) -- plain command
+     * mode. */
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, STREAM_A, false, 0u,
+                                                     0u, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2542: dispatch_e2e_fragment_tscf()'s own 8-octet peek gate
+ * (`fragment_len < 8 || unpack(...) != RCP_ACF_OK`) -- fragment_len <
+ * 8's own TRUE side, on a genuinely CRC-enabled slot (past the L2530
+ * delegation guard, and BEFORE any stream fault is latched -- the
+ * already-faulted-stream test above only reaches this line's sibling
+ * guards, not this cheap early peek, once STREAM_FAULTED short-circuits
+ * ahead of it), was never exercised at this specific call site. */
+static void test_dispatch_e2e_fragment_tscf_short_fragment_before_any_fault_is_rejected(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       short_req[3] = {0x01, 0x02, 0x03};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 5, RCP_AVTP_SUBTYPE_TSCF,
+                                                     RCP_ACF_MSG_TYPE_ABB, true, STREAM_A, false, 0u,
+                                                     0u, short_req, sizeof(short_req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -2706,6 +3531,27 @@ int main(void)
     RUN_TEST(test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot);
     RUN_TEST(test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream);
     RUN_TEST(test_new_server_seeds_ep_id_map_default_row_for_ep0);
+
+    RUN_TEST(test_wakeup_repetition_interval_resp_stream_index_zero_fails);
+    RUN_TEST(test_pending_count_on_stream_mcdc_independence);
+    RUN_TEST(test_apply_ep_generic_cfg_at_full_capacity);
+    RUN_TEST(test_dispatch_tscf_ntscf_subtype_ignores_reserved_bytes_rule);
+    RUN_TEST(test_response_shorter_than_acf_header_is_not_classified);
+    RUN_TEST(test_take_deferred_response_unregistered_bus_returns_false);
+    RUN_TEST(test_take_deferred_response_on_stream_unregistered_bus_returns_false);
+    RUN_TEST(test_set_sequencer_count_alloc_failure_reports_false);
+    RUN_TEST(test_lifecycle_rejected_short_frame_builds_no_response);
+    RUN_TEST(test_dispatch_multi_response_rejected_guard_mcdc);
+    RUN_TEST(test_dispatch_multi_response_defends_against_over_reporting_handler);
+    RUN_TEST(test_e2e_dispatch_variants_with_no_registered_endpoint);
+    RUN_TEST(test_dispatch_e2e_crc_stream_index_resolvable_rx_enforce_clear_no_broadcast);
+    RUN_TEST(test_dispatch_e2e_faulted_stream_short_frame);
+    RUN_TEST(test_dispatch_e2e_tscf_faulted_stream_short_frame);
+    RUN_TEST(test_dispatch_e2e_fragment_faulted_stream_mcdc);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_faulted_stream_mcdc);
+    RUN_TEST(test_dispatch_e2e_tscf_crc_stream_index_resolvable_rx_enforce_clear_no_broadcast);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_plain_command_mode_delegates);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_short_fragment_before_any_fault_is_rejected);
 
     RUN_TEST(test_strerror_never_null);
 

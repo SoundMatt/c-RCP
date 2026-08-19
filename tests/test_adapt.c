@@ -27,6 +27,7 @@
 #include "unity.h"
 
 #include <rcp/adapt.h>
+#include <rcp/alloc.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/discovery.h>
@@ -47,7 +48,36 @@
 #include <rcp/shmem.h>
 #include <relay/relay.h>
 
+#include <stdlib.h>
 #include <string.h>
+
+/* Thread helper for the relay_message_channel_recv() blocking-wait tests
+ * below -- same pattern as tests/test_admin.c's own test_thread_spawn()/
+ * test_thread_join() (plain OS threads, independent of this project's
+ * own internal src/platform.h, which is not a public header). */
+#if defined(_WIN32)
+#include <windows.h>
+typedef HANDLE test_thread_t;
+static test_thread_t test_thread_spawn(DWORD(WINAPI *fn)(void *), void *arg)
+{
+    return CreateThread(NULL, 0, fn, arg, 0, NULL);
+}
+static void test_thread_join(test_thread_t t)
+{
+    WaitForSingleObject(t, INFINITE);
+    CloseHandle(t);
+}
+#else
+#include <pthread.h>
+typedef pthread_t test_thread_t;
+static test_thread_t test_thread_spawn(void *(*fn)(void *), void *arg)
+{
+    pthread_t t;
+    pthread_create(&t, NULL, fn, arg);
+    return t;
+}
+static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
+#endif
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -175,6 +205,143 @@ static void test_channel_is_closed_reflects_close_state(void)
     relay_message_channel_close(ch);
     TEST_ASSERT_TRUE(relay_message_channel_is_closed(ch));
 
+    relay_message_channel_release(ch);
+}
+
+/* MC/DC: relay_message_channel_push()'s `if (ch->closed || ch->count >=
+ * ch->cap)` (src/relay.c) never had the `ch->closed` operand's own
+ * independent contribution demonstrated --
+ * test_channel_push_returns_false_when_full() above only ever pushes
+ * into an open channel (`ch->closed` constant false throughout), so
+ * only `ch->count >= ch->cap` has ever driven the decision. This closes
+ * a channel that still has room (`count(0) < cap(2)`, the same
+ * count<cap state that channel's very first push above returns true
+ * for) and confirms push is rejected anyway -- with `ch->count >=
+ * ch->cap` held equal (false in both), only `ch->closed` differs
+ * between the two vectors and the outcome flips, which is exactly
+ * MC/DC's independence requirement for that operand. */
+static void test_channel_push_returns_false_when_closed_even_with_room(void)
+{
+    relay_message_channel_t *ch = relay_message_channel_new(2);
+    relay_message_t a;
+
+    relay_message_init(&a);
+
+    relay_message_channel_close(ch);
+    TEST_ASSERT_FALSE(relay_message_channel_push(ch, &a)); /* closed, not full */
+
+    relay_message_channel_release(ch);
+}
+
+/* relay_message_channel_recv() (src/relay.c) had no test at all in this
+ * file before this milestone -- not just an MC/DC gap on its `while
+ * (ch->count == 0 && !ch->closed)` wait condition, but a genuinely
+ * untested function. The three tests below establish real functional
+ * coverage of all three reachable states (message already queued;
+ * empty-and-closed; empty-and-open, requiring an actual blocking wait
+ * woken by another thread) and, together, close both of that decision's
+ * missing MC/DC operands:
+ *
+ *   - test_recv_returns_true_immediately_when_message_already_queued():
+ *     `ch->count == 0` is false, short-circuiting `!ch->closed`
+ *     (masked) -- the while loop is never entered.
+ *   - test_recv_returns_false_immediately_on_empty_closed_channel():
+ *     `ch->count == 0` true, `!ch->closed` false -- loop condition
+ *     false, no wait.
+ *   - test_recv_blocks_until_another_thread_pushes(): `ch->count == 0`
+ *     true, `!ch->closed` true -- the loop is actually entered and
+ *     rcp_cond_wait() genuinely blocks this thread until the pusher
+ *     thread's rcp_cond_signal() (inside
+ *     relay_message_channel_push()) wakes it; the loop then
+ *     re-evaluates with `ch->count == 0` now false, exiting.
+ *
+ * Pairing the second and third tests' first-iteration vectors -- (true,
+ * false) -> loop-false vs (true, true) -> loop-true, `ch->count == 0`
+ * held equal -- demonstrates `!ch->closed`'s independence. Pairing the
+ * third test's own first (true, true) -> true and re-evaluation (false,
+ * masked) -> false vectors demonstrates `ch->count == 0`'s independence.
+ */
+static void test_recv_returns_true_immediately_when_message_already_queued(void)
+{
+    relay_message_channel_t *ch = relay_message_channel_new(4);
+    relay_message_t sent, received;
+
+    relay_message_init(&sent);
+    TEST_ASSERT_TRUE(relay_message_set_id(&sent, "already-queued"));
+    TEST_ASSERT_TRUE(relay_message_channel_push(ch, &sent));
+
+    TEST_ASSERT_TRUE(relay_message_channel_recv(ch, &received));
+    TEST_ASSERT_EQUAL_STRING("already-queued", received.id);
+
+    relay_message_free(&sent);
+    relay_message_free(&received);
+    relay_message_channel_release(ch);
+}
+
+static void test_recv_returns_false_immediately_on_empty_closed_channel(void)
+{
+    relay_message_channel_t *ch = relay_message_channel_new(4);
+    relay_message_t out;
+
+    relay_message_channel_close(ch);
+    TEST_ASSERT_FALSE(relay_message_channel_recv(ch, &out));
+
+    relay_message_channel_release(ch);
+}
+
+typedef struct {
+    relay_message_channel_t *ch;
+} recv_thread_pusher_ctx_t;
+
+#if defined(_WIN32)
+static DWORD WINAPI recv_thread_pusher(void *arg)
+#else
+static void *recv_thread_pusher(void *arg)
+#endif
+{
+    recv_thread_pusher_ctx_t *ctx = (recv_thread_pusher_ctx_t *)arg;
+    relay_message_t msg;
+
+    /* Give the main thread a real chance to reach rcp_cond_wait() first --
+       this is a best-effort ordering aid, not a correctness requirement:
+       relay_message_channel_push()'s rcp_cond_signal() would simply be a
+       no-op racing ahead of the wait otherwise, and the main thread's own
+       `while (count == 0 ...)` loop guards against a missed wakeup either
+       way. */
+    {
+        uint64_t start = rcp_monotonic_ms();
+        while (rcp_monotonic_ms() - start < 20) { /* busy-wait */ }
+    }
+
+    relay_message_init(&msg);
+    (void)relay_message_set_id(&msg, "from-other-thread");
+    (void)relay_message_channel_push(ctx->ch, &msg);
+    relay_message_free(&msg);
+
+#if defined(_WIN32)
+    return 0;
+#else
+    return NULL;
+#endif
+}
+
+static void test_recv_blocks_until_another_thread_pushes(void)
+{
+    relay_message_channel_t *ch = relay_message_channel_new(4);
+    recv_thread_pusher_ctx_t ctx;
+    relay_message_t received;
+    test_thread_t t;
+
+    ctx.ch = ch;
+    t = test_thread_spawn(recv_thread_pusher, &ctx);
+
+    /* Blocks in rcp_cond_wait() (the channel is empty and open) until the
+       spawned thread's push signals it. */
+    TEST_ASSERT_TRUE(relay_message_channel_recv(ch, &received));
+    TEST_ASSERT_EQUAL_STRING("from-other-thread", received.id);
+
+    test_thread_join(t);
+    relay_message_free(&received);
     relay_message_channel_release(ch);
 }
 
@@ -650,6 +817,55 @@ static void test_mdio_write_request_maps_addr_meta_and_packed_words(void)
     relay_message_free(&msg);
 }
 
+/* RCP_ADAPT_OP_MDIO_WRITE's `if (msg->payload.len == 0 ||
+ * (msg->payload.len % 2) != 0) return fail_encode(out_err);` (adapt.c)
+ * needs both conditions independently demonstrated. The test above
+ * only ever uses a nonzero, even payload.len (4) -- neither the
+ * len==0 short-circuit nor an odd (non-word-aligned) nonzero length is
+ * exercised anywhere else in this file. */
+//cfusa:test REQ-RELAY-005
+static void test_mdio_write_request_rejects_empty_payload(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    relay_message_init(&msg); /* payload left empty: len == 0 */
+    relay_message_set_meta(&msg, "rcp.mdio.clause", "0");
+    relay_message_set_meta(&msg, "rcp.mdio.prtad", "1");
+    relay_message_set_meta(&msg, "rcp.mdio.devad", "0");
+    relay_message_set_meta(&msg, "rcp.mdio.regad", "5");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_MDIO_WRITE, 4, make_stream(1), &msg, 7, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+//cfusa:test REQ-RELAY-005
+static void test_mdio_write_request_rejects_odd_payload_length(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+    uint8_t odd_payload[3] = {0x12, 0x34, 0x56}; /* not a whole number of
+                                                   * 16-bit words */
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(odd_payload, sizeof(odd_payload));
+    relay_message_set_meta(&msg, "rcp.mdio.clause", "0");
+    relay_message_set_meta(&msg, "rcp.mdio.prtad", "1");
+    relay_message_set_meta(&msg, "rcp.mdio.devad", "0");
+    relay_message_set_meta(&msg, "rcp.mdio.regad", "5");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_MDIO_WRITE, 4, make_stream(1), &msg, 7, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
 static void test_wakeup_sleepcmd_round_trips_without_timed_meta(void)
 {
     relay_message_t msg;
@@ -1002,6 +1218,46 @@ static void test_uart_read_request_rejects_empty_read_size_meta(void)
 
     relay_message_init(&msg);
     relay_message_set_meta(&msg, "rcp.uart.read_size", "");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_UART_READ, 1, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+/* meta_get_u32()'s SECOND decision, `if (!end || *end != '\0') return
+ * false;` (src/adapt.c, right after the strtoul() call): needs
+ * `*end != '\0'` independently demonstrated -- every existing meta
+ * value in this file is either absent, empty, or a clean all-digit
+ * string, so strtoul() always consumes the whole value and leaves
+ * *end == '\0'. A value with trailing non-digit garbage after real
+ * digits (distinct from the all-garbage/empty cases above, which
+ * never reach strtoul() at all) leaves *end pointing at that garbage,
+ * demonstrating this condition true for the first time in this file.
+ *
+ * The OTHER condition on this same line, `!end`, is NOT independently
+ * demonstrable: `end` is the address of a local passed as strtoul()'s
+ * endptr argument, and C11 7.22.1.4p6 guarantees strtoul() always
+ * stores a value through a non-NULL endptr -- success, partial parse,
+ * or total failure alike -- so `end` is never NULL here regardless of
+ * *v's content. Since line 126's own `!v || !*v` check has already
+ * returned before this line whenever v could have been NULL, `end`
+ * cannot be NULL here in any real execution; this is a genuine,
+ * structural MC/DC gap guaranteed unreachable by the C standard's own
+ * strtoul() contract, not a missing test. */
+//cfusa:test REQ-RELAY-005
+static void test_uart_read_request_rejects_meta_with_trailing_garbage(void)
+{
+    relay_message_t msg;
+    rcp_bytes_t req;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.uart.read_size", "8x"); /* digits followed
+                                                                * by non-digit
+                                                                * trailing
+                                                                * garbage */
 
     req = rcp_message_to_request(RCP_ADAPT_OP_UART_READ, 1, make_stream(1), &msg, 1, &err);
     TEST_ASSERT_NULL(req.data);
@@ -1587,6 +1843,76 @@ static void test_adapt_send_transmits_a_valid_gpio_write_request(void)
     rcp_avtp_transport_release(server_t);
 }
 
+/* build_frame()'s `if (!frame.data && out_err) *out_err =
+ * RCP_ADAPT_ERR_ENCODE;` (adapt.c) needs `!frame.data` independently
+ * demonstrated: every other send/call test in this file reaches a
+ * successful rcp_avtp_encode_ntscf(), so frame.data is always non-NULL
+ * there. A call-counting malloc hook (same idiom as ep_can.c's
+ * counting_malloc / shmem.c's counting_calloc) lets the GPIO-write
+ * request's own body encode (rcp_acf_encode_abb()'s one rcp_malloc()
+ * call, #1) succeed while encode_ntscf()'s own rcp_malloc() call (#2)
+ * fails -- the only way to reach this line with frame.data NULL
+ * through this adapter's real call graph, since build_frame() returns
+ * early (before ever reaching this line) whenever body.data itself is
+ * NULL.
+ *
+ * The OTHER condition on this line -- `out_err` itself -- can NOT be
+ * independently demonstrated: build_frame() is `static` and has
+ * exactly two call sites in this file (adapter_send() and
+ * adapter_call()), both of which unconditionally pass `&err`, the
+ * address of a real local variable, never NULL. There is no reachable
+ * call path through this adapter's public API (rcp_relay_caller_send()/
+ * _call(), the only entry points) that can make out_err NULL here --
+ * this is a genuine, structural MC/DC gap, not a missing test. */
+static int g_adapt_malloc_call_count;
+static int g_adapt_malloc_fail_at_call;
+
+static void *counting_malloc(size_t size)
+{
+    g_adapt_malloc_call_count++;
+    if (g_adapt_malloc_call_count == g_adapt_malloc_fail_at_call) return NULL;
+    return malloc(size);
+}
+
+//cfusa:test REQ-RELAY-008
+static void test_adapt_send_reports_encode_error_when_ntscf_wrap_allocation_fails(void)
+{
+    rcp_avtp_transport_t *client_t = NULL;
+    rcp_avtp_transport_t *server_t = NULL;
+    rcp_relay_caller_t *caller;
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t msg;
+    uint8_t payload[RCP_EP_GPIO_PAYLOAD_LEN] = {0, 0, 0, 0x2A};
+    rcp_alloc_hooks_t hooks = {0};
+    int ec;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 4, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 9, RCP_ADAPT_EP_GPIO);
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.adapt.op", "gpio_write");
+    msg.payload = relay_bytes_dup(payload, sizeof(payload));
+
+    g_adapt_malloc_call_count   = 0;
+    g_adapt_malloc_fail_at_call = 2; /* call #1 = body's rcp_acf_encode_abb(),
+                                       * call #2 = encode_ntscf()'s own frame
+                                       * allocation -- the one this test
+                                       * targets. */
+    hooks.malloc_fn = counting_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    ec = rcp_relay_caller_send(caller, &ctx, &msg);
+
+    rcp_alloc_reset_hooks();
+
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, ec);
+
+    relay_message_free(&msg);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
 /* adapter_send()'s own final transport-error fallthrough (ec not OK/
  * CLOSED): shmem_side_send() (src/shmem.c) reports RCP_ERR_BUSY once the
  * client->server queue is at its configured capacity -- a real, reachable
@@ -1896,7 +2222,11 @@ int main(void)
     RUN_TEST(test_message_meta_set_upserts_and_get_looks_up);
 
     RUN_TEST(test_channel_push_returns_false_when_full);
+    RUN_TEST(test_channel_push_returns_false_when_closed_even_with_room);
     RUN_TEST(test_channel_is_closed_reflects_close_state);
+    RUN_TEST(test_recv_returns_true_immediately_when_message_already_queued);
+    RUN_TEST(test_recv_returns_false_immediately_on_empty_closed_channel);
+    RUN_TEST(test_recv_blocks_until_another_thread_pushes);
 
     RUN_TEST(test_subscriber_options_defaults);
 
@@ -1920,12 +2250,15 @@ int main(void)
     RUN_TEST(test_uart_read_request_requires_read_size_meta);
     RUN_TEST(test_uart_read_request_round_trips_with_read_size_meta);
     RUN_TEST(test_uart_read_request_rejects_empty_read_size_meta);
+    RUN_TEST(test_uart_read_request_rejects_meta_with_trailing_garbage);
     RUN_TEST(test_iseled_command_default_is_write_direction);
     RUN_TEST(test_iseled_command_read_size_meta_selects_read_direction);
     RUN_TEST(test_iseled_command_read_size_above_max_rejected);
     RUN_TEST(test_can_frame_request_rejects_xl_formats_as_out_of_scope);
     RUN_TEST(test_can_frame_request_accepts_classical_format);
     RUN_TEST(test_mdio_write_request_maps_addr_meta_and_packed_words);
+    RUN_TEST(test_mdio_write_request_rejects_empty_payload);
+    RUN_TEST(test_mdio_write_request_rejects_odd_payload_length);
     RUN_TEST(test_wakeup_sleepcmd_round_trips_without_timed_meta);
     RUN_TEST(test_discovery_response_maps_fields_and_server_stream_id);
 
@@ -1977,6 +2310,7 @@ int main(void)
     RUN_TEST(test_adapt_protocol_returns_rcp);
     RUN_TEST(test_adapt_rejects_op_outside_bound_kind);
     RUN_TEST(test_adapt_send_transmits_a_valid_gpio_write_request);
+    RUN_TEST(test_adapt_send_reports_encode_error_when_ntscf_wrap_allocation_fails);
     RUN_TEST(test_adapt_send_returns_transport_error_when_queue_is_full);
     RUN_TEST(test_adapt_call_gpio_read_returns_mapped_response);
     RUN_TEST(test_adapt_call_discovery_returns_mapped_response);

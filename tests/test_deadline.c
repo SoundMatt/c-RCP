@@ -195,6 +195,55 @@ static void test_dead_event_fires_and_is_not_repeated(void)
     TEST_ASSERT_EQUAL(1, g_dead_count);
 }
 
+/* MC/DC: check_deadlines()'s `should_emit = (elapsed >= st->deadline_ms)
+ * && (st->alive || !st->ever_reported)` (src/deadline.c) never had the
+ * st->alive operand's own independent contribution demonstrated.
+ * test_dead_event_fires_and_is_not_repeated() above never heartbeats at
+ * all, so st->alive is false for the stream's entire life -- its single
+ * dead-event vector is (elapsed>=deadline, false, true) -> true, decided
+ * by !ever_reported, and its steady-state "not repeated" vectors are
+ * (elapsed>=deadline, false, false) -> false. Neither ever has st->alive
+ * true when elapsed first crosses the deadline. This test heartbeats
+ * once (establishing alive=true, ever_reported=true) and then lets the
+ * deadline elapse with no further heartbeat, so the eventual dead event
+ * fires with elapsed>=deadline_ms true and st->alive itself still true
+ * (masking !ever_reported, which is false and irrelevant to the OR).
+ * Paired against test_dead_event_fires_and_is_not_repeated()'s
+ * steady-state (true, false, false) -> false vector (same elapsed>=
+ * deadline_ms=true, ever_reported held equal at true throughout), only
+ * st->alive differs between the two vectors and the outcome flips --
+ * exactly what MC/DC independence requires. */
+//cfusa:test REQ-DL-002
+//cfusa:test REQ-DL-004
+static void test_dead_event_fires_after_heartbeat_then_deadline_elapses(void)
+{
+    rcp_deadline_stream_cfg_t streams[] = {{1, 30}};
+    rcp_deadline_config_t cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t *mon;
+
+    cfg.poll_interval_ms = 5;
+
+    g_dead_count = 0;
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+
+    /* Establishes alive=true, ever_reported=true (via emit() inside
+       heartbeat()'s was_alive==false path) before the deadline elapses --
+       unlike test_dead_event_fires_and_is_not_repeated(), which never
+       heartbeats and so never has st->alive true at all. */
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_heartbeat(mon, 1));
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_alive(mon, 1));
+
+    /* No further heartbeat: several deadline_ms(30) cycles pass with the
+       background poll thread's own check_deadlines() eventually
+       declaring the stream dead because it WAS alive, not because it was
+       never reported. */
+    test_sleep_ms(200);
+
+    rcp_deadline_monitor_destroy(mon);
+    TEST_ASSERT_EQUAL(1, g_dead_count);
+}
+
 /* ── Live stream detected ─────────────────────────────────────────────────── */
 
 static int g_alive_count;
@@ -303,6 +352,63 @@ static void test_notify_overflow_unknown_stream_returns_false(void)
     rcp_deadline_monitor_t *mon = rcp_deadline_monitor_new(cfg, NULL, 0);
 
     TEST_ASSERT_FALSE(rcp_deadline_monitor_notify_overflow(mon, 99));
+
+    rcp_deadline_monitor_destroy(mon);
+}
+
+/* MC/DC: rcp_deadline_monitor_notify_overflow()'s `should_emit =
+ * st->alive || !st->ever_reported` (src/deadline.c) never had either
+ * operand independently demonstrated -- the only other call
+ * (test_notify_overflow_immediately_declares_dead() above) always
+ * heartbeats first, so st->alive is true and st->ever_reported is
+ * already true (!ever_reported == false) at the one vector it exercises
+ * -- (true, false) -> true, deciding entirely on the first operand.
+ * This test supplies the two missing vectors, on a freshly-constructed
+ * stream that is never heartbeated:
+ *   1. First call: alive=false, ever_reported=false -> should_emit =
+ *      false || true = true (the !ever_reported operand alone decides
+ *      it -- paired against vector 3 below, alive held false, this
+ *      shows !ever_reported's independence). emit() fires, setting
+ *      ever_reported=true.
+ *   2. (same call as 1) -- alive stays false throughout, since nothing
+ *      here ever calls heartbeat().
+ *   3. Second call: alive=false, ever_reported=true -> should_emit =
+ *      false || false = false (paired against
+ *      test_notify_overflow_immediately_declares_dead()'s (true,
+ *      false) -> true vector, ever_reported held equal (false there,
+ *      via a fresh alive=true/reported=true state -- see that test),
+ *      this shows st->alive's independence: only it differs, and the
+ *      outcome flips). No second dead event fires -- g_dead_count stays
+ *      at 1. */
+//cfusa:test REQ-DL-006
+static void test_notify_overflow_should_emit_independent_operands(void)
+{
+    rcp_deadline_stream_cfg_t streams[] = {{1, 5000}}; /* long deadline: the
+                                                            background poll
+                                                            thread's own
+                                                            check_deadlines()
+                                                            never fires
+                                                            during this test,
+                                                            isolating
+                                                            notify_overflow()'s
+                                                            own should_emit. */
+    rcp_deadline_config_t cfg = rcp_deadline_default_config();
+    rcp_deadline_monitor_t *mon;
+
+    cfg.poll_interval_ms = 5;
+
+    g_dead_count = 0;
+    mon = rcp_deadline_monitor_new(cfg, streams, 1);
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
+
+    /* Never heartbeated: alive=false, ever_reported=false. */
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_notify_overflow(mon, 1));
+    TEST_ASSERT_EQUAL(1, g_dead_count);
+
+    /* alive still false, but ever_reported is now true (emit() above set
+       it): should_emit is false this time, so no second event fires. */
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_notify_overflow(mon, 1));
+    TEST_ASSERT_EQUAL(1, g_dead_count);
 
     rcp_deadline_monitor_destroy(mon);
 }
@@ -438,10 +544,12 @@ int main(void)
     RUN_TEST(test_monitor_new_returns_null_on_alloc_failure);
     RUN_TEST(test_zero_deadline_ms_uses_config_default);
     RUN_TEST(test_dead_event_fires_and_is_not_repeated);
+    RUN_TEST(test_dead_event_fires_after_heartbeat_then_deadline_elapses);
     RUN_TEST(test_alive_event_on_first_heartbeat);
     RUN_TEST(test_heartbeat_resets_deadline_timer);
     RUN_TEST(test_heartbeat_unknown_stream_returns_false);
     RUN_TEST(test_notify_overflow_immediately_declares_dead);
+    RUN_TEST(test_notify_overflow_should_emit_independent_operands);
     RUN_TEST(test_notify_overflow_unknown_stream_returns_false);
     RUN_TEST(test_alive_returns_false_before_first_heartbeat);
     RUN_TEST(test_monitor_new_at_max_streams_succeeds);

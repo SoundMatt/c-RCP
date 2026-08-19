@@ -570,6 +570,19 @@ static void test_encode_reconfig_request_rejects_empty_data(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+/* MC/DC: independently demonstrates the `data == NULL` half of
+ * `data_len == 0 || data == NULL` -- a nonzero data_len paired with a NULL
+ * data pointer, so the rejection can only be attributed to the second
+ * operand, not the first (which the empty-data test above already
+ * covers). */
+//cfusa:test REQ-UART-039
+static void test_encode_reconfig_request_rejects_null_data_with_nonzero_len(void)
+{
+    rcp_bytes_t frame = rcp_ep_uart_encode_reconfig_request(0x00, 0, NULL, 5, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
 //cfusa:test REQ-UART-040
 static void test_reconfig_strerror_never_null(void)
 {
@@ -1186,6 +1199,7 @@ int main(void)
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
     RUN_TEST(test_reconfig_request_round_trip);
     RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_encode_reconfig_request_rejects_null_data_with_nonzero_len);
     RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);

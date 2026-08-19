@@ -303,6 +303,39 @@ static void test_pair_new_frees_partial_state_when_side_allocation_fails(void)
     TEST_ASSERT_NULL(b);
 }
 
+/* `if (!a_to_b_items || !b_to_a_items) { ... }` (shmem.c) needs BOTH
+ * conditions independently demonstrated. The test above (fail_at_call
+ * 2) only ever exercises a_to_b_items failing -- b_to_a_items failing
+ * while a_to_b_items itself succeeded is a distinct call-order
+ * instance, exercised nowhere else in this file. */
+static void test_pair_new_frees_partial_state_when_second_queue_allocation_fails(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+
+    reset_counting_calloc(3); /* b_to_a_items, after core + a_to_b_items succeed */
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_ERR_ALLOC, rcp_shmem_avtp_pair_new(true, 2, &a, &b));
+    TEST_ASSERT_NULL(a);
+    TEST_ASSERT_NULL(b);
+}
+
+/* `if (!a || !b) { ... }` (shmem.c) needs BOTH conditions independently
+ * demonstrated. The test above (fail_at_call 4) only ever exercises
+ * side `a` failing -- side `b` failing while `a` itself succeeded is a
+ * distinct call-order instance, exercised nowhere else in this file. */
+static void test_pair_new_frees_partial_state_when_second_side_allocation_fails(void)
+{
+    rcp_avtp_transport_t *a = NULL;
+    rcp_avtp_transport_t *b = NULL;
+
+    reset_counting_calloc(5); /* side b, after core + both queues + side a succeed */
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_ERR_ALLOC, rcp_shmem_avtp_pair_new(true, 2, &a, &b));
+    TEST_ASSERT_NULL(a);
+    TEST_ASSERT_NULL(b);
+}
+
 /* ── The genuine blocking wait (issue #520 category 2) ───────────────────────
  *
  * shmem_side_recv()'s rcp_cond_wait() call (the no-deadline branch,
@@ -389,7 +422,9 @@ int main(void)
     RUN_TEST(test_pair_shares_time_sync_supported);
     RUN_TEST(test_pair_new_returns_alloc_error_when_core_allocation_fails);
     RUN_TEST(test_pair_new_frees_partial_state_when_queue_allocation_fails);
+    RUN_TEST(test_pair_new_frees_partial_state_when_second_queue_allocation_fails);
     RUN_TEST(test_pair_new_frees_partial_state_when_side_allocation_fails);
+    RUN_TEST(test_pair_new_frees_partial_state_when_second_side_allocation_fails);
     RUN_TEST(test_recv_wakes_from_blocking_wait_when_peer_sends);
 
     return UNITY_END();

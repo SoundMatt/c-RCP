@@ -100,6 +100,103 @@ static void test_parse_server_implemented_options_trigger_and_chained(void)
     rcp_config_manifest_free(&m);
 }
 
+/* MC/DC: parse_server_fields()'s own `k && extract_uint_at(...)` guard for
+ * vendor_id needs both conditions shown independent -- every other test
+ * either omits the key entirely (k false) or gives it a clean numeric
+ * value (both true). This is the missing case: key present, value not a
+ * valid number (extract_uint_at's own scan hits a byte that's neither a
+ * digit nor '-' and returns false) -- vendor_id must stay at its memset
+ * default rather than reading garbage. Also exercises extract_uint_at's
+ * own `*from > '9'` disjunct (line 42) with 't' (ASCII 116), a byte
+ * neither '-' nor in ['0','9'] -- an independence pair against any of
+ * the valid-digit tests above (both hold *from < '0' false; only *from >
+ * '9' flips, and the whole condition flips with it). */
+//cfusa:test REQ-CFG-007
+static void test_parse_server_vendor_id_malformed_value_leaves_default(void)
+{
+    const char *json = "{ \"server\": { \"vendor_id\": true } }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT16(0, m.server.vendor_id); /* malformed -> untouched default */
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: same as above for device_id's own guard, but the malformed byte
+ * chosen here ('#', ASCII 35) instead exercises extract_uint_at's
+ * `*from < '0'` disjunct (line 42) -- paired against any valid-digit
+ * test, where that disjunct is false and the whole condition is false. */
+//cfusa:test REQ-CFG-007
+static void test_parse_server_device_id_malformed_value_leaves_default(void)
+{
+    const char *json = "{ \"server\": { \"device_id\": # } }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT16(0, m.server.device_id); /* malformed -> untouched default */
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: same as vendor_id/device_id above for magic's own guard (line
+ * 236) -- key present, value malformed, so magic stays at its memset
+ * default rather than the nonzero value the "negative value" test below
+ * proves it CAN take when extract_uint_at succeeds. */
+//cfusa:test REQ-CFG-007
+static void test_parse_server_magic_malformed_value_leaves_default(void)
+{
+    const char *json = "{ \"server\": { \"magic\": bad } }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT32(0, m.server.magic); /* malformed -> untouched default */
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: extract_uint_at's own doc comment says it parses "the first
+ * integer (optionally negative)" -- no existing test actually exercises
+ * a negative value, which is exactly what's needed to show line 42's
+ * `*from != '-'` disjunct independently false (short-circuiting the rest
+ * of that condition) against every other test's '-'-free digit, where
+ * it's independently true. strtoull's own defined behaviour for a
+ * leading '-' (C99 7.20.1.4: negate the unsigned result) means "-1"
+ * parses to ULLONG_MAX, truncated by the (uint32_t) cast down to
+ * 0xFFFFFFFF -- asserted explicitly here so this isn't just a "does it
+ * crash" check. */
+//cfusa:test REQ-CFG-007
+static void test_parse_server_magic_negative_value_wraps(void)
+{
+    const char *json = "{ \"server\": { \"magic\": -1 } }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT32(0xFFFFFFFFu, m.server.magic);
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: extract_uint_at's leading skip-loop (line 41) ORs five distinct
+ * separator checks (space/tab/newline/CR/colon); every existing test's
+ * JSON is formatted with plain spaces and a colon, so tab/newline/CR
+ * were never independently true in any recorded evaluation. This feeds
+ * all three through in one value, each as its own loop iteration (one
+ * byte examined per evaluation, so only one of the five can be true at
+ * a time) -- independent of the digit-reached iteration where all five
+ * are false, already exercised by every passing test above. */
+//cfusa:test REQ-CFG-007
+static void test_parse_server_vendor_id_skips_tab_newline_cr_separators(void)
+{
+    const char *json = "{ \"server\": { \"vendor_id\":\t\n\r 42 } }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT16(42, m.server.vendor_id);
+
+    rcp_config_manifest_free(&m);
+}
+
 /* ── parse_json: hw_pin_map ────────────────────────────────────────────────── */
 
 /* rcp_config_manifest_free()'s own contract (include/rcp/config.h): frees
@@ -194,6 +291,95 @@ static void test_parse_hw_pin_map_missing_hw_ep_nr_fails(void)
     TEST_ASSERT_TRUE(strlen(err) > 0);
 }
 
+/* MC/DC: parse_pin_entry()'s own `!k || !extract_uint_at(...)` guard for
+ * hw_ep_nr (line 262) needs both conditions shown independent. The
+ * "missing entirely" test above only ever has k false (short-circuits
+ * before extract_uint_at is even called). This is the other half: the
+ * key is present (k true) but its value isn't a number, so
+ * extract_uint_at itself returns false -- same rejected outcome, reached
+ * via the other condition, paired against every valid-entry test above
+ * where both are false. */
+//cfusa:test REQ-CFG-001
+static void test_parse_hw_pin_map_hw_ep_nr_malformed_value_fails(void)
+{
+    const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_nr\": bad, \"hw_ep_pin_nr\": 3 }] }";
+    rcp_config_manifest_t m;
+    char err[128] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
+    TEST_ASSERT_EQUAL_UINT(0, m.hw_pin_map_len);
+    TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: same as above for hw_ep_pin_nr's own guard (line 269) -- valid
+ * hw_ep_nr so the entry reaches the hw_ep_pin_nr check at all, then a
+ * malformed hw_ep_pin_nr value. */
+//cfusa:test REQ-CFG-002
+static void test_parse_hw_pin_map_hw_ep_pin_nr_malformed_value_fails(void)
+{
+    const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": bad }] }";
+    rcp_config_manifest_t m;
+    char err[128] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
+    TEST_ASSERT_EQUAL_UINT(0, m.hw_pin_map_len);
+    TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: parse_pin_entry()'s hw_pin_type guard (line 278) is
+ * `find_bracket_span(...) && arr_end <= close` -- two conditions, and
+ * every existing test only ever hits the both-true case (a real
+ * "hw_pin_type": [...] array inside the entry). This is the
+ * condition-0-false case: the key is present but its value isn't an
+ * array at all, and -- because find_bracket_span() itself searches
+ * forward from the key with a bare strchr(), unbounded by this entry's
+ * own `close` -- there is no '[' anywhere left in the rest of the
+ * document either, so find_bracket_span() returns false outright and
+ * hw_pin_type is correctly left at its default. */
+//cfusa:test REQ-CFG-003
+static void test_parse_hw_pin_type_missing_brackets_leaves_default(void)
+{
+    const char *json =
+        "{ \"hw_pin_map\": [ { \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 1, \"hw_pin_type\": 5 } ] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(1, m.hw_pin_map_len);
+    TEST_ASSERT_EQUAL_UINT8(0, m.hw_pin_map[0].hw_pin_type);
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: the condition-1-false case for the same guard -- find_bracket_
+ * span() *does* find a '[' ... ']' pair (condition 0 true), but only
+ * because its unbounded strchr() search walked straight past this
+ * entry's own `close` into the NEXT hw_pin_map entry's own array, so the
+ * found `arr_end` lands beyond `close` and the guard correctly refuses
+ * to treat a later, unrelated entry's array as this entry's own
+ * hw_pin_type. The first entry's own (non-array) "hw_pin_type": 5 value
+ * is what makes find_bracket_span() skip past entry 1's close in the
+ * first place; the second entry's own real array parses normally,
+ * proving this isn't accidentally breaking the well-formed case. */
+//cfusa:test REQ-CFG-003
+static void test_parse_hw_pin_type_array_leaking_past_entry_close_is_ignored(void)
+{
+    const char *json =
+        "{ \"hw_pin_map\": ["
+        "  { \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 1, \"hw_pin_type\": 5 },"
+        "  { \"hw_ep_nr\": 2, \"hw_ep_pin_nr\": 3, \"hw_pin_type\": [\"pull_up\"] }"
+        "] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(2, m.hw_pin_map_len);
+
+    TEST_ASSERT_EQUAL_UINT8(0, m.hw_pin_map[0].hw_pin_type); /* leaked array correctly ignored */
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_PULL_UP,
+                            (uint8_t)(m.hw_pin_map[1].hw_pin_type & RCP_REGMAP_HW_PIN_PULL_MASK));
+
+    rcp_config_manifest_free(&m);
+}
+
 /* ── parse_json: endpoints ─────────────────────────────────────────────────── */
 
 //cfusa:test REQ-CFG-005
@@ -248,6 +434,53 @@ static void test_parse_endpoint_missing_byte_bus_id_fails(void)
     TEST_ASSERT_TRUE(strlen(err) > 0);
 }
 
+/* MC/DC: parse_endpoint_entry()'s own `!k || !extract_uint_at(...)` guard
+ * for byte_bus_id (line 299) -- key present, value malformed, mirroring
+ * the hw_pin_map pattern above. */
+//cfusa:test REQ-CFG-004
+static void test_parse_endpoint_byte_bus_id_malformed_value_fails(void)
+{
+    const char *json = "{ \"endpoints\": [{ \"byte_bus_id\": bad, \"ep_type\": 1 }] }";
+    rcp_config_manifest_t m;
+    char err[128] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
+    TEST_ASSERT_EQUAL_UINT(0, m.endpoints_len);
+    TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: same guard for ep_type (line 306) -- valid byte_bus_id so the
+ * entry reaches the ep_type check, then a malformed ep_type value. */
+//cfusa:test REQ-CFG-014
+static void test_parse_endpoint_ep_type_malformed_value_fails(void)
+{
+    const char *json = "{ \"endpoints\": [{ \"byte_bus_id\": 1, \"ep_type\": bad }] }";
+    rcp_config_manifest_t m;
+    char err[128] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
+    TEST_ASSERT_EQUAL_UINT(0, m.endpoints_len);
+    TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: parse_endpoint_entry()'s own optional `k && extract_bool_at(...)`
+ * guard for ep_enable (line 313) -- key present, but "1" matches neither
+ * "true" nor "false" so extract_bool_at() returns false and ep_enable is
+ * correctly left at its memset default rather than reading `b`
+ * uninitialized. */
+//cfusa:test REQ-CFG-005
+static void test_parse_endpoint_ep_enable_malformed_value_leaves_default(void)
+{
+    const char *json = "{ \"endpoints\": [{ \"byte_bus_id\": 1, \"ep_type\": 2, \"ep_enable\": 1 }] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(1, m.endpoints_len);
+    TEST_ASSERT_FALSE(m.endpoints[0].ep_enable); /* malformed -> untouched default */
+
+    rcp_config_manifest_free(&m);
+}
+
 /* ── parse_json: streams ───────────────────────────────────────────────────── */
 
 //cfusa:test REQ-CFG-015
@@ -282,6 +515,91 @@ static void test_parse_stream_missing_rx_stream_id_fails(void)
     TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
     TEST_ASSERT_EQUAL_UINT(0, m.streams_len);
     TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: parse_stream_entry()'s own `!k || !extract_uint_at(...)` guard
+ * for rx_stream_id (line 331) -- key present, value malformed. */
+//cfusa:test REQ-CFG-006
+static void test_parse_stream_rx_stream_id_malformed_value_fails(void)
+{
+    const char *json = "{ \"streams\": [{ \"rx_stream_id\": bad }] }";
+    rcp_config_manifest_t m;
+    char err[128] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, sizeof(err)));
+    TEST_ASSERT_EQUAL_UINT(0, m.streams_len);
+    TEST_ASSERT_TRUE(strlen(err) > 0);
+}
+
+/* MC/DC: parse_stream_entry()'s own optional `k && extract_bool_at(...)`
+ * guard for configured (line 338) -- key present but "nope" matches
+ * neither "true" nor "false", so extract_bool_at() returns false and
+ * `configured` is correctly left at the entry-exists default (true) that
+ * was set before parsing began, rather than being clobbered by an
+ * uninitialized `b`. Distinguishable from the explicit-false case
+ * test_parse_stream_entries already covers. */
+//cfusa:test REQ-CFG-015
+static void test_parse_stream_configured_malformed_value_leaves_default(void)
+{
+    const char *json = "{ \"streams\": [{ \"rx_stream_id\": 5, \"configured\": nope }] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(1, m.streams_len);
+    TEST_ASSERT_TRUE(m.streams[0].configured); /* malformed -> untouched "entry exists" default */
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: extract_bool_at's own leading skip-loop (line 55, textually
+ * identical to extract_uint_at's line-41 loop but a distinct source
+ * location/decision instance) -- same gap, same fix: tab/newline/CR
+ * fed through before a real "false", each its own loop iteration. */
+//cfusa:test REQ-CFG-015
+static void test_parse_stream_configured_skips_tab_newline_cr_separators(void)
+{
+    const char *json = "{ \"streams\": [{ \"rx_stream_id\": 5, \"configured\":\t\n\rfalse }] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(1, m.streams_len);
+    TEST_ASSERT_FALSE(m.streams[0].configured);
+
+    rcp_config_manifest_free(&m);
+}
+
+/* MC/DC: set_err()'s own `err_msg && err_msg_cap > 0` guard (line 15) --
+ * every existing error-path test passes a real, adequately-sized buffer
+ * (both conditions true). These two show each condition independently
+ * false: a NULL err_msg (must not deref/crash), and a real pointer with
+ * a zero cap (must not touch the buffer at all, not even to check its
+ * contents) -- exercised through the same "missing hw_ep_nr" error path
+ * the existing REQ-CFG-001 test already uses with a real buffer, so the
+ * only thing that differs between these and that baseline is err_msg/
+ * err_msg_cap themselves. */
+//cfusa:test REQ-CFG-001
+static void test_parse_error_with_null_err_msg_does_not_crash(void)
+{
+    const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_pin_nr\": 3 }] }"; /* missing hw_ep_nr */
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(0, m.hw_pin_map_len);
+}
+
+//cfusa:test REQ-CFG-001
+static void test_parse_error_with_zero_err_msg_cap_leaves_buffer_untouched(void)
+{
+    const char *json = "{ \"hw_pin_map\": [{ \"hw_ep_pin_nr\": 3 }] }"; /* missing hw_ep_nr */
+    rcp_config_manifest_t m;
+    char err[8];
+
+    memset(err, 0x5A, sizeof(err)); /* sentinel: must survive untouched */
+
+    TEST_ASSERT_EQUAL(RCP_CFG_ERR_PARSE, rcp_config_parse_json(json, &m, err, 0));
+    TEST_ASSERT_EQUAL_UINT(0, m.hw_pin_map_len);
+    TEST_ASSERT_EQUAL_HEX8(0x5A, (uint8_t)err[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x5A, (uint8_t)err[sizeof(err) - 1]);
 }
 
 /* ── apply_to_mock / load ──────────────────────────────────────────────────── */
@@ -431,18 +749,36 @@ int main(void)
     RUN_TEST(test_parse_server_fields);
     RUN_TEST(test_parse_server_implemented_options);
     RUN_TEST(test_parse_server_implemented_options_trigger_and_chained);
+    RUN_TEST(test_parse_server_vendor_id_malformed_value_leaves_default);
+    RUN_TEST(test_parse_server_device_id_malformed_value_leaves_default);
+    RUN_TEST(test_parse_server_magic_malformed_value_leaves_default);
+    RUN_TEST(test_parse_server_magic_negative_value_wraps);
+    RUN_TEST(test_parse_server_vendor_id_skips_tab_newline_cr_separators);
 
     RUN_TEST(test_manifest_free_zeroes_the_struct_and_tolerates_double_free);
     RUN_TEST(test_parse_hw_pin_map_entries);
     RUN_TEST(test_parse_hw_pin_map_missing_hw_ep_pin_nr_fails);
     RUN_TEST(test_parse_hw_pin_map_missing_hw_ep_nr_fails);
+    RUN_TEST(test_parse_hw_pin_map_hw_ep_nr_malformed_value_fails);
+    RUN_TEST(test_parse_hw_pin_map_hw_ep_pin_nr_malformed_value_fails);
+    RUN_TEST(test_parse_hw_pin_type_missing_brackets_leaves_default);
+    RUN_TEST(test_parse_hw_pin_type_array_leaking_past_entry_close_is_ignored);
 
     RUN_TEST(test_parse_endpoint_entries);
     RUN_TEST(test_parse_endpoint_missing_ep_type_fails);
     RUN_TEST(test_parse_endpoint_missing_byte_bus_id_fails);
+    RUN_TEST(test_parse_endpoint_byte_bus_id_malformed_value_fails);
+    RUN_TEST(test_parse_endpoint_ep_type_malformed_value_fails);
+    RUN_TEST(test_parse_endpoint_ep_enable_malformed_value_leaves_default);
 
     RUN_TEST(test_parse_stream_entries);
     RUN_TEST(test_parse_stream_missing_rx_stream_id_fails);
+    RUN_TEST(test_parse_stream_rx_stream_id_malformed_value_fails);
+    RUN_TEST(test_parse_stream_configured_malformed_value_leaves_default);
+    RUN_TEST(test_parse_stream_configured_skips_tab_newline_cr_separators);
+
+    RUN_TEST(test_parse_error_with_null_err_msg_does_not_crash);
+    RUN_TEST(test_parse_error_with_zero_err_msg_cap_leaves_buffer_untouched);
 
     RUN_TEST(test_apply_to_mock_sets_regmap_fields);
     RUN_TEST(test_apply_to_mock_ors_options_into_regmap);

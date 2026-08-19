@@ -2842,6 +2842,220 @@ static void test_compound_never_due_without_a_sequencer_table(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+ * MC/DC gap-closing tests (mock.c batch, continued in this file since it
+ * already carries the chain/cascade fixtures these decisions need).
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── L1217: apply_cancellation()'s own CLEAR_SINGLE target-lookup loop
+ * (`slot->queue.pending[j].in_use && slot->queue.pending[j].
+ * transaction_num == target_tn`) -- every existing clear-single test's
+ * own target happens to be the FIRST pending entry (index 0), so the
+ * transaction_num comparison's own FALSE side (walking past a real,
+ * in-use, NON-matching entry before reaching the real target further
+ * into the store) was never exercised. Two pending requests, clearing
+ * the SECOND one by name -- j=0 must fail the tn compare (in_use true,
+ * tn mismatch) before j=1 succeeds. */
+static void test_clear_single_target_not_first_in_store(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t a = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                   RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 91);
+    rcp_bytes_t b = make_compound(RCP_REQUEST_TYPE_COMPOUND, 1,
+                                   RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 92);
+    rcp_bytes_t clear = rcp_cancel_encode_clear_single(1, 92, 93); /* names b, not a */
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &a));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &b));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED, submit(srv, &clear));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    /* The survivor is 'a' -- the one NOT named this time. */
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_UINT8(91, log.transaction_num[0]);
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L2972: last_pending_index()'s own `best == RCP_SERVER_MAX_PENDING
+ * || pending[i].sequence >= max_seq` selection loop, called from
+ * rcp_mock_server_dispatch_frame()'s own per-chained-member bookkeeping
+ * (mock.c ~L3174) right after each member's own PENDING admission.
+ * Every existing chain test's own store happens to hold exactly one
+ * in-use entry whenever this runs (this function's own first, sentinel-
+ * driven pick), so neither condition's own independent effect was ever
+ * exercised: best == SENTINEL's FALSE side needs a SECOND in-use entry
+ * already present, and sequence >= max_seq needs BOTH values once
+ * that's true.
+ *
+ * Four single-member "frames" through dispatch_frame() (the real entry
+ * point this decision lives behind), each admitting or cancelling one
+ * COMPOUND request on the SAME endpoint:
+ *   A (slot 0, seq 1) -- last_pending_index() sees ONE entry: best ==
+ *     SENTINEL picks it (cond0 TRUE; cond1 never evaluated).
+ *   B (slot 1, seq 2) -- TWO entries now: i=0 cond0=FALSE, cond1
+ *     (seq(A)=1 >= max_seq(1, from A itself)) TRUE -- closes (F,T).
+ *   cancel A -- frees slot 0; B (slot 1, seq 2) is untouched.
+ *   C (reclaims slot 0, seq 3 -- a NEWER sequence than B's, since
+ *     rcp_server_endpoint_t's own sequence counter is global and
+ *     monotonic regardless of which slot index gets reused) -- now
+ *     slot 0 = C (seq 3), slot 1 = B (seq 2, OLDER, still pending): i=0
+ *     picks C (cond0 TRUE); i=1, B's own seq(2) >= max_seq(3) is FALSE
+ *     -- closes the (F,F) pairing this file's own natural
+ *     admission order can never otherwise produce (sequence numbers
+ *     only ever increase with array index under simple sequential
+ *     admission -- only a free-slot reclaim after an earlier cancel
+ *     can put an OLDER sequence at a HIGHER array index than a newer
+ *     one). */
+static void test_last_pending_index_mcdc_independence(void)
+{
+    handler_log_t                   log;
+    rcp_mock_server_t              *srv = fixture(&log);
+    rcp_bytes_t                      a = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                                        RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 201);
+    rcp_bytes_t                      b = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                                        RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 202);
+    rcp_bytes_t                      c = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                                        RCP_SEQUENCER_POWER_ON_STATE, 0, 0, 0, 203);
+    rcp_bytes_t                      clear = rcp_cancel_encode_clear_single(1, 201, 204);
+    rcp_mock_frame_member_result_t   results[4];
+    uint8_t                          ab_frame[FRAME_BUF_CAP];
+    size_t                           ab_frame_len;
+    size_t                           n;
+
+    /* A and B dispatched together as ONE 2-member frame, not two
+     * separate single-member ones: dispatch_frame()'s own chain_group
+     * assignment for a non-chained member is `i + 1`, scoped to ITS OWN
+     * frame call (mock.c) -- two SEPARATE single-member frame calls
+     * would each independently assign chain_group 1 to their own solo
+     * member, and apply_cancellation()'s own cascade rule (REQ-
+     * CANCEL-012) would then treat A and B as chain siblings sharing
+     * that same (group, position) pair, cascading A's own cancellation
+     * onto B too -- not this test's own point at all. Dispatched
+     * together, A is i=0 (chain_group 1) and B is i=1 (chain_group 2):
+     * genuinely independent, exactly like two unrelated standalone
+     * requests dispatched in the same NTSCF frame really are. */
+    ab_frame_len = concat2(ab_frame, sizeof(ab_frame), &a, &b);
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, ab_frame,
+                                        ab_frame_len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&results[1].response);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, clear.data,
+                                        clear.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED, results[0].result);
+    rcp_bytes_free(&results[0].response);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1)); /* only B left */
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, c.data, c.len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[0].result);
+    rcp_bytes_free(&results[0].response);
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_pending_count(srv, 1)); /* B and C */
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+    rcp_bytes_free(&c);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── L3151: rcp_mock_server_dispatch_frame()'s own per-member chaining-
+ * error classifier (`out->result == ERR_UNKNOWN_BUS || out->result ==
+ * REJECTED || out->result == DROPPED`) -- this file's own extensive
+ * chain tests exercise CHAIN_ERROR/CHAIN_ABORTED (a completely
+ * different, EARLIER branch in the same loop) extensively, but never
+ * ANY of these three specific rcp_mock_server_dispatch() result values
+ * as an ordinary (non-chained) member's own outcome, so none of the
+ * three conditions has ever independently been demonstrated true. One
+ * frame, three ordinary (non-chained) members, one of each: */
+static void test_dispatch_frame_prev_errored_classifier_mcdc(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new(); /* still HW_UNCONFIGURED */
+    rcp_bytes_t                      dropped_member, rejected_member;
+    rcp_acf_byte_message_info_t      abb_hdr = {0};
+    rcp_acf_gbb_header_t              gbb_hdr;
+    uint8_t                          frame[FRAME_BUF_CAP];
+    size_t                           frame_len;
+    rcp_mock_frame_member_result_t   results[4];
+    size_t                           n;
+
+    /* Member 0: DROPPED -- HW_UNCONFIGURED, NTSCF, addressed to a
+     * non-discovery bus (REQ-LIFECYCLE-033's own DROP rule). Any
+     * acf_msg_type triggers it; ABB is simplest. */
+    abb_hdr.byte_bus_id     = 9;
+    abb_hdr.transaction_num = 1;
+    dropped_member = rcp_acf_encode_abb(&abb_hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(dropped_member.data);
+
+    /* Member 1: REJECTED -- HW_UNCONFIGURED, NTSCF, addressed to the
+     * discovery bus, but ACF_GBB (not ABB) -- REQ-LIFECYCLE-033's own
+     * REJECT rule (rcp_lifecycle_should_accept(), lifecycle.c) accepts
+     * only an ABB request to EP0 at this state; anything else,
+     * including every conditional (GBB) request kind, is REJECTED.
+     * dispatch_frame()'s own per-member msg_type is peeked straight off
+     * the wire bytes (peek_member_byte_bus_id(), mock.c), so this must
+     * be a genuinely GBB-encoded member, not just an ABB one addressed
+     * to the discovery bus (which the state above ACCEPTS). */
+    memset(&gbb_hdr, 0, sizeof(gbb_hdr));
+    gbb_hdr.info.byte_bus_id     = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    gbb_hdr.info.transaction_num = 2;
+    rejected_member = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(rejected_member.data);
+
+    frame_len = concat2(frame, sizeof(frame), &dropped_member, &rejected_member);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, false, 1u, 0u, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED, results[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, results[1].result);
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&results[1].response);
+    rcp_bytes_free(&dropped_member);
+    rcp_bytes_free(&rejected_member);
+    rcp_mock_server_destroy(srv);
+
+    /* ERR_UNKNOWN_BUS, on its own real (RCP_CONFIGURED) fixture() server
+     * -- the third and last of the three classified result values,
+     * closing cond0's own TRUE side (this file's own other chain tests
+     * never dispatch a member that resolves to no endpoint at all
+     * through THIS specific loop). fixture() registers its own single
+     * endpoint at byte_bus_id 1 only -- byte_bus_id 77 resolves to no
+     * slot on any stream. */
+    {
+        handler_log_t                   log2;
+        rcp_mock_server_t              *srv2 = fixture(&log2);
+        rcp_bytes_t                      solo;
+        rcp_acf_byte_message_info_t      h2 = {0};
+
+        h2.byte_bus_id     = 77;
+        h2.transaction_num = 3;
+        solo = rcp_acf_encode_abb(&h2, NULL, 0);
+        TEST_ASSERT_NOT_NULL(solo.data);
+
+        n = rcp_mock_server_dispatch_frame(srv2, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, solo.data,
+                                            solo.len, results, 4);
+        TEST_ASSERT_EQUAL_size_t(1, n);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, results[0].result);
+        rcp_bytes_free(&results[0].response);
+        rcp_bytes_free(&solo);
+        rcp_mock_server_destroy(srv2);
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -2921,6 +3135,10 @@ int main(void)
 
     RUN_TEST(test_undecodable_conditional_request_is_rejected);
     RUN_TEST(test_compound_never_due_without_a_sequencer_table);
+
+    RUN_TEST(test_clear_single_target_not_first_in_store);
+    RUN_TEST(test_last_pending_index_mcdc_independence);
+    RUN_TEST(test_dispatch_frame_prev_errored_classifier_mcdc);
 
     return UNITY_END();
 }

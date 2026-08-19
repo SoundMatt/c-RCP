@@ -175,6 +175,35 @@ static void test_endpoints_returns_a_snapshot_of_registered_endpoints(void)
     rcp_admin_server_destroy(srv);
 }
 
+/* MC/DC: rcp_admin_server_endpoints()'s `for (i = 0; i < n && i < cap;
+ * i++)` (src/admin.c) never had `i < cap` independently demonstrated --
+ * every other call site in this file passes a `cap` at least as large
+ * as the registered count, so the loop always runs its full course and
+ * `i < n` alone ever decides when it stops. This registers two
+ * endpoints but caps the output array at 1, so the *second* iteration's
+ * `i < cap` (false, i=1 == cap=1) is what actually ends the loop -- not
+ * `i < n` (which would still be true, i=1 < n=2). The full count (2) is
+ * still the return value: cap only bounds how much of out[] gets
+ * written, not what rcp_admin_server_endpoints() reports as the true
+ * registered total (mirroring snprintf()'s own "would-have-written"
+ * convention, see rcp_admin_server_metrics_text() a few lines down). */
+//cfusa:test REQ-ADMIN-001
+static void test_endpoints_return_value_is_full_count_even_when_cap_truncates_output(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    rcp_endpoint_info_t out[1];
+    size_t n;
+
+    TEST_ASSERT_TRUE(rcp_admin_server_register_endpoint(srv, make_addr(1, 0)));
+    TEST_ASSERT_TRUE(rcp_admin_server_register_endpoint(srv, make_addr(2, 0)));
+
+    n = rcp_admin_server_endpoints(srv, out, 1);
+    TEST_ASSERT_EQUAL_UINT(2, n); /* full count, not clamped to cap */
+    TEST_ASSERT_TRUE(out[0].registered); /* only the one slot cap allowed got written */
+
+    rcp_admin_server_destroy(srv);
+}
+
 /* ── Subscription / emit ──────────────────────────────────────────────────── */
 
 static int g_event_count;
@@ -298,6 +327,35 @@ static void test_metrics_text_renders_prometheus_format(void)
 
     rcp_admin_server_metrics_text(srv, buf, sizeof(buf));
     TEST_ASSERT_NOT_NULL(strstr(buf, "# TYPE rcp.requests.total counter"));
+
+    rcp_admin_server_destroy(srv);
+}
+
+/* MC/DC: rcp_admin_server_metrics_text()'s `if (out && cap > 0)` (src/
+ * admin.c) never had `cap > 0` independently demonstrated -- every
+ * existing call in this file either passes a real, non-NULL buffer with
+ * a real capacity (`cap > 0` true) or passes `out == NULL, cap == 0`
+ * together (short-circuiting on the first operand, so the second is
+ * never even reached). Holding `out` non-NULL constant and passing
+ * `cap == 0` is what's missing: the copy-out must be skipped without
+ * touching `out[0]` (which would be an out-of-bounds write into a
+ * caller buffer the caller declared zero-capacity), while `total`
+ * (the would-have-been-written length) is still computed and
+ * returned exactly as the `out == NULL` path does. */
+//cfusa:test REQ-ADMIN-006
+static void test_metrics_text_with_non_null_buf_but_zero_cap_writes_nothing(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    char buf[256];
+    size_t total;
+
+    memset(buf, 'Z', sizeof(buf)); /* sentinel: must stay untouched */
+
+    TEST_ASSERT_TRUE(rcp_admin_server_record_counter(srv, "rcp.requests.total", "", 3.0));
+
+    total = rcp_admin_server_metrics_text(srv, buf, 0);
+    TEST_ASSERT_TRUE(total > 0);           /* same "would-have-written" length as out==NULL */
+    TEST_ASSERT_EQUAL_UINT8('Z', (uint8_t)buf[0]); /* out non-NULL but cap==0: nothing written */
 
     rcp_admin_server_destroy(srv);
 }
@@ -459,11 +517,13 @@ int main(void)
     RUN_TEST(test_destroy_frees_srv_when_non_null);
     RUN_TEST(test_register_and_deregister_report_membership_changes);
     RUN_TEST(test_endpoints_returns_a_snapshot_of_registered_endpoints);
+    RUN_TEST(test_endpoints_return_value_is_full_count_even_when_cap_truncates_output);
     RUN_TEST(test_subscribe_and_emit_deliver_the_correct_event);
     RUN_TEST(test_emit_invokes_every_subscriber_in_registration_order);
     RUN_TEST(test_record_counter_accumulates_each_delta_exactly_once);
     RUN_TEST(test_distinct_name_labels_tracked_separately);
     RUN_TEST(test_metrics_text_renders_prometheus_format);
+    RUN_TEST(test_metrics_text_with_non_null_buf_but_zero_cap_writes_nothing);
     RUN_TEST(test_metrics_text_with_long_name_and_labels_does_not_read_out_of_bounds);
     RUN_TEST(test_admin_server_tolerates_concurrent_mutation);
     RUN_TEST(test_register_endpoint_at_max_succeeds_then_next_fails);
