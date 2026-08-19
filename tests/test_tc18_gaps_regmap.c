@@ -2212,6 +2212,93 @@ static void test_ep0_dispatcher_routes_optional_subsystem_cfg_sections(void)
         rcp_bytes_free(&resp);
     }
 
+    /* 2b) MC/DC closure (write-side, optional_subsystem_cfg_write_route):
+     * every write case above lands INSIDE some section's own [ptr,
+     * ptr+len) extent, so the "is this address even below this
+     * section's own start" condition was never independently
+     * demonstrated true. An address one below network_interface_cfg's
+     * own ptr, with a non-NULL/nonzero-len cfg for that section, must
+     * be routed past it (and past physical_layer_cfg/time_synch_cfg,
+     * both NULL, and security_cfg, whose own [0x0700,0x0700) is also
+     * out of reach from here) all the way to EP_NOT_FOUND. */
+    {
+        uint8_t payload[3] = {0x05u, 0xFFu, 0x11u}; /* addr=0x05FF = network_cfg_ptr-1 */
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL,
+                                                   0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL,
+                                                   NULL, 0u, 0u, &err, &tn, 0u, &optional_cfg, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 2c) MC/DC closure (write-side, size-guarded combine): an OR write
+     * into network_interface_cfg (len=4) whose own [relative,
+     * relative+data_len) span EXCEEDS that len -- the render+combine
+     * step must be skipped (there is no in-bounds current image to
+     * combine against), falling through to apply_reconfig()'s own,
+     * separate out-of-range rejection instead of reading past cfg's
+     * own 4-octet data[] array. */
+    {
+        uint8_t payload[8] = {0x06u, 0x00u, 1u, 2u, 3u, 4u, 5u, 6u}; /* addr=network_cfg_ptr+0,
+                                                                         6 data octets > len=4 */
+
+        hdr.evt = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL,
+                                                   0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL,
+                                                   NULL, 0u, 0u, &err, &tn, 0u, &optional_cfg, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        hdr.evt = 0u; /* restore SET for every case below */
+        rcp_bytes_free(&frame);
+    }
+
+    /* 2d) MC/DC closure (read-side, optional_subsystem_cfg_read_route):
+     * case 2 above's successful read leaves ALL THREE of this helper's
+     * own conditions (cfg==NULL, addr<table_ptr, addr>=table_ptr+len)
+     * false every time it's reached -- and reaching it at all requires
+     * an EARLIER section to have already failed to handle the address,
+     * which case 2 also never exercises. A read one below
+     * network_interface_cfg's own ptr demonstrates addr<table_ptr=true
+     * for network (and, falling through, cfg==NULL=true for physical/
+     * time_synch, and addr<table_ptr=true again for security_cfg) --
+     * not handled by any section. */
+    {
+        rcp_bytes_t                 resp;
+        rcp_acf_byte_message_info_t rhdr = {0};
+        const uint8_t               *rpayload;
+        size_t                       rpayload_len;
+
+        resp = rcp_regmap_ep0_encode_read_response(0x05FFu, 4u, 23, &map, NULL, 0u, NULL, 0u,
+                                                     NULL, 0u, NULL, 0u, NULL, 0u, NULL, NULL, 0u,
+                                                     &err, 0u, &optional_cfg, NULL);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp.data);
+        (void)rhdr; (void)rpayload; (void)rpayload_len;
+    }
+
+    /* 2e) MC/DC closure (read-side): a read exactly one octet PAST
+     * network_interface_cfg's own 4-octet extent (addr=ptr+4) --
+     * cfg==NULL is false and addr<table_ptr is false, but
+     * addr>=table_ptr+len is true, demonstrating that condition's own
+     * independent effect (contrast against case 2's all-false vector,
+     * both reached via the SAME section's own call so cfg==NULL and
+     * addr<table_ptr are held at the same false value between them). */
+    {
+        rcp_bytes_t resp;
+
+        resp = rcp_regmap_ep0_encode_read_response((uint16_t)(map.svr_network_interface_cfg_ptr + 4u),
+                                                     2u, 24, &map, NULL, 0u, NULL, 0u,
+                                                     NULL, 0u, NULL, 0u, NULL, 0u, NULL, NULL, 0u,
+                                                     &err, 0u, &optional_cfg, NULL);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp.data);
+    }
+
     /* 3) security_cfg's own address range -- present in optional_cfg but
      * len==0, so its own [ptr, ptr+0) extent is empty and never matches
      * any address; falls through to EP_NOT_FOUND, matching TC18's own
@@ -2717,6 +2804,31 @@ static void test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_valu
     TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
     TEST_ASSERT_EQUAL_UINT32(50u, rows[1].ep_delay_time);
     TEST_ASSERT_FALSE(rows[1].ep_used); /* bit 0 of 0x30 is 0 */
+}
+
+/* MC/DC closure: every other test in this file writes into a row
+ * starting AT or BEFORE ep_tx_buffer_size's own offset (8) -- so the
+ * "does this write even reach far enough to touch this field"
+ * condition (touched_start <= row_base+8, and its own row_base+10
+ * sibling for ep_rx_buffer_size) was never independently demonstrated
+ * false. A write starting at relative 11 (past BOTH fields' own start
+ * offsets, touching only the last octet of the row) must leave both
+ * ep_tx_buffer_size and ep_rx_buffer_size entirely untouched. */
+static void test_ep_generic_cfg_apply_reconfig_write_starting_past_tx_and_rx_buffer_size_leaves_both_untouched(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0xEEu}; /* row's own last octet, relative 11 */
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_tx_buffer_size = 111u; /* pre-existing values, distinguishable from 0 */
+    row.ep_rx_buffer_size = 222u;
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 11u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_UINT16(111u, row.ep_tx_buffer_size); /* untouched -- write starts too late */
+    TEST_ASSERT_EQUAL_UINT16(222u, row.ep_rx_buffer_size); /* untouched -- write starts too late */
 }
 
 static void test_ep_generic_cfg_apply_reconfig_rejects_short_payload(void)
@@ -5044,6 +5156,20 @@ static void test_ep_id_map_flags_multi_client_ep(void)
 
     /* Vacuous cases. */
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_has_single_client_per_ep(NULL, 0u));
+
+    /* MC/DC closure: every case above shares ep_id=7 across both rows,
+     * so the ep_id-equality condition itself was never independently
+     * demonstrated false. Two DIFFERENT ep_ids, with DIFFERENT request
+     * streams too (the multi-client shape, if it were even the same
+     * endpoint) -- must NOT be flagged, since they're not the same
+     * endpoint at all. */
+    {
+        rcp_regmap_ep_id_map_entry_t different_eps[2];
+
+        different_eps[0].ep_id = 7u; different_eps[0].byte_bus_id = 1u; different_eps[0].request_stream_index = 1u;
+        different_eps[1].ep_id = 8u; different_eps[1].byte_bus_id = 1u; different_eps[1].request_stream_index = 2u;
+        TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_has_single_client_per_ep(different_eps, 2u));
+    }
 }
 
 /* REQ-RMAP-058: TC18 §12.7.8 recommends that endpoints sharing a
@@ -5093,6 +5219,21 @@ static void test_ep_id_map_flags_heterogeneous_shared_bus(void)
 
     /* Vacuous case. */
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(NULL, NULL, 0u));
+
+    /* MC/DC closure: every case above shares request_stream_index=1
+     * across both rows, so the stream-equality condition was never
+     * independently demonstrated false. Two DIFFERENT request streams,
+     * same byte_bus_id, differing ep_type -- not a shared-bus group at
+     * all (a byte_bus_id is only shared WITHIN one stream), so this
+     * must NOT be flagged regardless of ep_type. */
+    {
+        rcp_regmap_ep_id_map_entry_t different_streams[2];
+        uint8_t                      types[2] = {1u, 2u};
+
+        different_streams[0].ep_id = 8u; different_streams[0].byte_bus_id = 3u; different_streams[0].request_stream_index = 1u;
+        different_streams[1].ep_id = 9u; different_streams[1].byte_bus_id = 3u; different_streams[1].request_stream_index = 2u;
+        TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(different_streams, types, 2u));
+    }
 }
 
 /* REQ-WAKEUP-020: TC18 §13.7.2.1 fixes the WakeUp endpoint's own EP_Nr
@@ -5954,6 +6095,385 @@ static void test_ep0_dispatcher_applies_xor_write_op_to_sequencer_table(void)
     rcp_bytes_free(&frame);
 }
 
+/* MC/DC closure: no dispatcher-level OR/AND/XOR write test exists for
+ * response-queue-config or ep_generic_cfg at all (only the low-level
+ * rcp_regmap_ep0_combine_write_op() primitive and hw_pin_map/
+ * ep_id_map/sequencer_table's own end-to-end dispatch are covered
+ * above) -- so both tables' own "write_op != SET" combine-guard
+ * condition was never independently demonstrated true, and their own
+ * size-guard condition (relative+data_len <= this dispatcher's own
+ * fixed MAX_ENTRIES-sized scratch buffer) never demonstrated at all.
+ * Each sub-case below closes one table's own pair: a small in-bounds
+ * OR/AND write (combine-guard true, size-guard true), then a write
+ * whose table is configured with MAX_ENTRIES+1 rows (a real, if
+ * unusual, caller-supplied count -- svr_*_max fields are the caller's
+ * own responsibility to keep in sync with real storage, this
+ * dispatcher's own header comment already says so) so the write's own
+ * span exceeds the fixed scratch buffer while staying inside the
+ * table's own real declared extent -- proving the documented
+ * raw-passthrough fallback (see hw_pin_map's own identical comment
+ * above rcp_regmap_ep0_decode_write_request()) actually engages
+ * instead of silently truncating or overflowing the stack buffer. */
+static void test_ep0_dispatcher_mcdc_closure_response_queue_and_ep_generic_cfg_combine_guards(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_regmap_general_t        map;
+    rcp_bytes_t                 frame;
+    rcp_wire_error_t            err;
+    uint8_t                     tn;
+    rcp_regmap_ep0_errc_t       rc;
+
+    rcp_regmap_general_init(&map);
+
+    /* response-queue-config: small in-bounds OR write. */
+    {
+        rcp_regmap_response_queue_cfg_t response_queue_cfg[2];
+        uint8_t                         payload[4];
+
+        memset(response_queue_cfg, 0, sizeof(response_queue_cfg));
+        map.svr_response_stream_cfg_ptr = 0x0300u;
+
+        put_test_u16(payload, (uint16_t)(map.svr_response_stream_cfg_ptr + 2u));
+        put_test_u16(&payload[2], 0x00FFu);
+
+        hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+        hdr.op              = RCP_ACF_OP_WRITE;
+        hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+        hdr.transaction_num = 30;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   NULL, 0u, NULL, 0u, response_queue_cfg, 2u,
+                                                   NULL, 0u, NULL, 0u, NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* response-queue-config: MAX_ENTRIES+1 rows, a write near the top
+     * of the table's own real extent whose own span (645 octets)
+     * exceeds the dispatcher's fixed 640-octet (MAX_ENTRIES*10) scratch
+     * buffer but stays inside the table's own real 650-octet extent. */
+    {
+        rcp_regmap_response_queue_cfg_t
+            response_queue_cfg[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES + 1u];
+        uint8_t payload[12];
+
+        memset(response_queue_cfg, 0, sizeof(response_queue_cfg));
+        map.svr_response_stream_cfg_ptr = 0x0300u;
+
+        put_test_u16(payload, (uint16_t)(map.svr_response_stream_cfg_ptr + 635u));
+        memset(&payload[2], 0x11u, 10u);
+
+        hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_AND;
+        hdr.transaction_num = 31;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   NULL, 0u, NULL, 0u, response_queue_cfg,
+                                                   RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES + 1u,
+                                                   NULL, 0u, NULL, 0u, NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        /* Raw passthrough (AND against an unrendered current image would
+         * be wrong -- but the dispatcher deliberately skips render+
+         * combine here per its own documented fallback), still accepted
+         * since 645 <= the table's own real 650-octet extent. */
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* ep_generic_cfg: small in-bounds AND write. */
+    {
+        rcp_regmap_ep_generic_cfg_t ep_generic_cfg[2];
+        uint8_t                     payload[3];
+
+        rcp_regmap_ep_generic_cfg_init(&ep_generic_cfg[0]);
+        rcp_regmap_ep_generic_cfg_init(&ep_generic_cfg[1]);
+        map.svr_ep_generic_cfg_ptr = 0x0500u;
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_generic_cfg_ptr + 13u)); /* row 1's own
+                                                                                  ep_type-adjacent
+                                                                                  octet */
+        payload[2] = 0x0Fu;
+
+        hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_AND;
+        hdr.transaction_num = 32;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   ep_generic_cfg, 2u, NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* ep_generic_cfg: MAX_ENTRIES+1 rows, a write near the top of the
+     * table's own real extent whose own span (772 octets) exceeds the
+     * dispatcher's fixed 768-octet (MAX_ENTRIES*12) scratch buffer but
+     * stays inside the table's own real 780-octet extent. */
+    {
+        rcp_regmap_ep_generic_cfg_t
+            ep_generic_cfg[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES + 1u];
+        uint8_t payload[14];
+        size_t  i;
+
+        for (i = 0u; i < RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES + 1u; i++) {
+            rcp_regmap_ep_generic_cfg_init(&ep_generic_cfg[i]);
+        }
+        map.svr_ep_generic_cfg_ptr = 0x0500u;
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_generic_cfg_ptr + 760u));
+        memset(&payload[2], 0x22u, 12u);
+
+        hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+        hdr.transaction_num = 33;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   ep_generic_cfg, RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES + 1u,
+                                                   NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        /* Unlike the other four tables, rcp_regmap_ep_generic_cfg_apply_
+         * reconfig() has no internal MAX_ENTRIES-sized scratch buffer at
+         * all (it patches entries[row_i] directly, per-field) -- so it
+         * was never vulnerable to the count > MAX_ENTRIES overflow the
+         * dispatcher's own combine-guard fix above addresses, and
+         * correctly accepts this write (touched_end=772 <= this table's
+         * own real 780-octet extent, row_end_idx=64 is a valid index
+         * into the 65-entry array below). */
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        rcp_bytes_free(&frame);
+    }
+
+    hdr.evt = 0u;
+}
+
+/* MC/DC closure: hw_pin_map/EP_ID_config/sequencer_table's own OR/AND/
+ * XOR dispatch tests above (test_ep0_dispatcher_applies_*) always fit
+ * comfortably inside these tables' own fixed scratch buffers, so each
+ * one's own size-guard condition (relative+data_len <= the buffer) was
+ * demonstrated true but never false. Same MAX_ENTRIES+1 technique as
+ * response-queue-config/ep_generic_cfg above, one per table. */
+static void test_ep0_dispatcher_mcdc_closure_hw_pin_map_ep_id_map_sequencer_combine_guards(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_regmap_general_t        map;
+    rcp_bytes_t                 frame;
+    rcp_wire_error_t            err;
+    uint8_t                     tn;
+    rcp_regmap_ep0_errc_t       rc;
+
+    rcp_regmap_general_init(&map);
+    hdr.byte_bus_id = RCP_REGMAP_EP0_INDEX;
+    hdr.op          = RCP_ACF_OP_WRITE;
+
+    /* hw_pin_map: MAX_ENTRIES+1 rows (65*3=195-octet real extent), an
+     * OR write whose own span (194 octets) exceeds the fixed 192-octet
+     * (MAX_ENTRIES*3) scratch buffer but stays inside the table's own
+     * real extent. */
+    {
+        rcp_regmap_hw_pin_map_entry_t hw_pin_map[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES + 1u];
+        uint8_t                       payload[8];
+
+        memset(hw_pin_map, 0, sizeof(hw_pin_map));
+        map.svr_hw_cfg_ptr  = 0x0100u;
+        hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+        hdr.transaction_num = 40;
+
+        put_test_u16(payload, (uint16_t)(map.svr_hw_cfg_ptr + 188u));
+        memset(&payload[2], 0x33u, 6u);
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   hw_pin_map, RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES + 1u,
+                                                   NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* EP_ID_config: MAX_ENTRIES+1 rows (65*4=260-octet real extent), an
+     * AND write whose own span (260 octets) exceeds the fixed
+     * 256-octet (MAX_ENTRIES*4) scratch buffer but stays inside the
+     * table's own real extent. */
+    {
+        rcp_regmap_ep_id_map_entry_t ep_id_map[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES + 1u];
+        uint8_t                      payload[10];
+
+        memset(ep_id_map, 0, sizeof(ep_id_map));
+        map.svr_ep_bytebus_id_map_ptr = 0x0200u;
+        hdr.evt                       = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_AND;
+        hdr.transaction_num           = 41;
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 252u));
+        memset(&payload[2], 0x44u, 8u);
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
+                                                   NULL, 0u, ep_id_map, RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES + 1u,
+                                                   NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* sequencer_table: MAX_ENTRIES+1 sequencers (256*2=512-octet real
+     * extent), an XOR write whose own span (512 octets) exceeds the
+     * fixed 510-octet (MAX_ENTRIES*2) scratch buffer but stays inside
+     * the table's own real extent. Ownership-authorized against
+     * requester_stream_index=0 throughout (all-zero owner array). */
+    {
+        uint8_t sequencer_state[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES + 1u];
+        uint8_t sequencer_owner[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES + 1u];
+        uint8_t payload[6];
+
+        memset(sequencer_state, 0, sizeof(sequencer_state));
+        /* Every sequencer pre-claimed by client 5 (matching
+         * requester_stream_index=5 below) -- REQ-SEQ-013's own
+         * ownership-aware authorization runs BEFORE apply_reconfig()
+         * ever sees this write, so an unclaimed/mismatched-owner target
+         * would be rejected as RCP_ERROR_UNAUTHORIZED_ACCESS before the
+         * MAX_ENTRIES guard under test is even reached. */
+        memset(sequencer_owner, 5u, sizeof(sequencer_owner));
+        map.svr_sequencer_state_ptr = 0x0600u;
+        hdr.evt                     = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_XOR;
+        hdr.transaction_num         = 42;
+
+        put_test_u16(payload, (uint16_t)(map.svr_sequencer_state_ptr + 508u));
+        memset(&payload[2], 0x55u, 4u);
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
+                                                   NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   sequencer_state, sequencer_owner,
+                                                   RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES + 1u, 5u,
+                                                   &err, &tn, 0u, NULL, NULL, 0u, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+}
+
+/* MC/DC closure: every write/read dispatch test touching the sequencer
+ * table above always passes sequencer_state and sequencer_owner
+ * TOGETHER (both NULL, or both non-NULL) -- so each pointer's own
+ * independent "!= NULL" effect on this decision was never
+ * demonstrated (only their combined effect). Passing one non-NULL and
+ * the other NULL demonstrates each pointer's own independent
+ * short-circuit effect, for both the write and read dispatchers. */
+static void test_ep0_dispatcher_mcdc_closure_sequencer_null_pointer_independence(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_regmap_general_t        map;
+    uint8_t                     sequencer_state[1] = {0x0Fu};
+    uint8_t                     sequencer_owner[1] = {0u};
+    uint8_t                     payload[3];
+    rcp_bytes_t                 frame;
+    rcp_wire_error_t            err;
+    uint8_t                     tn;
+    rcp_regmap_ep0_errc_t       rc;
+
+    rcp_regmap_general_init(&map);
+    map.svr_sequencer_state_ptr = 0x0600u;
+
+    put_test_u16(payload, (uint16_t)map.svr_sequencer_state_ptr);
+    payload[2] = 0x00u;
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 0u; /* SET */
+    hdr.transaction_num = 50;
+
+    /* Write-side: sequencer_state non-NULL, sequencer_owner NULL --
+     * must fall through (not routed into the sequencer table at all),
+     * same as if the address matched nothing. */
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                              RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
+                                              NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                              sequencer_state, NULL, 1u, 0u,
+                                              &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+    rcp_bytes_free(&frame);
+
+    /* Write-side: sequencer_state NULL, sequencer_owner non-NULL --
+     * same fall-through, the other pointer's own independent effect. */
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                              RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
+                                              NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                              NULL, sequencer_owner, 1u, 0u,
+                                              &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+    rcp_bytes_free(&frame);
+
+    /* Read-side: same two mismatched-NULL cases, through the read
+     * dispatcher's own identical 4-condition check. */
+    {
+        rcp_bytes_t resp;
+
+        resp = rcp_regmap_ep0_encode_read_response(map.svr_sequencer_state_ptr, 2u, 51, &map,
+                                                     NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                     sequencer_state, NULL, 1u,
+                                                     &err, 0u, NULL, NULL);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp.data);
+
+        resp = rcp_regmap_ep0_encode_read_response(map.svr_sequencer_state_ptr, 2u, 52, &map,
+                                                     NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                     NULL, sequencer_owner, 1u,
+                                                     &err, 0u, NULL, NULL);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp.data);
+    }
+
+    /* Read-side: both non-NULL but address OUT of the sequencer
+     * table's own [ptr, ptr+2) extent (count=1) -- demonstrates the
+     * upper-bound address condition's own independent effect
+     * (contrast against the existing in-range XOR write-op test's own
+     * successful read-back elsewhere in this file, and against the
+     * NULL-pointer cases just above, which never reach the address
+     * comparisons at all). */
+    {
+        rcp_bytes_t resp;
+
+        resp = rcp_regmap_ep0_encode_read_response((uint16_t)(map.svr_sequencer_state_ptr + 2u),
+                                                     2u, 53, &map,
+                                                     NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                     sequencer_state, sequencer_owner, 1u,
+                                                     &err, 0u, NULL, NULL);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp.data);
+    }
+}
+
 /* REQ-RMAP-068 x REQ-WAKEUP-020: the fixed-ep_id invariant prediction
  * (ep_id_map_write_keeps_fixed_ep_id()) must see the SAME combined
  * bytes the write will really apply, not the raw pre-combine request
@@ -6135,6 +6655,7 @@ int main(void)
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_leaves_partially_covered_field_unchanged);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_does_not_launder_an_untouched_rows_own_invalid_delay_time);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_write_starting_past_tx_and_rx_buffer_size_leaves_both_untouched);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_rejects_short_payload);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_request_stream_cfg_apply_reconfig_patches_addressed_octets_only);
@@ -6208,6 +6729,9 @@ int main(void)
     RUN_TEST(test_ep0_dispatcher_applies_or_write_op_to_hw_pin_map);
     RUN_TEST(test_ep0_dispatcher_applies_and_write_op_to_ep_id_map);
     RUN_TEST(test_ep0_dispatcher_applies_xor_write_op_to_sequencer_table);
+    RUN_TEST(test_ep0_dispatcher_mcdc_closure_response_queue_and_ep_generic_cfg_combine_guards);
+    RUN_TEST(test_ep0_dispatcher_mcdc_closure_hw_pin_map_ep_id_map_sequencer_combine_guards);
+    RUN_TEST(test_ep0_dispatcher_mcdc_closure_sequencer_null_pointer_independence);
     RUN_TEST(test_ep0_dispatcher_or_write_op_respects_fixed_ep_id_after_combine);
     RUN_TEST(test_ep0_dispatcher_applies_and_write_op_to_optional_subsystem_section);
 
