@@ -1,12 +1,12 @@
-# Safety Case — c-RCP v0.225.0
+# Safety Case — c-RCP v0.458.0
 
-**Standard:** iso26262  |  **Generated:** 2026-08-17T21:35:18Z
+**Standard:** iso26262  |  **Generated:** 2026-08-19T00:34:49Z
 
 ---
 
 ## G1 — goal
 
-> c-RCP v0.225.0 has no unmitigated hazard from .fusa-hara.json and no unresolved ERROR finding from `cfusa check` at the iso26262 analysis boundary
+> c-RCP v0.458.0 has no unmitigated hazard from .fusa-hara.json and no unresolved ERROR finding from `cfusa check` at the iso26262 analysis boundary
 
 ## St1 — strategy
 
@@ -14,7 +14,7 @@
 
 ## C1 — context
 
-> Scope: c-RCP source under ".", analyzed against iso26262 by c-FuSa v0.5.54
+> Scope: c-RCP source under ".", analyzed against iso26262 by c-FuSa v0.6.2
 
 ## A1 — assumption
 
@@ -27,6 +27,12 @@
 ## G1.2 — goal
 
 > The c-RCP development process gives justified confidence: static analysis, FMEA/TARA, and tool qualification evidence are current
+
+## Sn1 — solution
+
+> Hazard analysis and risk assessment
+
+Evidence: `HARA.md`
 
 ## Sn3 — solution
 
@@ -57,8 +63,9 @@ Evidence: `qualify-report.json`
 | St1 | A1 | inContextOf |
 | St1 | G1.1 | supportedBy |
 | St1 | G1.2 | supportedBy |
+| G1.1 | Sn1 | supportedBy |
 | G1.2 | Sn3 | supportedBy |
 | G1.2 | Sn4 | supportedBy |
 | G1.2 | Sn5 | supportedBy |
 
-_Completeness: 3 goal(s), 1 with cited evidence, 1 undeveloped._
+_Completeness: 3 goal(s), 2 with cited evidence, 0 undeveloped._
