@@ -1083,6 +1083,59 @@ static void test_commit_entry_requires_the_response_to_have_been_sent(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+/* MC/DC closure: rcp_pwrmode_commit_entry()'s own routing-validity check
+ * -- "(mode!=NORMAL && mode!=STANDBY) || (target!=STANDBY && target!=SLEEP)"
+ * -- has every existing test above reaching it with the SAME shape
+ * (mode==NORMAL, target==SLEEP), so none of its four conditions ever had
+ * an independence pair. Each sub-case below is also a real, meaningful
+ * transition or a real, meaningful rejection in its own right, not just
+ * coverage padding. */
+static void test_commit_entry_mode_target_routing_independence(void)
+{
+    rcp_pwrmode_entry_gate_t gate = {true, true, true};
+    rcp_pwrmode_t            mode;
+    rcp_pwrmode_start_kind_t kind;
+
+    /* A) STANDBY -> SLEEP: a real, valid COLD transition (same rule
+     * rcp_pwrmode_transition() itself already grants NORMAL->SLEEP).
+     * mode!=STANDBY evaluates false here (independence for that
+     * condition, paired against D below where it evaluates true). */
+    mode = RCP_PWRMODE_STANDBY;
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_SLEEP, &gate, true, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
+
+    /* B) NORMAL -> STANDBY: a real, valid HOT transition. target==STANDBY
+     * evaluates the right-hand pair's own first condition false
+     * (independence for that condition, paired against C below where it
+     * evaluates true). */
+    mode = RCP_PWRMODE_NORMAL;
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_STANDBY, &gate, true, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_STANDBY, mode);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
+
+    /* C) NORMAL -> NORMAL via this entry path: target is neither STANDBY
+     * nor SLEEP, so commit_entry() itself must refuse it as an invalid
+     * transition regardless of the gate/response_sent being fully
+     * satisfied -- this entry path exists only to enter standby/sleep,
+     * never to "commit" staying in (or returning to) NORMAL. */
+    mode = RCP_PWRMODE_NORMAL;
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_INVALID_TRANSITION,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_NORMAL, &gate, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode); /* untouched */
+
+    /* D) SLEEP -> SLEEP via this entry path: already asleep, so
+     * re-committing entry must be refused rather than silently treated
+     * as a no-op -- a caller re-driving this path after a stale/duplicate
+     * sleep request must not corrupt or re-trigger the entry sequence. */
+    mode = RCP_PWRMODE_SLEEP;
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_INVALID_TRANSITION,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_SLEEP, &gate, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode); /* untouched */
+}
+
 /* ── §12.5: the network-sleep return value IS the LPS-suppression signal ──── */
 
 static void test_network_sleep_refusal_return_value_gates_the_lps_confirmation(void)
@@ -1882,6 +1935,7 @@ int main(void)
     RUN_TEST(test_sleepcmd_requires_root_client_authorization);
     RUN_TEST(test_commit_entry_re_checks_the_gate_and_aborts_the_race);
     RUN_TEST(test_commit_entry_requires_the_response_to_have_been_sent);
+    RUN_TEST(test_commit_entry_mode_target_routing_independence);
     RUN_TEST(test_network_sleep_refusal_return_value_gates_the_lps_confirmation);
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
     RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
