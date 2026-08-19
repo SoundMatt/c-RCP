@@ -78,9 +78,9 @@ static int shmem_side_send(rcp_avtp_transport_t *self, const uint8_t *frame, siz
 //cfusa:req REQ-SHMEM-002
 //cfusa:req REQ-SHMEM-003
 //cfusa:req REQ-SHMEM-004
-//cfusa:req REQ-SHMEM-005
 //cfusa:req REQ-SHMEM-006
 //cfusa:req REQ-SHMEM-007
+//cfusa:req REQ-SHMEM-010
 static int shmem_side_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                             uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
@@ -132,6 +132,7 @@ static int shmem_side_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
 
 //cfusa:req REQ-SHMEM-004
 //cfusa:req REQ-SHMEM-005
+//cfusa:req REQ-SHMEM-010
 static int shmem_side_close(rcp_avtp_transport_t *self)
 {
     rcp_shmem_side_t      *s = (rcp_shmem_side_t *)self;

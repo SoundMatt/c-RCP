@@ -1693,8 +1693,8 @@
     },
     {
       "id": "REQ-SHMEM-005",
-      "title": "send()/recv() on a closed side return RCP_ERR_CLOSED",
-      "text": "Once close() has been called on a side, that side's own send() shall return RCP_ERR_CLOSED immediately, and its recv() shall return RCP_ERR_CLOSED once its already-queued items (if any) have been drained.",
+      "title": "send() on a closed side returns RCP_ERR_CLOSED immediately",
+      "text": "Once close() has been called on a side, that side's own send() shall return RCP_ERR_CLOSED immediately. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from a prior single id that also bundled recv()'s own separate post-close-and-drained contract (now REQ-SHMEM-010) -- send()'s own tests/test_shmem.c coverage (test_send_recv_on_closed_side_returns_closed) already exercised both functions independently, just under one shared id.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -1735,6 +1735,16 @@
       "id": "REQ-SHMEM-009",
       "title": "the shared pair state is freed only once both sides are released",
       "text": "The internal state shared by a pair shall be freed exactly once, only after both sides' own refcounts have independently reached zero, regardless of release order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-SHMEM-010",
+      "title": "recv() on a closed side returns RCP_ERR_CLOSED once drained",
+      "text": "A side's own recv() shall return RCP_ERR_CLOSED once that side is closed (directly, or via its peer closing) and its already-queued items (if any) have been drained -- items queued before the close remain deliverable. Split 2026-08-18 (issue #533, c-RCP-18 atomicity audit) from REQ-SHMEM-005's own prior bundled text; see that id for the split rationale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

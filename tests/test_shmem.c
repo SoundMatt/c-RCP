@@ -112,6 +112,7 @@ static void test_recv_times_out_when_empty(void)
 }
 
 //cfusa:test REQ-SHMEM-005
+//cfusa:test REQ-SHMEM-010
 static void test_send_recv_on_closed_side_returns_closed(void)
 {
     rcp_avtp_transport_t *a = NULL;
@@ -131,7 +132,7 @@ static void test_send_recv_on_closed_side_returns_closed(void)
     rcp_avtp_transport_release(b);
 }
 
-//cfusa:test REQ-SHMEM-005
+//cfusa:test REQ-SHMEM-010
 static void test_recv_on_open_side_returns_closed_once_peer_closes_and_drains(void)
 {
     rcp_avtp_transport_t *a = NULL;
