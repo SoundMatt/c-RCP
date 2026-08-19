@@ -457,6 +457,70 @@ static void test_addr_string_returns_zero_for_zero_capacity_buffer(void)
     rcp_avtp_transport_release(srv);
 }
 
+/* rcp_udp_avtp_transport_port()'s `if (u->fd < 0 || getsockname(...) <
+ * 0) return 0;` still needs getsockname()'s own failure independently
+ * demonstrated with fd>=0 held true (test_port_returns_zero_for_
+ * fd_from_failed_bind above only covers the fd<0 side). No public API
+ * call in this codebase can put a live transport into that state:
+ * rcp_avtp_transport_close() (udp_avtp_close()) only flips a logical
+ * `closed` bool and never touches the real fd; only udp_avtp_destroy()
+ * ever closes it, and that also sets u->fd = -1 in the same breath, so
+ * "fd>=0 but the OS-level descriptor is actually invalid" can't be
+ * reached by asking the object itself to do anything.
+ *
+ * This closes the real OS descriptor out from under the transport
+ * directly, bypassing the object. POSIX guarantees fd-allocating calls
+ * (socket() included) return the lowest-numbered descriptor not
+ * currently open in the process, so opening and immediately closing a
+ * throwaway "probe" socket right before bind() reserves that exact
+ * number for bind()'s own internal socket() call -- verified
+ * empirically here via port() returning a real, nonzero port
+ * immediately afterwards, proving the transport's fd really did land
+ * on that reserved number. Closing the probe's fd number a second time
+ * then closes the transport's real fd, while u->fd itself (an opaque
+ * copy of that same int inside the private struct) still holds the
+ * same non-negative value it always did: fd>=0-but-invalid, exactly
+ * the state this branch exists to catch.
+ *
+ * Cleanup: srv is never release()'d normally here. udp_avtp_destroy()
+ * would close(u->fd) again, and by then that fd number may have been
+ * reused by something else entirely in the process (double-close on a
+ * stale number is a real footgun) -- so a filler socket re-claims the
+ * same number first (same lowest-available guarantee), giving
+ * destroy()'s close() a harmless target of our own instead. */
+//cfusa:test REQ-UDP-004
+static void test_port_returns_zero_when_fd_invalid_underneath_transport(void)
+{
+    rcp_avtp_transport_t *srv;
+    int                     probe;
+    int                     filler;
+    uint16_t                port_before;
+
+    probe = socket(AF_INET, SOCK_DGRAM, 0);
+    TEST_ASSERT_TRUE(probe >= 0);
+    close(probe);
+
+    srv = bind_or_ignore();
+    if (!srv) return;
+
+    /* Confirms the transport's real fd landed on `probe`'s reserved
+     * number: a genuinely bound transport's port() must succeed. */
+    port_before = rcp_udp_avtp_transport_port(srv);
+    TEST_ASSERT_NOT_EQUAL(0, port_before);
+
+    /* Closes the transport's real fd out from under it -- srv/u->fd is
+     * never touched. */
+    close(probe);
+
+    TEST_ASSERT_EQUAL_UINT16(0, rcp_udp_avtp_transport_port(srv));
+
+    /* Re-claim the same fd number with something this test owns before
+     * letting the transport's own destroy() close(u->fd) again. */
+    filler = socket(AF_INET, SOCK_DGRAM, 0);
+    TEST_ASSERT_TRUE(filler >= 0);
+    rcp_avtp_transport_release(srv);
+}
+
 static void test_dial_unreachable_host_still_ok_at_construct_time(void)
 {
     /* connect() on a UDP socket only validates the address family/format,
@@ -761,6 +825,7 @@ int main(void)
     RUN_TEST(test_port_returns_zero_for_fd_from_failed_bind);
     RUN_TEST(test_addr_string_returns_zero_for_fd_from_failed_bind);
     RUN_TEST(test_addr_string_returns_zero_for_zero_capacity_buffer);
+    RUN_TEST(test_port_returns_zero_when_fd_invalid_underneath_transport);
     RUN_TEST(test_dial_unreachable_host_still_ok_at_construct_time);
     RUN_TEST(test_dial_bad_address_is_not_ok);
 

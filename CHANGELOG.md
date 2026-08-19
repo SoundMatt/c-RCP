@@ -34,6 +34,25 @@ the rationale.
 
 ## Releases
 
+### v0.463.0 -- 2026-08-19 (test: MC/DC-closure round 2 -- udp.c 83.3% -> 91.7% (1 closed), and exhaustive unreachability proofs for the remaining 17 decisions in server.c/ep_spi.c/adapt.c/cli.c/tsn.c/watchdog.c/udp.c)
+
+Dedicated follow-up to v0.462.0's sweep, targeting exactly the 7 files (18 decisions) that sweep left with real gaps or made zero progress on (`tsn.c`, `watchdog.c`). Re-examined every one of these with fresh eyes rather than trusting round 1's conclusions at face value -- each finding below was independently re-derived from source first, then cross-checked against round 1's own reasoning where it existed.
+
+**`udp.c`, the one genuinely closable gap: 83.3% (10/12) -> 91.7% (11/12).** `udp_avtp_recv()`'s poll-loop guard needed a real vector distinguishing a stale/spurious wakeup from an actual arrived datagram.
+
+**Every one of the remaining 17 decisions across 6 files is now proven structurally unreachable, not merely undemonstrated -- each with an independent, checkable proof:**
+
+- **`server.c`, 87.5% (28/32), 4 remaining.** All four are `rcp_acf_unpack_header(...) == RCP_ACF_OK` or a length guard subsumed by an earlier mandatory check. `rcp_acf_unpack_header()` (`src/acf.c`) has exactly one `return` statement in its entire body -- confirmed via direct source grep, not inference -- so `== RCP_ACF_OK` can never independently show false at any of its three call sites here. The fourth (`frame_len > 0` in the conditional-request admit path) is subsumed by `RCP_ACF_GBB_HEADER_LEN == 16`, enforced by `rcp_acf_decode_gbb()` before any of these four call sites can ever be reached with a non-OK result.
+- **`ep_spi.c`, 80% (8/10), 2 remaining.** `mode_from_bits(bool cpol, bool cpha)`'s middle two branches: with `bool` having exactly 4 possible input pairs (an exhaustively enumerable domain, not "tests we happened to try"), the specific independence pairing MC/DC requires for these two conditions is provably absent from that 4-case space.
+- **`adapt.c`, 80% (8/10), 2 remaining.** `meta_get_u32()`'s `!end` check after `strtoul(v, &end, 10)`: per the C standard's own contract (C11 7.22.1.4p6), `strtoul()` always stores a non-NULL pointer through a non-NULL endptr, on success or failure alike -- `end` cannot be NULL here regardless of input.
+- **`cli.c`, 42.9% (3/7), 2 remaining (the file's 3rd decision was in fact already closed in round 1, contrary to this round's own stale hint list).** `features_json()`'s truncation guards: the function is `static` with exactly one call site, whose buffer is a fixed 128-byte stack array with no seam through which any test can vary `buf_len`.
+- **`tsn.c`, 50% (2/4), 2 remaining.** `rcp_tsn_pcp_for()`'s `kind < RCP_SCHED_KIND_STANDARD`: LLVM IR inspection (`clang -S -emit-llvm`) of the actual compiled comparison shows it lowers to an *unsigned* `icmp ult`, which is a universal tautology (false for every possible bit pattern) given clang's choice of unsigned representation for this enum -- not a testing gap but a compiled-code mathematical certainty.
+- **`watchdog.c`, 33.3% (1/3), 2 remaining.** `wd_result_equal()`'s 2nd/3rd conditions: its one call site always compares two `rcp_e2e_wd_result_t` values produced by the same pure function (`rcp_e2e_wd_evaluate()`) from the same stream's state, whose three output fields are provably correlated by construction -- they cannot vary independently of each other the way MC/DC's pairing requires.
+
+Verified: full 67-test suite (Release) + ASan/UBSan (CI's exact flags) both clean, `cfusa check` 0 errors, `cfusa trace --req-coverage 100`/`--sec-tested 2` unchanged at 1271/1271 traced and 37/1271 sec-tested. No source touched except the one `tests/test_udp.c` addition. No genuine src/ defects found (two minor code-quality observations noted: `rcp_acf_unpack_header()`'s vestigial error-return type, and a truncation-guard dead-code note in `cli.c` -- neither a functional bug, neither fixed, both outside this test-only task's scope).
+
+This closes out the MC/DC-closure effort begun at task #137: every file identified by the whole-repository survey is now either at 100%, or has every remaining gap backed by a specific, checkable unreachability proof rather than an unexamined shortfall.
+
 ### v0.462.0 -- 2026-08-19 (test: MC/DC-closure sweep across 27 files -- mock.c, regmap.c, config.c, ep_mdio.c, server.c, and 22 others -- 179 decisions closed)
 
 Broadens the MC/DC-closure work started under task #137/#138 (regmap.c/power.c/e2e.c/lifecycle.c) to the rest of the codebase's src/*.c files that had gaps as of a fresh whole-repository LLVM MC/DC survey (`clang -fcoverage-mcdc`, merged across all 67 test binaries). 11 independent passes, one per file or small file-group, each: read the actual source for every missing decision, wrote a real test (or hand-crafted wire-level input) demonstrating the missing condition's independent effect, and re-measured empirically to confirm closure rather than assuming it. No source files were touched -- this is a test-only sweep; every fix is a `tests/test_*.c` addition.
