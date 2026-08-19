@@ -19106,6 +19106,59 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.458.0 -- 2026-08-18 (fusa: disposition 13 CFUSA-L003/A007
+findings in src/alloc.c, src/udp.c, src/l2.c -- both architecturally
+unfixable, real code unchanged)
+
+A full production-code (non-test) sweep of every `cfusa check`
+finding, prompted by user request, individually verified against the
+real call site before any disposition was written (not a blanket
+"accept the rule" pass -- three other rules found in that same sweep,
+`COUP002`/`A003`/`L007`, turned out to be genuine tool false-positives
+instead and are tracked as an upstream c-FuSa issue, not dispositioned
+here).
+
+**`CFUSA-L003` (4 findings, all in `src/alloc.c`)**: "replace dynamic
+allocation" fired on `rcp_malloc`/`rcp_calloc`/`rcp_realloc`/
+`rcp_free`'s own bodies (lines 34/41/48/58) -- but `src/alloc.c`
+**is** this project's own designated single allocator-indirection
+point (`REQ-ALLOC-001..006`), the one file whose entire purpose is
+being where the real libc allocator is allowed to appear so every
+other module can call the hookable `rcp_*` wrappers instead. The
+finding is technically correct and structurally unfixable without
+deleting the hook mechanism itself -- a real, load-bearing feature,
+not an oversight. Dispositioned via `cfusa disposition add --action
+accept` (`DISP-0001..0004`), one per fingerprint.
+
+**`CFUSA-A007` (9 findings, `src/udp.c` x5, `src/l2.c` x4)**: "check
+the return value of the system call" fired on unchecked `close(fd)`
+calls. Checked every call site's actual shape before dispositioning:
+each is either a `void`-returning destructor
+(`udp_avtp_destroy`/`l2_avtp_destroy`) abandoning an fd that's already
+going away with literally no channel to report through, or a
+`connect()`/`bind()`/`ioctl()` setup-failure cleanup path that already
+returns a real, documented error to the caller (`return &u->base`,
+`ok()==false`) -- the `close()` there just abandons a half-initialized
+fd for a different, already-signaled reason. Considered adding a
+debug-log call (the tool's own suggested remediation direction)
+before dispositioning, and found this codebase has **no logging
+facility anywhere** -- a deliberate, pre-existing architectural choice
+(no stdio dependency, standard for embedded/automotive C), not an
+oversight to patch around. Introducing one purely to log a close()
+failure with no caller-visible effect and no available recovery
+action would be new project infrastructure, not a 9-line fix -- out
+of scope for this pass; asked the user directly rather than deciding
+unilaterally, who confirmed disposition over adding logging.
+Dispositioned via `cfusa disposition add --action accept`
+(`DISP-0005`/`DISP-0006`), one per fingerprint -- both fingerprints
+are function-scoped, covering all 9 call sites across 2 entries.
+
+No source code changed. `cfusa check`: 358 -> 345 warnings (13 fewer,
+all accounted for above), 0 errors, `13 dispositioned` (was 0). `cfusa
+trace --req-coverage 100`/`--sec-tested 2` unchanged at 1271/1271 and
+37/1271. Full 67-test suite + ASan/UBSan clean (no source touched,
+`.fusa-dispositions.json` only).
+
 ### v0.457.0 -- 2026-08-18 (CI tooling: bump pinned `cfusa` v0.6.1 ->
 v0.6.2)
 
