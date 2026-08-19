@@ -19106,6 +19106,85 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.476.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533
+batch REQ-MOCK-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged REQ-MOCK-* (33, src/mock.c) -- 10 proxy-flagged
+(REQ-MOCK-003, 007, 009, 012, 020, 021, 022, 023, 025, 026).
+
+9 of 10 flagged ids confirmed atomic -- no splits, no text trims.
+Each bundles one function's complete contract or branch table purely
+for completeness, the same pattern established throughout this
+audit: REQ-MOCK-003 is rcp_mock_server_destroy()'s complete contract
+(free-everything path + NULL no-op edge case); REQ-MOCK-007 is
+rcp_mock_server_add_endpoint()'s complete success contract (adds the
+slot AND updates svr_ep_count, two facets of the same successful
+call); REQ-MOCK-009 is rcp_mock_server_remove_endpoint()'s complete
+branch table (found + not-found); REQ-MOCK-012 is
+rcp_mock_server_dispatch()'s complete admission-then-DROPPED
+contract; REQ-MOCK-020 is rcp_mock_server_dispatch_frame()'s
+complete fail-safe branch table (unparseable frame vs. undecodable
+member); REQ-MOCK-021 is rcp_mock_server_dispatch()'s complete
+outcome-mapping contract (its "standard request" sentence restates
+the same general rule for one request-kind subset, not a separate
+behavior); REQ-MOCK-022 is the tightly-coupled
+rcp_mock_server_set_sequencer_count()/rcp_mock_server_sequencers()
+pair, already tagged as one cohesive feature at the source, the same
+"matched pair" pattern established for REQ-E2E-036 (wrap/unwrap) in
+the prior batch; REQ-MOCK-023 is rcp_mock_server_tick()'s complete
+branch table (executes the highest-priority due request +
+nothing-due failure path); REQ-MOCK-025 is
+rcp_mock_server_notify_trigger()'s complete contract (fan-out to
+every endpoint + its own return count).
+
+One genuine .fusa-reqs.json authoring defect found and text-trimmed
+-- REQ-MOCK-026, no split, no new id. Its previous text bundled two
+unrelated functions: rcp_mock_server_dispatch_frame()'s
+chain-sequencing behavior (first clause) and
+rcp_mock_server_watchdog_purge()'s purge behavior (second clause).
+Ground-truth check against src/mock.c's own //cfusa:req tags showed
+rcp_mock_server_watchdog_purge() is the ONLY function ever tagged
+REQ-MOCK-026; rcp_mock_server_dispatch_frame() itself is tagged
+REQ-MOCK-019/020/029, never 026 -- and the chain-sequencing content
+the old text redundantly re-described was already REQ-MOCK-029's own
+separate, correctly-tagged requirement. Retitled/retexted to
+rcp_mock_server_watchdog_purge()'s own actual, sole contract; every
+other field (standard/level/asil/scope/status/tc18) left unchanged
+-- git diff --stat .fusa-reqs.json confirms a 2-insertion/2-deletion
+surgical edit, not a rewrite.
+
+File-header tagging fixed across two files. tests/test_mock.c
+(REQ-MOCK-001..020/030..033, plus out-of-scope
+REQ-RMAP-084/REQ-AVTP-030/032/033/034 header lines, left untouched)
+had its stacked header removed and per-function tags applied across
+the file, covering all 24 of its own ids. tests/test_conditional_
+dispatch.c is a large, heavily-multi-prefix shared-header file whose
+header scattered REQ-MOCK-021..027 and REQ-MOCK-028/029 in two
+separate clusters among REQ-SRV-*/REQ-ACF-*/REQ-CANCEL-012/
+REQ-TIMED-012/013 lines; only the two REQ-MOCK-* clusters were
+touched and relocated per-function, per the established
+REQ-WDG-010/REQ-PWRMODE/REQ-LIFECYCLE-batch precedent. REQ-MOCK-027
+already carried a correct, separate per-function tag in this file's
+own body -- its header-line duplicate was simply removed, nothing
+added. REQ-MOCK-025's own strongest evidence
+(rcp_mock_server_notify_trigger() genuinely reaching more than one
+registered endpoint) turned out to live in tests/test_mock.c
+instead, since test_conditional_dispatch.c's own shared fixture
+registers only one endpoint; its marker was relocated there rather
+than force-fit onto a single-endpoint test.
+
+Verification: full clean rebuild + 67/67 test suite passing;
+ASan/UBSan clean, 67/67; pinned cfusa v0.6.2: check 0 errors, trace
+--req-coverage 100/--sec-tested 100 both pass -- 1274/1274 traced
+(unchanged, no add/remove), 512/512 functions annotated.
+
+This closes out Group 4's residual sweep of issue #533 (started with
+the REQ-MDNS-*/REQ-L2-*/REQ-FRAG-* batch, PR #589) -- every
+proxy-flagged prefix identified for Group 4 has now been triaged.
+Issue #533 itself may still have further groups/scope beyond Group
+4; check the issue's own tracker comments before assuming it's fully
+closable.
+
 ### v0.475.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533
 batch REQ-LIFECYCLE-*: requirement-atomicity audit, Group 4 residual)
 

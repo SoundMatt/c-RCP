@@ -1,28 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-MOCK-001
-//cfusa:test REQ-MOCK-002
-//cfusa:test REQ-MOCK-003
-//cfusa:test REQ-MOCK-004
-//cfusa:test REQ-MOCK-005
-//cfusa:test REQ-MOCK-006
-//cfusa:test REQ-MOCK-007
-//cfusa:test REQ-MOCK-008
-//cfusa:test REQ-MOCK-009
-//cfusa:test REQ-MOCK-010
-//cfusa:test REQ-MOCK-011
-//cfusa:test REQ-MOCK-012
-//cfusa:test REQ-MOCK-013
-//cfusa:test REQ-MOCK-014
-//cfusa:test REQ-MOCK-015
-//cfusa:test REQ-MOCK-016
-//cfusa:test REQ-MOCK-017
-//cfusa:test REQ-MOCK-018
-//cfusa:test REQ-MOCK-019
-//cfusa:test REQ-MOCK-020
-//cfusa:test REQ-MOCK-030
-//cfusa:test REQ-MOCK-031
-//cfusa:test REQ-MOCK-032
-//cfusa:test REQ-MOCK-033
 //cfusa:test REQ-RMAP-084
 //cfusa:test REQ-AVTP-030
 //cfusa:test REQ-AVTP-032
@@ -31,7 +7,21 @@
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
- * copy of this file's own old content) now tests that instead. */
+ * copy of this file's own old content) now tests that instead.
+ *
+ * REQ-MOCK-001 through 020 and REQ-MOCK-030 through 033 (c-RCP-18
+ * requirement-atomicity audit, issue #533, Group 4 residual) used to be
+ * listed as one flat block here, covering the whole file regardless of
+ * which function each one actually described. Each id now carries its
+ * own individual marker placed directly at the specific test function(s)
+ * that function's own assertions actually exercise, the same per-function
+ * placement convention this file's own other per-function markers already
+ * used (see the ones right above this comment block). The rest of the
+ * REQ-MOCK range is not this file's concern at all -- it belongs to
+ * tests/test_conditional_dispatch.c instead (one id relocated further,
+ * into this file, when this file's own fixtures turned out to be the
+ * strongest available evidence for it; see that id's own marker comment
+ * here). */
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -95,6 +85,7 @@ static void to_rcp_configured(rcp_mock_server_t *srv)
 
 /* ── Server lifecycle ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MOCK-002
 static void test_new_server_starts_hw_unconfigured(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -102,6 +93,8 @@ static void test_new_server_starts_hw_unconfigured(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-004
+//cfusa:test REQ-MOCK-005
 static void test_transition_passthrough_valid(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -110,6 +103,7 @@ static void test_transition_passthrough_valid(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-005
 static void test_transition_passthrough_rejects_invalid(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -121,6 +115,7 @@ static void test_transition_passthrough_rejects_invalid(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-003
 static void test_destroy_null_is_safe(void)
 {
     rcp_mock_server_destroy(NULL);
@@ -129,6 +124,7 @@ static void test_destroy_null_is_safe(void)
 
 /* ── Register map access ───────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MOCK-002
 static void test_new_server_regmap_starts_empty(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -140,6 +136,7 @@ static void test_new_server_regmap_starts_empty(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-006
 static void test_regmap_is_mutable(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -153,6 +150,7 @@ static void test_regmap_is_mutable(void)
 
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MOCK-007
 static void test_add_endpoint_increments_svr_ep_count(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -166,6 +164,7 @@ static void test_add_endpoint_increments_svr_ep_count(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-008
 static void test_add_endpoint_duplicate_bus_id_rejected(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -178,6 +177,7 @@ static void test_add_endpoint_duplicate_bus_id_rejected(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-008
 static void test_add_endpoint_capacity_exhausted(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -209,6 +209,7 @@ static void test_add_endpoint_capacity_exhausted(void)
 #define STREAM_B ((uint64_t)0x2222222222222222ULL)
 #define STREAM_C ((uint64_t)0x3333333333333333ULL)
 
+//cfusa:test REQ-MOCK-031
 static void test_add_endpoint_on_stream_allows_same_bus_id_on_different_streams(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -223,6 +224,7 @@ static void test_add_endpoint_on_stream_allows_same_bus_id_on_different_streams(
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-031
 static void test_add_endpoint_on_stream_duplicate_on_same_stream_rejected(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -237,6 +239,7 @@ static void test_add_endpoint_on_stream_duplicate_on_same_stream_rejected(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-031
 static void test_add_endpoint_on_stream_rejected_when_unscoped_endpoint_already_registered(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -252,6 +255,7 @@ static void test_add_endpoint_on_stream_rejected_when_unscoped_endpoint_already_
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-009
 static void test_remove_endpoint_decrements_svr_ep_count(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -265,6 +269,7 @@ static void test_remove_endpoint_decrements_svr_ep_count(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-009
 static void test_remove_endpoint_unknown_bus_returns_false(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -283,6 +288,7 @@ static void test_readd_after_remove_succeeds(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-010
 static void test_set_endpoint_enable_unknown_bus_returns_false(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -290,6 +296,7 @@ static void test_set_endpoint_enable_unknown_bus_returns_false(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-011
 static void test_queue_len_unknown_bus_is_zero(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -324,6 +331,7 @@ static void reset_handler_capture(void)
     memset(g_seen_request, 0, sizeof(g_seen_request));
 }
 
+//cfusa:test REQ-MOCK-012
 static void test_dispatch_dropped_by_lifecycle(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new(); /* still HW_UNCONFIGURED */
@@ -571,6 +579,7 @@ static void test_pwrmode_resume_returns_false_before_handshake_echoed(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-013
 static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -887,6 +896,7 @@ static void test_dispatch_tscf_tu_one_and_tu_zero_produce_identical_outcome(void
  * 27's EP_NOT_FOUND row is scoped to a Trigger request's own
  * trigger_source_ep naming a nonexistent EP, a different, unimplemented
  * case. */
+//cfusa:test REQ-MOCK-030
 static void test_dispatch_unknown_bus_is_dropped_silently(void)
 {
     rcp_mock_server_t           *srv = rcp_mock_server_new();
@@ -910,6 +920,7 @@ static void test_dispatch_unknown_bus_is_dropped_silently(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-014
 static void test_dispatch_ok_runs_handler_immediately(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -950,6 +961,7 @@ static void test_dispatch_ok_runs_handler_immediately(void)
  * real slot. See test_add_endpoint_on_stream_allows_same_bus_id_on_
  * different_streams() etc. (above) for the registration-level half of
  * this same guarantee. */
+//cfusa:test REQ-MOCK-031
 static void test_dispatch_stream_scoped_endpoints_route_by_stream_id(void)
 {
     rcp_mock_server_t *srv      = rcp_mock_server_new();
@@ -1597,6 +1609,7 @@ static void test_watchdog_out_of_range_request_stream_index_returns_false(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-014
 static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1615,6 +1628,7 @@ static void test_dispatch_no_handler_leaves_response_zeroed(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-015
 static void test_dispatch_queued_when_endpoint_disabled(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1635,6 +1649,7 @@ static void test_dispatch_queued_when_endpoint_disabled(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-016
 static void test_drain_endpoint_runs_queued_request(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1659,6 +1674,7 @@ static void test_drain_endpoint_runs_queued_request(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-017
 static void test_drain_endpoint_empty_queue_returns_false(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1671,6 +1687,7 @@ static void test_drain_endpoint_empty_queue_returns_false(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-018
 static void test_drain_endpoint_unknown_bus_returns_false(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1702,6 +1719,7 @@ static void test_discovery_bus_accepted_while_hw_unconfigured(void)
 
 /* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ──────────────────────── */
 
+//cfusa:test REQ-MOCK-019
 static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
 {
     rcp_mock_server_t          *srv = rcp_mock_server_new();
@@ -1759,6 +1777,7 @@ static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-019
 static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
 {
     /* A single-member frame behaves identically to calling
@@ -1794,6 +1813,7 @@ static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-020
 static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1810,6 +1830,7 @@ static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-020
 static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
 {
     /* A syntactically well-formed member (rcp_sched_split_frame_members()
@@ -2195,6 +2216,7 @@ static rcp_bytes_t make_triggered_frame(rcp_byte_bus_id_t byte_bus_id, uint8_t s
                                          0);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_remove_endpoint_on_stream_targets_correct_slot(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -2222,6 +2244,7 @@ static void test_remove_endpoint_on_stream_targets_correct_slot(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_set_endpoint_enable_on_stream_and_drain_endpoint_on_stream_target_correct_slot(
     void)
 {
@@ -2269,6 +2292,7 @@ static void test_set_endpoint_enable_on_stream_and_drain_endpoint_on_stream_targ
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_stash_and_take_deferred_response_on_stream_target_correct_slot(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -2307,6 +2331,7 @@ static void test_stash_and_take_deferred_response_on_stream_target_correct_slot(
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_pending_count_on_stream_and_watchdog_purge_on_stream_target_correct_slot(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -2342,6 +2367,15 @@ static void test_pending_count_on_stream_and_watchdog_purge_on_stream_target_cor
     rcp_mock_server_destroy(srv);
 }
 
+/* Also the strongest available proof of REQ-MOCK-025 (rcp_mock_server_
+ * notify_trigger() reaches EVERY registered endpoint's own request store,
+ * not just one): the single rcp_mock_server_notify_trigger(srv, 7, 3)
+ * call below arms BOTH slots at once and its own return value (2) counts
+ * both -- test_conditional_dispatch.c's own fixture() only ever registers
+ * one endpoint, so no test there can demonstrate the fan-out itself, only
+ * the per-notification count on that one endpoint. */
+//cfusa:test REQ-MOCK-032
+//cfusa:test REQ-MOCK-025
 static void test_tick_on_stream_targets_correct_slot(void)
 {
     rcp_mock_server_t     *srv  = rcp_mock_server_new();
@@ -2401,6 +2435,7 @@ static void test_tick_on_stream_targets_correct_slot(void)
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_set_endpoint_req_crc_enable_on_stream_targets_correct_slot(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -2439,6 +2474,7 @@ static void test_set_endpoint_req_crc_enable_on_stream_targets_correct_slot(void
     rcp_mock_server_destroy(srv);
 }
 
+//cfusa:test REQ-MOCK-032
 static void test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot(void)
 {
     rcp_mock_server_t             *srv = rcp_mock_server_new();
@@ -2491,6 +2527,7 @@ static void test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot(void
  * must purge only STREAM_A's own slot, never STREAM_B's, even though both
  * slots share the same byte_bus_id the old, unscoped find_slot() could
  * not tell apart. */
+//cfusa:test REQ-MOCK-033
 static void test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream(void)
 {
     rcp_mock_server_t              *srv = rcp_mock_server_new();
@@ -3425,6 +3462,7 @@ static void test_dispatch_e2e_fragment_tscf_short_fragment_before_any_fault_is_r
 
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MOCK-001
 static void test_strerror_never_null(void)
 {
     TEST_ASSERT_NOT_NULL(rcp_mock_strerror(RCP_MOCK_OK));
