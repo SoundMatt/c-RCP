@@ -12975,7 +12975,7 @@
     {
       "id": "REQ-WDG-012",
       "title": "rcp_watchdog_keeper_destroy() closes the poll thread and releases every owned resource",
-      "text": "rcp_watchdog_keeper_destroy(k) shall be a safe no-op when k is NULL; otherwise it shall close k (joining the background poll thread if one was started) and then free its states, callbacks, and callback_ctx arrays and destroy its mutex before freeing k itself.",
+      "text": "rcp_watchdog_keeper_destroy(k) shall be a safe no-op when k is NULL; otherwise it shall close k (joining the background poll thread if one was started) and then destroy its mutex before freeing k itself. Text corrected 2026-08-19 (issue #533 atomicity audit): the prior text described states/callbacks/callback_ctx as separately freed arrays, stale since [c-RCP-17] converted them to fixed-capacity arrays embedded directly in the keeper struct (RCP_WATCHDOG_MAX_STREAMS/RCP_WATCHDOG_MAX_CALLBACKS) -- freeing k itself already covers them, there is nothing left to separately free.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

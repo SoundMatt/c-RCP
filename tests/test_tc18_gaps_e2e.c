@@ -11,7 +11,6 @@
 //cfusa:test REQ-E2E-040
 //cfusa:test REQ-E2E-041
 //cfusa:test REQ-E2E-042
-//cfusa:test REQ-WDG-010
 //cfusa:test REQ-E2E-021
 //cfusa:test REQ-E2E-028
 //cfusa:test REQ-E2E-029
@@ -1340,6 +1339,7 @@ static void wdg_busy_wait_ms(unsigned ms)
  * test_kick_resets_timer_prevents_overflow(): a 40 ms timeout, dispatched
  * every 10 ms for 100 ms total -- far longer than 40 ms would survive
  * without kicking. */
+//cfusa:test REQ-WDG-010
 static void test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request(void)
 {
     rcp_mock_server_t         *srv = rcp_mock_server_new();

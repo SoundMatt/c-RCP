@@ -1,15 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-WDG-001
-//cfusa:test REQ-WDG-002
-//cfusa:test REQ-WDG-003
-//cfusa:test REQ-WDG-004
-//cfusa:test REQ-WDG-005
-//cfusa:test REQ-WDG-006
-//cfusa:test REQ-WDG-007
-//cfusa:test REQ-WDG-008
-//cfusa:test REQ-WDG-009
-//cfusa:test REQ-WDG-011
-//cfusa:test REQ-WDG-012
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -200,6 +189,7 @@ static void test_overflow_after_timeout_without_kick(void)
  * eventual detection.
  */
 //cfusa:test REQ-E2E-025
+//cfusa:test REQ-WDG-004
 static void test_overflow_detected_within_recorded_ftti(void)
 {
     const uint32_t ftti_ms    = 100; /* .fusa-hara.json hazards[] H-001.ftti_ms */
