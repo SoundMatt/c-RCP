@@ -52,6 +52,7 @@
 
 #include "../src/mem_bounded.h"
 
+#include <rcp/alloc.h>
 #include <rcp/e2e.h>
 #include <rcp/request_sequencer.h>
 
@@ -437,6 +438,125 @@ static void test_wrap_unwrap_round_trip_ok(void)
 
     rcp_bytes_free(&wrapped);
     rcp_bytes_free(&body);
+}
+
+/* MC/DC closure: rcp_e2e_wrap()'s own "!acf_frame && acf_frame_len > 0"
+ * guard only ever evaluates its own second condition when acf_frame is
+ * NULL -- every existing NULL-acf_frame test uses a nonzero length (the
+ * genuine misuse this guard rejects), so that condition's own
+ * independent effect (acf_frame==NULL with length ZERO) was never
+ * demonstrated. Discovered while designing this case: a NULL frame
+ * with zero length is not actually a supported "no ACF payload"
+ * convention -- it falls through this guard (correctly) but is then
+ * rejected downstream by adapt_acf_msg_length()'s own shared
+ * frame_len<2 guard (0 octets can never hold the 9-bit acf_msg_length
+ * field), the same rejection every acf_frame_len<2 call gets. */
+static void test_wrap_null_frame_with_zero_length_is_rejected(void)
+{
+    rcp_bytes_t wrapped;
+
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 1u, 1u, NULL, 0u);
+    TEST_ASSERT_NULL(wrapped.data);
+    TEST_ASSERT_EQUAL_UINT(0u, wrapped.len);
+}
+
+/* MC/DC closure: adapt_acf_msg_length() (the static helper both
+ * rcp_e2e_wrap()/rcp_e2e_unwrap() share) has an "adapted < 0" branch no
+ * real caller can reach through wrap() (its own +1 delta can never go
+ * negative) or through a genuinely wrap()-produced frame fed back into
+ * unwrap() (wrap() already added 1, so unwrap()'s own -1 delta can
+ * never underflow a real round trip). The only way to reach it is an
+ * adversarial frame that was never actually produced by wrap() -- one
+ * whose own acf_msg_length field already reads 0. Both call sites
+ * ignore adapt_acf_msg_length()'s own return value (cast to void), so
+ * the only observable effect is whether the field gets rewritten --
+ * confirmed here that it does not, leaving the already-invalid field
+ * exactly as it arrived rather than underflowing it to 0x1FF. */
+static void test_unwrap_leaves_already_zero_acf_msg_length_unadapted(void)
+{
+    /* real_len=4 (bytes 0-3, acf_msg_length pre-encoded to 0, pad=0),
+     * followed by an arbitrary 4-octet CRC32 trailer that deliberately
+     * does not match -- this test's own concern is the header field,
+     * not the CRC verdict. */
+    uint8_t        wrapped[8] = {0x00u, 0x00u, 0x00u, 0x00u, 0xDEu, 0xADu, 0xBEu, 0xEFu};
+    rcp_bytes_t    body       = {0};
+    rcp_e2e_errc_t rc;
+
+    rc = rcp_e2e_unwrap(0x05u, 0x00u, false, 1u, 1u, wrapped, sizeof(wrapped), &body);
+    TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH, rc);
+    TEST_ASSERT_NOT_NULL(body.data);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, body.data[0]); /* still 0 -- not underflowed */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, body.data[1]);
+
+    rcp_bytes_free(&body);
+}
+
+static void *e2e_always_fails_malloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+/* MC/DC closure: rcp_e2e_unwrap()'s own "!body_copy.data && body_len > 0"
+ * guard was never exercised at all -- rcp_malloc() failing is normally
+ * unreachable in these tests. Fault-injected via the same
+ * rcp_alloc_set_hooks() idiom test_fragment.c's own alloc-failure test
+ * uses. When body_len>0 but the allocation fails, the function must
+ * still report the real CRC verdict (the one piece of information it
+ * CAN compute without the copy) rather than silently losing it. */
+static void test_unwrap_malloc_failure_still_reports_crc_verdict(void)
+{
+    uint8_t           acf_frame[12];
+    rcp_bytes_t       wrapped;
+    rcp_bytes_t       body = {0};
+    rcp_e2e_errc_t    rc;
+    rcp_alloc_hooks_t hooks = {0};
+
+    make_test_acf_frame(acf_frame, sizeof(acf_frame));
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 0xDEADBEEFu, 0xCAFEu, acf_frame, sizeof(acf_frame));
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+
+    hooks.malloc_fn = e2e_always_fails_malloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    rc = rcp_e2e_unwrap(0x05u, 0x00u, false, 0xDEADBEEFu, 0xCAFEu, wrapped.data, wrapped.len, &body);
+
+    rcp_alloc_reset_hooks();
+
+    TEST_ASSERT_EQUAL_INT(RCP_E2E_OK, rc); /* CRC matched -- reported despite the failed alloc */
+    TEST_ASSERT_NULL(body.data);           /* no copy could be produced */
+    TEST_ASSERT_EQUAL_UINT(0u, body.len);
+
+    rcp_bytes_free(&wrapped);
+}
+
+/* MC/DC closure: "!body_copy.data && body_len > 0"'s own second
+ * condition (body_len > 0) is only ever EVALUATED when the first is
+ * true (body_copy.data is NULL) -- the previous malloc-failure test
+ * demonstrates body_len>0 in that branch, but needs a companion where
+ * body_len==0 too (the malloc block is skipped entirely, so
+ * body_copy.data stays NULL "naturally," with no allocation ever
+ * attempted): a wrapped frame that is nothing but the CRC32 trailer
+ * (no header-and-payload region, no pad octets) is a legitimate
+ * "empty ACF frame" round trip, correctly reported as an empty
+ * (NULL, 0) body rather than falling into the malloc-failure path's
+ * own early return at all. */
+static void test_unwrap_crc_only_frame_yields_empty_body(void)
+{
+    uint8_t        wrapped[4] = {0x00u, 0x00u, 0x00u, 0x00u}; /* pad_octets bits (frame[2]
+                                                                   bits 7:6) are 0 */
+    rcp_bytes_t    body       = {0};
+    rcp_e2e_errc_t rc;
+
+    rc = rcp_e2e_unwrap(0x05u, 0x00u, false, 1u, 1u, wrapped, sizeof(wrapped), &body);
+    /* The all-zero 4-octet CRC32 trailer above doesn't happen to match
+     * the real CRC over zero real octets -- this test's own concern is
+     * body_len==0's own independent effect on the guard, not the CRC
+     * verdict, so a mismatch is fine; the body is populated (as empty)
+     * either way (see the malloc-failure test above for why). */
+    TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH, rc);
+    TEST_ASSERT_NULL(body.data);
+    TEST_ASSERT_EQUAL_UINT(0u, body.len);
 }
 
 static void test_unwrap_short_frame(void)
@@ -971,6 +1091,10 @@ int main(void)
     RUN_TEST(test_wrap_too_short_for_length_field_fails_safe);
     RUN_TEST(test_wrap_adapts_acf_msg_length_by_one_quadlet);
     RUN_TEST(test_wrap_unwrap_round_trip_ok);
+    RUN_TEST(test_wrap_null_frame_with_zero_length_is_rejected);
+    RUN_TEST(test_unwrap_leaves_already_zero_acf_msg_length_unadapted);
+    RUN_TEST(test_unwrap_malloc_failure_still_reports_crc_verdict);
+    RUN_TEST(test_unwrap_crc_only_frame_yields_empty_body);
     RUN_TEST(test_unwrap_short_frame);
     RUN_TEST(test_unwrap_crc_mismatch_on_corruption);
     RUN_TEST(test_unwrap_crc_mismatch_on_wrong_stream_id);

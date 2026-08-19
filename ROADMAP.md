@@ -19106,6 +19106,50 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.461.0 -- 2026-08-19 (test: close e2e.c MC/DC gaps 85.2% -> 100%,
+lifecycle.c 89.3% -> 96.4% (1 genuinely unreachable))
+
+Continuing task #137/#138's MC/DC-closure sweep after regmap.c (v0.459.0)
+and power.c (v0.460.0), both safety-mechanism files per `SAFETY_PLAN.md`'s
+own table: e2e.c (safety-tagged request gate) and lifecycle.c (access-
+control gating).
+
+**e2e.c, 85.2% (23/27) -> 100% (27/27).** Four decisions, each closed with a
+real, meaningful case rather than coverage padding: `rcp_e2e_wrap()`'s NULL-
+frame-with-zero-length guard (discovered not actually a supported convention
+-- rejected downstream by the shared `adapt_acf_msg_length()` helper's own
+frame_len<2 check); that same static helper's `adapted < 0` branch (no real
+caller path exists -- closed with an adversarial hand-crafted frame whose
+own acf_msg_length field already reads 0, confirming the field is left
+unadapted rather than underflowed); `rcp_e2e_unwrap()`'s malloc-failure
+guard (fault-injected via this codebase's own established
+rcp_alloc_set_hooks() idiom, confirming the real CRC verdict is still
+reported); and that guard's own body_len>0 condition (needed a companion
+all-CRC-trailer frame giving body_len==0, a legitimate empty-ACF-frame round
+trip).
+
+**lifecycle.c, 89.3% (25/28) -> 96.4% (27/28), 1 condition genuinely
+unreachable.** Two of three closed with real cases:
+rcp_lifecycle_transition()'s RCP_CONFIGURED->HW_UNCONFIGURED demotion gate
+(by elimination, from can only ever be RCP_CONFIGURED whenever this line is
+reached -- closed with a corrupted/out-of-range *state, matching
+test_power.c's own established (rcp_pwrmode_t)99 idiom for the identical
+situation); and rcp_lifecycle_should_accept()'s avtp_subtype!=NTSCF
+condition (every existing test used NTSCF specifically -- closed with a
+third, unrecognized subtype). request_streams_consistent()'s
+has_stream_assoc condition is genuinely unreachable-false:
+rcp_lifecycle_check_rcp_cfg()'s own bullet-1 loop already rejects any
+ep_used-without-has_stream_assoc endpoint before this function is ever
+called, so by the time this inner loop runs, has_stream_assoc is
+structurally guaranteed true. Confirmed by direct source read; a test aimed
+at this case was written, found to trip the earlier gate instead, and kept
+anyway as a legitimate test of that gate's own behavior.
+
+Verified: full 67-test suite (Release) + ASan/UBSan (CI's exact flags) both
+clean, `cfusa check` 0 errors, `cfusa trace --req-coverage 100`/`--sec-
+tested 2` unchanged at 1271/1271 traced and 37/1271 sec-tested. No source
+touched -- tests/test_e2e.c and tests/test_lifecycle.c only.
+
 ### v0.460.0 -- 2026-08-19 (test: close power.c's remaining MC/DC gaps,
 69.6% -> 100%)
 

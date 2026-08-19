@@ -34,6 +34,25 @@ the rationale.
 
 ## Releases
 
+### v0.461.0 -- 2026-08-19 (test: close e2e.c MC/DC gaps 85.2% -> 100%, lifecycle.c 89.3% -> 96.4% (1 genuinely unreachable))
+
+Continuing task #137/#138's MC/DC-closure sweep after regmap.c (v0.459.0) and power.c (v0.460.0), both safety-mechanism files per `SAFETY_PLAN.md`'s own table: e2e.c (safety-tagged request gate) and lifecycle.c (access-control gating).
+
+**e2e.c, 85.2% (23/27) -> 100% (27/27).** Four decisions, each closed with a real, meaningful case rather than coverage padding:
+
+- `rcp_e2e_wrap()`'s `!acf_frame && acf_frame_len > 0` guard had never seen `acf_frame==NULL` paired with `acf_frame_len==0` -- discovered this is not actually a supported "no ACF payload" convention: it falls through the guard correctly but is then rejected downstream by the shared `adapt_acf_msg_length()` helper's own `frame_len<2` check, the same rejection every sub-2-octet call gets.
+- `adapt_acf_msg_length()`'s (the static helper both wrap/unwrap share) `adapted < 0` branch has no real caller path to it at all -- wrap's own `+1` delta can never go negative, and a frame genuinely produced by wrap() always has `len_field >= 1` by construction, so unwrap's own `-1` delta can't underflow a real round trip either. Closed with an adversarial hand-crafted frame whose own `acf_msg_length` field already reads 0 (never actually produced by `wrap()`), confirming the field is left exactly as it arrived rather than underflowed to 0x1FF -- both call sites ignore the helper's return value, so this is the only observable effect.
+- `rcp_e2e_unwrap()`'s `!body_copy.data && body_len > 0` guard (a `rcp_malloc()`-failure path) had never been exercised at all. Fault-injected via this codebase's own established `rcp_alloc_set_hooks()` idiom (`tests/test_fragment.c`'s alloc-failure test); confirmed the function still reports the real CRC verdict even though no copy could be produced.
+- The same guard's own `body_len > 0` condition is only ever *evaluated* when `body_copy.data` is NULL (short-circuit) -- needed a companion case where `body_len==0` too: a wrapped frame that is nothing but the CRC32 trailer (no header-and-payload region at all), a legitimate "empty ACF frame" round trip correctly reported as an empty `(NULL, 0)` body.
+
+**lifecycle.c, 89.3% (25/28) -> 96.4% (27/28), 1 condition genuinely unreachable.** Two of three closed with real cases:
+
+- `rcp_lifecycle_transition()`'s `target==HW_UNCONFIGURED && from==RCP_CONFIGURED` demotion gate: by elimination, `from` can only ever be `RCP_CONFIGURED` whenever this line is actually reached (the function's own no-op shortcut catches `from==target` first, and the sibling check just above catches `from==HW_CONFIGURED`) -- `rcp_lifecycle_state_t` has exactly three real values, so no genuine state reaches this line with the condition false. Closed with a corrupted/out-of-range `*state`, matching this project's own established `(rcp_pwrmode_t)99` idiom (`tests/test_power.c`) for the identical situation in a sibling module -- itself a meaningful defensive case.
+- `rcp_lifecycle_should_accept()`'s `avtp_subtype != NTSCF || byte_bus_id != DISCOVERY_BYTE_BUS_ID` guard: every existing HW_UNCONFIGURED test used `avtp_subtype==NTSCF` (TSCF is dropped one line earlier, before this check is ever reached), so the first condition's own independent effect was never shown. Closed with a third, unrecognized AVTP subtype.
+- `request_streams_consistent()`'s `ep->ep_used && ep->has_stream_assoc && ep->request_stream_index==i` -- the `has_stream_assoc` condition is genuinely unreachable-false whenever this line runs: `rcp_lifecycle_check_rcp_cfg()`'s own "bullet 1" loop (checked *before* this function is ever called) already rejects any `ep_used && !has_stream_assoc` endpoint outright, so by the time this inner loop runs, every `ep_used` endpoint it sees is structurally guaranteed to already have `has_stream_assoc==true`. Confirmed by direct source read, not assumed; a test aimed at this case was written, found to trip the earlier bullet-1 gate instead (never reaching this line at all), and kept anyway as a legitimate test of that gate's own behavior -- documented here rather than forced.
+
+Verified: full 67-test suite (Release) + ASan/UBSan (CI's exact flags) both clean, `cfusa check` 0 errors, `cfusa trace --req-coverage 100`/`--sec-tested 2` unchanged at 1271/1271 traced and 37/1271 sec-tested. No source touched -- `tests/test_e2e.c` and `tests/test_lifecycle.c` only.
+
 ### v0.460.0 -- 2026-08-19 (test: close power.c's remaining MC/DC gaps, 69.6% -> 100%)
 
 Test-only follow-up to v0.459.0's regmap.c batch, closing task #137's second file. Two decisions, both reached the same way by every existing test before this: `rcp_pwrmode_transition()`'s `target==UNPOWERED && (mode==NORMAL || mode==STANDBY || mode==SLEEP)` check (missing 3/4 conditions) and `rcp_pwrmode_commit_entry()`'s `(mode!=NORMAL && mode!=STANDBY) || (target!=STANDBY && target!=SLEEP)` routing-validity check (missing all 4).
