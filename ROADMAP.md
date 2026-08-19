@@ -19106,6 +19106,59 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.469.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
+REQ-GRPC-*/REQ-REST-*/REQ-SOMEIP-*/REQ-CAN-*/REQ-DDS-*/REQ-MQTT-*/REQ-LIN-*/
+REQ-UDS-*/REQ-DOIP-*/REQ-ERR-*/REQ-CORE-*/REQ-RELAY-014: requirement-
+atomicity audit, Group 4 residual)
+
+Triaged the 9 small protocol-binding stub prefixes (18 requirements:
+REQ-GRPC-*, REQ-REST-*, REQ-SOMEIP-*, REQ-CAN-*, REQ-DDS-*, REQ-MQTT-*,
+REQ-LIN-*, REQ-UDS-*, REQ-DOIP-* -- each 2 requirements over one
+*_bridge_send()/*_default_config() pair), plus REQ-ERR-* (8
+requirements, src/rcp.c's sentinel-error surface), REQ-CORE-* (2,
+rcp_bytes_t), and REQ-RELAY-014 (found incidentally alongside
+REQ-ERR-*/REQ-CORE-* in the same file) -- 29 requirements total. All 9
+protocol-binding prefixes already carry scope: "tc18" in
+.fusa-reqs.json, so issue #533's own flagged "confirm TC18-scoped vs.
+RELAY-generic" triage question for this residual group is already
+answered for these -- no further scope decision needed.
+
+No splits needed -- all 29 confirmed atomic. Every *-001
+(bridge_send() stub contract) bundles a return-code clause with an
+untouched-output-parameter clause under one "shall" pair, same
+one-function's-complete-behavior pattern established throughout this
+audit; every *-002 (default_config()) is a single "shall" to begin
+with. REQ-ERR-006 ("all sentinel errors mutually distinct") is one
+relational fact over 7 named constants, not 7 separate claims.
+REQ-CORE-001/-002 each bundle a main-path clause with a NULL/zero-input
+edge-case clause in the same function body, matching this audit's now-
+familiar destroy()/close()-style pattern.
+
+Real, in-scope fix found in all 10 test files: file-header tagging,
+not per-function. The 9 bridge test files (test_grpcbridge.c,
+test_restbridge.c, test_someipbr.c, test_canbr.c, test_ddsbr.c,
+test_mqttbr.c, test_linbr.c, test_udsbr.c, test_doipbr.c) each carried
+a redundant file-header block duplicating tags that were already also
+correctly placed per-function -- removed the header, left the correct
+per-function tags untouched. tests/test_core.c had the anti-pattern in
+its more usual form: a file-header block with zero per-function tags
+anywhere in the body. Mapped and added all 11: test_sentinel_errors_
+nonzero -> REQ-ERR-001/002/003/004/005 (one test covering all 5 non-
+zero-sentinel clauses at once); test_sentinel_errors_distinct ->
+REQ-ERR-006; test_timeout_detectable_by_value_comparison -> REQ-ERR-
+010; test_rcp_strerror_unique_nonempty -> REQ-ERR-012; test_relay_
+strerror_unique_nonempty -> REQ-RELAY-014; test_bytes_dup_copies_data/
+test_bytes_dup_zero_len_returns_zeroed -> REQ-CORE-001; test_bytes_
+free_zeroes_struct/test_bytes_free_safe_on_already_freed/test_bytes_
+free_safe_on_null_pointer -> REQ-CORE-002.
+
+Verification: full clean rebuild + 67/67 test suite passing (tag-only
+edit, no test behavior changed); ASan/UBSan clean, 67/67; pinned cfusa
+v0.6.2: check 0 errors, trace --req-coverage 100/--sec-tested 2 both
+pass, unchanged at 1272/1272 traced, 512/512 functions annotated.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.468.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
 REQ-MDNS-*/REQ-L2-*/REQ-FRAG-*: requirement-atomicity audit, Group 4
 residual)

@@ -7,8 +7,6 @@
  * well-defined error rather than undefined behaviour, and separately pin
  * rcp_uds_default_config()'s documented defaults.
  */
-//cfusa:test REQ-UDS-001
-//cfusa:test REQ-UDS-002
 #include "unity.h"
 
 #include <rcp/udsbr.h>

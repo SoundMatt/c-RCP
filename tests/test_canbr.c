@@ -9,8 +9,6 @@
  * canbr.h's own file header for this bridge's narrowed role relative to
  * ep_can.h (native CAN endpoint) and avtp.h (CAN-as-transport).
  */
-//cfusa:test REQ-CAN-001
-//cfusa:test REQ-CAN-002
 #include "unity.h"
 
 #include <rcp/canbr.h>

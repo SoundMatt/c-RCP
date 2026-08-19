@@ -9,8 +9,6 @@
  * linbr.h's own file header for this bridge's narrowed role relative to
  * ep_lin.h (native LIN endpoint).
  */
-//cfusa:test REQ-LIN-001
-//cfusa:test REQ-LIN-002
 #include "unity.h"
 
 #include <rcp/linbr.h>
