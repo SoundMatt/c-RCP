@@ -329,6 +329,17 @@ rcp_regmap_hw_pin_map_apply_reconfig(rcp_regmap_hw_pin_map_entry_t *entries, siz
 
     if (data_len == 0u) return RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_SHORT;
 
+    /* count drives both block_len above (used only for the bounds check)
+     * and render()'s own write into the FIXED, MAX_ENTRIES-sized `block`
+     * below -- a count exceeding that compile-time bound would render()
+     * past block's own real extent (stack buffer overflow) before this
+     * function ever got a chance to reject the write as out-of-range.
+     * Every real caller (rcp_mock_server_set_hw_pin_map() included)
+     * already rejects count > MAX_ENTRIES at its own boundary; this is
+     * the same rule enforced here too, for any caller that reaches this
+     * function directly. */
+    if (count > RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES) return RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_OUT_OF_RANGE;
+
     if ((size_t)relative_start_address + data_len > block_len) {
         return RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_OUT_OF_RANGE;
     }
@@ -849,15 +860,22 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
          * OR/AND/XOR render the table's own current image first and
          * combine against it. Skipped (falls through to the raw
          * passthrough) when the write's own span exceeds this
-         * function's own fixed scratch buffer -- apply_reconfig()
-         * itself still correctly rejects that write as out-of-range,
-         * using the table's own real count, not this buffer's bound. */
+         * function's own fixed scratch buffer -- apply_reconfig() itself
+         * still correctly rejects that write as out-of-range, using the
+         * table's own real count, not this buffer's bound. hw_pin_map_count
+         * is ALSO bounded against MAX_ENTRIES here (issue found via MC/DC
+         * adversarial testing, c-RCP-16): render() below writes
+         * hw_pin_map_count*3 octets into a buffer fixed at
+         * MAX_ENTRIES*3 -- without this guard, a caller-supplied count
+         * exceeding MAX_ENTRIES would overflow `rendered` before
+         * apply_reconfig() ever got a chance to reject it. */
         {
             const uint8_t *write_data = &payload[2];
             uint8_t        combined[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
 
             if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
+                (size_t)relative + data_len <= sizeof(combined) &&
+                hw_pin_map_count <= RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES) {
                 uint8_t rendered[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
 
                 rcp_regmap_hw_pin_map_render(hw_pin_map, hw_pin_map_count, rendered);
@@ -903,7 +921,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             uint8_t        combined[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
 
             if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
+                (size_t)relative + data_len <= sizeof(combined) &&
+                ep_id_map_count <= RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES) {
                 uint8_t rendered[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
 
                 rcp_regmap_ep_id_map_render(ep_id_map, ep_id_map_count, rendered);
@@ -958,7 +977,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             uint8_t        combined[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
 
             if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
+                (size_t)relative + data_len <= sizeof(combined) &&
+                response_queue_cfg_count <= RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES) {
                 uint8_t rendered[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
 
                 rcp_regmap_response_queue_cfg_render(response_queue_cfg, response_queue_cfg_count,
@@ -1071,7 +1091,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             uint8_t        combined[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
 
             if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
+                (size_t)relative + data_len <= sizeof(combined) &&
+                ep_generic_cfg_count <= RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES) {
                 uint8_t rendered[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
 
                 rcp_regmap_ep_generic_cfg_render(ep_generic_cfg, ep_generic_cfg_count, rendered);
@@ -1113,7 +1134,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             uint8_t        combined[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
 
             if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
+                (size_t)relative + data_len <= sizeof(combined) &&
+                sequencer_count <= RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES) {
                 uint8_t rendered[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
 
                 rcp_regmap_sequencer_table_render(sequencer_state, sequencer_owner, sequencer_count,
@@ -1312,65 +1334,97 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                              read_size, transaction_num);
     }
 
-    hw_cfg_len = hw_pin_map_count * 3u;
-    if ((size_t)addr >= map->svr_hw_cfg_ptr &&
-        (size_t)addr < (size_t)map->svr_hw_cfg_ptr + hw_cfg_len) {
-        uint8_t image[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
+    /* hw_pin_map_count/ep_id_map_count/response_queue_cfg_count/
+     * request_stream_cfg_count/ep_generic_cfg_count are each clamped to
+     * their own table's MAX_ENTRIES below, the same way
+     * sequencer_count already is a few blocks down (see that block's
+     * own doc comment) -- render() writes count*stride octets into a
+     * FIXED, MAX_ENTRIES-sized `image`; an unclamped caller-supplied
+     * count exceeding MAX_ENTRIES would overflow it (issue found via
+     * MC/DC adversarial testing, c-RCP-16). The *_len variables below
+     * are computed from the CLAMPED count (matching what render()
+     * actually filled), not the raw *_count parameter, so
+     * ep0_read_response_from_slice() never reads past image's own real
+     * extent either. */
+    {
+        size_t clamped = (hw_pin_map_count > RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES)
+                              ? RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES : hw_pin_map_count;
+        hw_cfg_len = clamped * 3u;
+        if ((size_t)addr >= map->svr_hw_cfg_ptr &&
+            (size_t)addr < (size_t)map->svr_hw_cfg_ptr + hw_cfg_len) {
+            uint8_t image[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
 
-        rcp_regmap_hw_pin_map_render(hw_pin_map, hw_pin_map_count, image);
-        *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, hw_cfg_len,
-                                             (size_t)addr - map->svr_hw_cfg_ptr,
-                                             read_size, transaction_num);
+            rcp_regmap_hw_pin_map_render(hw_pin_map, clamped, image);
+            *out_error = RCP_ERROR_NONE;
+            return ep0_read_response_from_slice(image, hw_cfg_len,
+                                                 (size_t)addr - map->svr_hw_cfg_ptr,
+                                                 read_size, transaction_num);
+        }
     }
 
-    ep_id_map_len = ep_id_map_count * 4u;
-    if ((size_t)addr >= map->svr_ep_bytebus_id_map_ptr &&
-        (size_t)addr < (size_t)map->svr_ep_bytebus_id_map_ptr + ep_id_map_len) {
-        uint8_t image[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
+    {
+        size_t clamped = (ep_id_map_count > RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES)
+                              ? RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES : ep_id_map_count;
+        ep_id_map_len = clamped * 4u;
+        if ((size_t)addr >= map->svr_ep_bytebus_id_map_ptr &&
+            (size_t)addr < (size_t)map->svr_ep_bytebus_id_map_ptr + ep_id_map_len) {
+            uint8_t image[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
 
-        rcp_regmap_ep_id_map_render(ep_id_map, ep_id_map_count, image);
-        *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, ep_id_map_len,
-                                             (size_t)addr - map->svr_ep_bytebus_id_map_ptr,
-                                             read_size, transaction_num);
+            rcp_regmap_ep_id_map_render(ep_id_map, clamped, image);
+            *out_error = RCP_ERROR_NONE;
+            return ep0_read_response_from_slice(image, ep_id_map_len,
+                                                 (size_t)addr - map->svr_ep_bytebus_id_map_ptr,
+                                                 read_size, transaction_num);
+        }
     }
 
-    response_queue_cfg_len = response_queue_cfg_count * 10u;
-    if ((size_t)addr >= map->svr_response_stream_cfg_ptr &&
-        (size_t)addr < (size_t)map->svr_response_stream_cfg_ptr + response_queue_cfg_len) {
-        uint8_t image[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
+    {
+        size_t clamped = (response_queue_cfg_count > RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES)
+                              ? RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES : response_queue_cfg_count;
+        response_queue_cfg_len = clamped * 10u;
+        if ((size_t)addr >= map->svr_response_stream_cfg_ptr &&
+            (size_t)addr < (size_t)map->svr_response_stream_cfg_ptr + response_queue_cfg_len) {
+            uint8_t image[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
 
-        rcp_regmap_response_queue_cfg_render(response_queue_cfg, response_queue_cfg_count, image);
-        *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, response_queue_cfg_len,
-                                             (size_t)addr - map->svr_response_stream_cfg_ptr,
-                                             read_size, transaction_num);
+            rcp_regmap_response_queue_cfg_render(response_queue_cfg, clamped, image);
+            *out_error = RCP_ERROR_NONE;
+            return ep0_read_response_from_slice(image, response_queue_cfg_len,
+                                                 (size_t)addr - map->svr_response_stream_cfg_ptr,
+                                                 read_size, transaction_num);
+        }
     }
 
-    request_stream_cfg_len = request_stream_cfg_count * 24u;
-    if ((size_t)addr >= map->svr_request_stream_cfg_ptr &&
-        (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
-        uint8_t image[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+    {
+        size_t clamped = (request_stream_cfg_count > RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES)
+                              ? RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES : request_stream_cfg_count;
+        request_stream_cfg_len = clamped * 24u;
+        if ((size_t)addr >= map->svr_request_stream_cfg_ptr &&
+            (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
+            uint8_t image[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
 
-        rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count, image,
-                                              watchdog_ms_per_tick, request_stream_status_blocked);
-        *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, request_stream_cfg_len,
-                                             (size_t)addr - map->svr_request_stream_cfg_ptr,
-                                             read_size, transaction_num);
+            rcp_regmap_request_stream_cfg_render(request_stream_cfg, clamped, image,
+                                                  watchdog_ms_per_tick, request_stream_status_blocked);
+            *out_error = RCP_ERROR_NONE;
+            return ep0_read_response_from_slice(image, request_stream_cfg_len,
+                                                 (size_t)addr - map->svr_request_stream_cfg_ptr,
+                                                 read_size, transaction_num);
+        }
     }
 
-    ep_generic_cfg_len = ep_generic_cfg_count * 12u;
-    if ((size_t)addr >= map->svr_ep_generic_cfg_ptr &&
-        (size_t)addr < (size_t)map->svr_ep_generic_cfg_ptr + ep_generic_cfg_len) {
-        uint8_t image[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
+    {
+        size_t clamped = (ep_generic_cfg_count > RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES)
+                              ? RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES : ep_generic_cfg_count;
+        ep_generic_cfg_len = clamped * 12u;
+        if ((size_t)addr >= map->svr_ep_generic_cfg_ptr &&
+            (size_t)addr < (size_t)map->svr_ep_generic_cfg_ptr + ep_generic_cfg_len) {
+            uint8_t image[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
 
-        rcp_regmap_ep_generic_cfg_render(ep_generic_cfg, ep_generic_cfg_count, image);
-        *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, ep_generic_cfg_len,
-                                             (size_t)addr - map->svr_ep_generic_cfg_ptr,
-                                             read_size, transaction_num);
+            rcp_regmap_ep_generic_cfg_render(ep_generic_cfg, clamped, image);
+            *out_error = RCP_ERROR_NONE;
+            return ep0_read_response_from_slice(image, ep_generic_cfg_len,
+                                                 (size_t)addr - map->svr_ep_generic_cfg_ptr,
+                                                 read_size, transaction_num);
+        }
     }
 
     /* REQ-SEQ-013/REQ-SEQ-014: sequencer_state/sequencer_owner
@@ -1500,6 +1554,10 @@ rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_
 
     if (data_len == 0u) return RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT;
 
+    /* Same MAX_ENTRIES-vs-fixed-buffer guard as
+     * rcp_regmap_hw_pin_map_apply_reconfig() -- see its own doc comment. */
+    if (count > RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES) return RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE;
+
     if ((size_t)relative_start_address + data_len > block_len) {
         return RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE;
     }
@@ -1584,6 +1642,12 @@ rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *en
     size_t  i;
 
     if (data_len == 0u) return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_SHORT;
+
+    /* Same MAX_ENTRIES-vs-fixed-buffer guard as
+     * rcp_regmap_hw_pin_map_apply_reconfig() -- see its own doc comment. */
+    if (count > RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES) {
+        return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+    }
 
     if ((size_t)relative_start_address + data_len > block_len) {
         return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_OUT_OF_RANGE;
@@ -2245,6 +2309,12 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
 
     if (data_len == 0u) return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_SHORT;
 
+    /* Same MAX_ENTRIES-vs-fixed-buffer guard as
+     * rcp_regmap_hw_pin_map_apply_reconfig() -- see its own doc comment. */
+    if (count > RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES) {
+        return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
     if ((size_t)relative_start_address + data_len > block_len) {
         return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE;
     }
@@ -2409,6 +2479,12 @@ rcp_regmap_sequencer_table_apply_reconfig(uint8_t *state, uint8_t *owner, size_t
     size_t  i;
 
     if (data_len == 0u) return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_SHORT;
+
+    /* Same MAX_ENTRIES-vs-fixed-buffer guard as
+     * rcp_regmap_hw_pin_map_apply_reconfig() -- see its own doc comment. */
+    if (count > RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES) {
+        return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_OUT_OF_RANGE;
+    }
 
     if ((size_t)relative_start_address + data_len > block_len) {
         return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_OUT_OF_RANGE;
