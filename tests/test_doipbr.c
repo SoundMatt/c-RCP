@@ -7,8 +7,6 @@
  * well-defined error rather than undefined behaviour, and separately pin
  * rcp_doip_default_config()'s documented defaults.
  */
-//cfusa:test REQ-DOIP-001
-//cfusa:test REQ-DOIP-002
 #include "unity.h"
 
 #include <rcp/doipbr.h>

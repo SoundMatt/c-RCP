@@ -7,8 +7,6 @@
  * well-defined error rather than undefined behaviour, and separately pin
  * rcp_dds_default_config()'s documented defaults.
  */
-//cfusa:test REQ-DDS-001
-//cfusa:test REQ-DDS-002
 #include "unity.h"
 
 #include <rcp/ddsbr.h>

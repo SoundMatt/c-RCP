@@ -7,8 +7,6 @@
  * well-defined error rather than undefined behaviour, and separately pin
  * rcp_rest_default_config()'s documented defaults.
  */
-//cfusa:test REQ-REST-001
-//cfusa:test REQ-REST-002
 #include "unity.h"
 
 #include <rcp/restbridge.h>

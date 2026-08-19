@@ -8,8 +8,6 @@
  * behaviour, and separately pin rcp_someip_default_config()'s documented
  * defaults.
  */
-//cfusa:test REQ-SOMEIP-001
-//cfusa:test REQ-SOMEIP-002
 #include "unity.h"
 
 #include <rcp/someipbr.h>

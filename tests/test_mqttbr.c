@@ -7,8 +7,6 @@
  * well-defined error rather than undefined behaviour, and separately pin
  * rcp_mqtt_default_config()'s documented defaults.
  */
-//cfusa:test REQ-MQTT-001
-//cfusa:test REQ-MQTT-002
 #include "unity.h"
 
 #include <rcp/mqttbr.h>

@@ -7,8 +7,6 @@
  * callers get a well-defined error rather than undefined behaviour, and
  * separately pin rcp_grpc_default_config()'s documented defaults.
  */
-//cfusa:test REQ-GRPC-001
-//cfusa:test REQ-GRPC-002
 #include "unity.h"
 
 #include <rcp/grpcbridge.h>

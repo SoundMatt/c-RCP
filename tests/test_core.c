@@ -1,15 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-ERR-001
-//cfusa:test REQ-ERR-002
-//cfusa:test REQ-ERR-003
-//cfusa:test REQ-ERR-004
-//cfusa:test REQ-ERR-005
-//cfusa:test REQ-ERR-006
-//cfusa:test REQ-ERR-010
-//cfusa:test REQ-ERR-012
-//cfusa:test REQ-RELAY-014
-//cfusa:test REQ-CORE-001
-//cfusa:test REQ-CORE-002
 /* Tests rcp.h/rcp.c's surviving surface: the shared, protocol-agnostic
  * primitives (base rcp_errc_t sentinels, rcp_strerror, relay_strerror,
  * rcp_bytes_t) that are all that remains of this header after the retired
@@ -29,6 +18,11 @@ void tearDown(void) {}
 
 /* ── Sentinel error codes ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ERR-001
+//cfusa:test REQ-ERR-002
+//cfusa:test REQ-ERR-003
+//cfusa:test REQ-ERR-004
+//cfusa:test REQ-ERR-005
 static void test_sentinel_errors_nonzero(void)
 {
     TEST_ASSERT_NOT_EQUAL(RCP_OK, RCP_ERR_CLOSED);
@@ -38,6 +32,7 @@ static void test_sentinel_errors_nonzero(void)
     TEST_ASSERT_NOT_EQUAL(RCP_OK, RCP_ERR_BUSY);
 }
 
+//cfusa:test REQ-ERR-006
 static void test_sentinel_errors_distinct(void)
 {
     const rcp_errc_t sentinels[] = {
@@ -53,6 +48,7 @@ static void test_sentinel_errors_distinct(void)
     }
 }
 
+//cfusa:test REQ-ERR-010
 static void test_timeout_detectable_by_value_comparison(void)
 {
     int rc = RCP_ERR_TIMEOUT;
@@ -60,6 +56,7 @@ static void test_timeout_detectable_by_value_comparison(void)
     TEST_ASSERT_NOT_EQUAL(RCP_OK, rc);
 }
 
+//cfusa:test REQ-ERR-012
 static void test_rcp_strerror_unique_nonempty(void)
 {
     const rcp_errc_t codes[] = {
@@ -79,6 +76,7 @@ static void test_rcp_strerror_unique_nonempty(void)
     }
 }
 
+//cfusa:test REQ-RELAY-014
 static void test_relay_strerror_unique_nonempty(void)
 {
     const relay_errc_t codes[] = {
@@ -100,6 +98,7 @@ static void test_relay_strerror_unique_nonempty(void)
 
 /* ── rcp_bytes_t ───────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CORE-001
 static void test_bytes_dup_copies_data(void)
 {
     const uint8_t src[] = {1, 2, 3, 4, 5};
@@ -113,6 +112,7 @@ static void test_bytes_dup_copies_data(void)
     rcp_bytes_free(&b);
 }
 
+//cfusa:test REQ-CORE-001
 static void test_bytes_dup_zero_len_returns_zeroed(void)
 {
     const uint8_t src[] = {0xAA};
@@ -122,6 +122,7 @@ static void test_bytes_dup_zero_len_returns_zeroed(void)
     TEST_ASSERT_EQUAL_UINT(0, b.len);
 }
 
+//cfusa:test REQ-CORE-002
 static void test_bytes_free_zeroes_struct(void)
 {
     const uint8_t src[] = {9, 8, 7};
@@ -132,6 +133,7 @@ static void test_bytes_free_zeroes_struct(void)
     TEST_ASSERT_EQUAL_UINT(0, b.len);
 }
 
+//cfusa:test REQ-CORE-002
 static void test_bytes_free_safe_on_already_freed(void)
 {
     rcp_bytes_t b;
@@ -143,6 +145,7 @@ static void test_bytes_free_safe_on_already_freed(void)
     TEST_ASSERT_EQUAL_UINT(0, b.len);
 }
 
+//cfusa:test REQ-CORE-002
 static void test_bytes_free_safe_on_null_pointer(void)
 {
     rcp_bytes_free(NULL); /* must not crash */
