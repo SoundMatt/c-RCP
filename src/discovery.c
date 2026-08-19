@@ -437,7 +437,6 @@ void rcp_discovery_claim_release(rcp_discovery_claim_t *claim)
 
 /* ── Client-side discovery result persistence ──────────────────────────────── */
 
-//cfusa:req REQ-DISC-023
 void rcp_discovery_cache_init(rcp_discovery_cache_t *cache)
 {
     cache->entries = NULL;
@@ -445,7 +444,6 @@ void rcp_discovery_cache_init(rcp_discovery_cache_t *cache)
     cache->cap     = 0;
 }
 
-//cfusa:req REQ-DISC-023
 void rcp_discovery_cache_destroy(rcp_discovery_cache_t *cache)
 {
     rcp_free(cache->entries);
@@ -485,7 +483,7 @@ bool rcp_discovery_cache_put(rcp_discovery_cache_t *cache,
     return true;
 }
 
-//cfusa:req REQ-DISC-023
+//cfusa:req REQ-DISC-030
 const rcp_discovery_result_t *rcp_discovery_cache_find(const rcp_discovery_cache_t *cache,
                                                         rcp_stream_id_t stream_id)
 {
@@ -499,7 +497,6 @@ const rcp_discovery_result_t *rcp_discovery_cache_find(const rcp_discovery_cache
     return NULL;
 }
 
-//cfusa:req REQ-DISC-023
 size_t rcp_discovery_cache_len(const rcp_discovery_cache_t *cache)
 {
     return cache->len;

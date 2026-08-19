@@ -1,47 +1,14 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-DISC-001
-//cfusa:test REQ-DISC-002
-//cfusa:test REQ-DISC-003
-//cfusa:test REQ-DISC-004
-//cfusa:test REQ-DISC-005
-//cfusa:test REQ-DISC-006
-//cfusa:test REQ-DISC-007
-//cfusa:test REQ-DISC-008
-//cfusa:test REQ-DISC-009
-//cfusa:test REQ-DISC-010
-//cfusa:test REQ-DISC-011
-//cfusa:test REQ-DISC-012
-//cfusa:test REQ-DISC-013
-//cfusa:test REQ-DISC-014
-//cfusa:test REQ-DISC-015
-//cfusa:test REQ-DISC-016
-//cfusa:test REQ-DISC-017
-//cfusa:test REQ-DISC-018
-//cfusa:test REQ-DISC-019
-//cfusa:test REQ-DISC-020
-//cfusa:test REQ-DISC-021
-//cfusa:test REQ-DISC-022
-//cfusa:test REQ-DISC-023
-//cfusa:test REQ-DISC-024
 // Security-relevant subset (CYBERSECURITY.md §1.4, Layer 4 —
 // Discovery/Bootstrap Claim): first-claimant-wins bootstrap-claim
 // admission, preventing a second attacker from displacing an
 // already-bonded claimant during HW_UNCONFIGURED. See CYBERSECURITY.md
 // and tara.md TS-003 (first-claimant cryptographic authentication is
 // explicitly NOT covered here -- that gap is closed only by Layer 1
-// MACsec, not implemented in this library).
-//cfusa:sec-test REQ-DISC-015
-//cfusa:sec-test REQ-DISC-016
-//cfusa:sec-test REQ-DISC-017
-//cfusa:sec-test REQ-DISC-018
-//cfusa:sec-test REQ-DISC-019
-//cfusa:sec-test REQ-DISC-020
-//cfusa:sec-test REQ-DISC-021
-//cfusa:sec-test REQ-DISC-022
-//cfusa:test REQ-DISC-025
-//cfusa:test REQ-DISC-026
-//cfusa:test REQ-DISC-027
-//cfusa:test REQ-DISC-028
+// MACsec, not implemented in this library). Each claim test function
+// below (REQ-DISC-015..022) carries its own security-test marker
+// alongside its regular test marker, placed at that function instead
+// of listed here.
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -63,16 +30,19 @@ static const uint8_t OTHER_MAC[6]  = {0x02, 0x00, 0x00, 0x00, 0x00, 0x03};
 
 /* ── NTSCF-only rule ────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-DISC-001
 static void test_should_drop_true_for_tscf(void)
 {
     TEST_ASSERT_TRUE(rcp_discovery_should_drop(RCP_AVTP_SUBTYPE_TSCF));
 }
 
+//cfusa:test REQ-DISC-001
 static void test_should_drop_false_for_ntscf(void)
 {
     TEST_ASSERT_FALSE(rcp_discovery_should_drop(RCP_AVTP_SUBTYPE_NTSCF));
 }
 
+//cfusa:test REQ-DISC-001
 static void test_should_drop_true_for_unrecognized_subtype(void)
 {
     TEST_ASSERT_TRUE(rcp_discovery_should_drop(0x00));
@@ -80,6 +50,8 @@ static void test_should_drop_true_for_unrecognized_subtype(void)
 
 /* ── Discovery request round-trip ──────────────────────────────────────────── */
 
+//cfusa:test REQ-DISC-002
+//cfusa:test REQ-DISC-003
 static void test_request_round_trip(void)
 {
     rcp_stream_id_t client = rcp_stream_id_make(CLIENT_MAC, 7);
@@ -96,6 +68,7 @@ static void test_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-002
 static void test_request_addressed_to_discovery_bus(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -122,6 +95,7 @@ static void test_request_addressed_to_discovery_bus(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-004
 static void test_request_dropped_when_tscf_headed(void)
 {
     rcp_avtp_tscf_header_t tscf_hdr = {0};
@@ -145,6 +119,7 @@ static void test_request_dropped_when_tscf_headed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-005
 static void test_request_rejects_non_abb_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -168,6 +143,7 @@ static void test_request_rejects_non_abb_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-006
 static void test_request_rejects_wrong_byte_bus_id(void)
 {
     rcp_stream_id_t client = rcp_stream_id_make(CLIENT_MAC, 1);
@@ -192,6 +168,7 @@ static void test_request_rejects_wrong_byte_bus_id(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-007
 static void test_request_rejects_wrong_op(void)
 {
     rcp_stream_id_t client = rcp_stream_id_make(CLIENT_MAC, 1);
@@ -216,6 +193,7 @@ static void test_request_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-008
 static void test_request_decode_short_frame(void)
 {
     rcp_discovery_request_t req;
@@ -225,6 +203,7 @@ static void test_request_decode_short_frame(void)
                        rcp_discovery_decode_request(tiny, sizeof(tiny), &req));
 }
 
+//cfusa:test REQ-DISC-008
 static void test_request_decode_empty_buffer(void)
 {
     rcp_discovery_request_t req;
@@ -250,6 +229,9 @@ static rcp_regmap_general_t sample_map(void)
     return map;
 }
 
+//cfusa:test REQ-DISC-009
+//cfusa:test REQ-DISC-010
+//cfusa:test REQ-DISC-012
 static void test_response_round_trip_exact_slice_len(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -289,6 +271,7 @@ static void test_response_round_trip_exact_slice_len(void)
  * regression (which shifted vendor_id, device_id and svr_ep_count each
  * two octets early, misparsing all three for any conforming peer) cannot
  * come back unnoticed. */
+//cfusa:test REQ-DISC-010
 static void test_response_general_slice_octet_layout(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -335,6 +318,7 @@ static void test_response_general_slice_octet_layout(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-009
 static void test_response_payload_len_always_equals_read_size(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -366,6 +350,7 @@ static void test_response_payload_len_always_equals_read_size(void)
     rcp_bytes_free(&frame_large);
 }
 
+//cfusa:test REQ-DISC-013
 static void test_response_truncated_slice_when_read_size_small(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -387,6 +372,7 @@ static void test_response_truncated_slice_when_read_size_small(void)
  * AVTP/ACF-level checks as rcp_discovery_decode_request() (both call the
  * shared decode_common() helper) -- one test per condition, mirroring
  * the request-side tests above but through the response entry point. */
+//cfusa:test REQ-DISC-014
 static void test_response_dropped_when_tscf_headed(void)
 {
     rcp_avtp_tscf_header_t tscf_hdr = {0};
@@ -411,6 +397,7 @@ static void test_response_dropped_when_tscf_headed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-014
 static void test_response_rejects_non_abb_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -435,6 +422,7 @@ static void test_response_rejects_non_abb_msg_type(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-014
 static void test_response_rejects_wrong_byte_bus_id(void)
 {
     rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
@@ -460,6 +448,7 @@ static void test_response_rejects_wrong_byte_bus_id(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-014
 static void test_response_rejects_wrong_op(void)
 {
     rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
@@ -485,6 +474,7 @@ static void test_response_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-DISC-011
 static void test_response_zero_fills_beyond_general_slice(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -511,12 +501,14 @@ static void test_response_zero_fills_beyond_general_slice(void)
 
 /* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
 
+//cfusa:test REQ-DISC-025
 static void test_fragment_count_one_when_unfragmented(void)
 {
     TEST_ASSERT_EQUAL_UINT(1, rcp_discovery_response_fragment_count(12, 100));
     TEST_ASSERT_EQUAL_UINT(1, rcp_discovery_response_fragment_count(0, 0));
 }
 
+//cfusa:test REQ-DISC-025
 static void test_fragment_unfragmented_matches_single_frame_path(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -545,6 +537,9 @@ static void test_fragment_unfragmented_matches_single_frame_path(void)
  * for why read_size's one-octet width means genuine discovery traffic
  * never actually needs more than one fragment in practice; this test
  * proves the mechanism composes correctly regardless. */
+//cfusa:test REQ-DISC-026
+//cfusa:test REQ-DISC-027
+//cfusa:test REQ-DISC-028
 static void test_fragment_deliberately_small_cap_round_trip(void)
 {
     rcp_regmap_general_t       map    = sample_map();
@@ -619,6 +614,7 @@ static void test_fragment_deliberately_small_cap_round_trip(void)
  * against: read_size = 255 (its own max value) with
  * max_fragment_payload = 1, so rcp_fragment_plan_count() returns exactly
  * 255 -- the ceiling itself, not merely "some large count under it". */
+//cfusa:test REQ-DISC-026
 static void test_fragment_max_read_size_min_payload_hits_ceiling_exactly(void)
 {
     rcp_regmap_general_t       map    = sample_map();
@@ -677,6 +673,7 @@ static void test_fragment_max_read_size_min_payload_hits_ceiling_exactly(void)
     for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
 }
 
+//cfusa:test REQ-DISC-026
 static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -692,6 +689,7 @@ static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
  * go through decode_common()) -- one representative condition proves the
  * fragment entry point actually reaches that shared check, rather than
  * bypassing it. */
+//cfusa:test REQ-DISC-027
 static void test_fragment_decode_rejects_wrong_byte_bus_id(void)
 {
     rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
@@ -727,6 +725,7 @@ static void test_fragment_decode_rejects_wrong_byte_bus_id(void)
  * RCP_DISCOVERY_GENERAL_SLICE_LEN is rejected, same
  * short-frame-not-fabricated-zeros discipline as
  * test_response_truncated_slice_when_read_size_small() above. */
+//cfusa:test REQ-DISC-028
 static void test_decode_reassembled_response_rejects_short_buffer(void)
 {
     rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
@@ -740,6 +739,10 @@ static void test_decode_reassembled_response_rejects_short_buffer(void)
 
 /* ── Discovery-stream claiming ──────────────────────────────────────────────── */
 
+//cfusa:test REQ-DISC-015
+//cfusa:test REQ-DISC-016
+//cfusa:sec-test REQ-DISC-015
+//cfusa:sec-test REQ-DISC-016
 static void test_claim_init_is_open_and_unheld(void)
 {
     rcp_discovery_claim_t claim;
@@ -751,6 +754,8 @@ static void test_claim_init_is_open_and_unheld(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_open(&claim, 0));
 }
 
+//cfusa:test REQ-DISC-017
+//cfusa:sec-test REQ-DISC-017
 static void test_claim_note_request_grants_when_open(void)
 {
     rcp_discovery_claim_t claim;
@@ -763,6 +768,8 @@ static void test_claim_note_request_grants_when_open(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 1000));
 }
 
+//cfusa:test REQ-DISC-018
+//cfusa:sec-test REQ-DISC-018
 static void test_claim_note_request_does_not_preempt_active_claimant(void)
 {
     rcp_discovery_claim_t claim;
@@ -777,6 +784,8 @@ static void test_claim_note_request_does_not_preempt_active_claimant(void)
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, b, 1005));
 }
 
+//cfusa:test REQ-DISC-016
+//cfusa:sec-test REQ-DISC-016
 static void test_claim_lapses_after_timeout(void)
 {
     rcp_discovery_claim_t claim;
@@ -790,6 +799,8 @@ static void test_claim_lapses_after_timeout(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_open(&claim, 1020));
 }
 
+//cfusa:test REQ-DISC-017
+//cfusa:sec-test REQ-DISC-017
 static void test_claim_reopens_to_new_claimant_after_lapse(void)
 {
     rcp_discovery_claim_t claim;
@@ -804,6 +815,8 @@ static void test_claim_reopens_to_new_claimant_after_lapse(void)
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, a, 1030));
 }
 
+//cfusa:test REQ-DISC-020
+//cfusa:sec-test REQ-DISC-020
 static void test_claim_config_write_refreshes_deadline_for_claimant(void)
 {
     rcp_discovery_claim_t claim;
@@ -818,6 +831,8 @@ static void test_claim_config_write_refreshes_deadline_for_claimant(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 1025));
 }
 
+//cfusa:test REQ-DISC-021
+//cfusa:sec-test REQ-DISC-021
 static void test_claim_config_write_rejected_for_non_claimant(void)
 {
     rcp_discovery_claim_t claim;
@@ -833,6 +848,8 @@ static void test_claim_config_write_rejected_for_non_claimant(void)
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, a, 1020));
 }
 
+//cfusa:test REQ-DISC-021
+//cfusa:sec-test REQ-DISC-021
 static void test_claim_config_write_never_resurrects_lapsed_claim(void)
 {
     rcp_discovery_claim_t claim;
@@ -845,6 +862,8 @@ static void test_claim_config_write_never_resurrects_lapsed_claim(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_open(&claim, 1025));
 }
 
+//cfusa:test REQ-DISC-019
+//cfusa:sec-test REQ-DISC-019
 static void test_claim_is_claimant_false_when_never_held(void)
 {
     rcp_discovery_claim_t claim;
@@ -855,6 +874,8 @@ static void test_claim_is_claimant_false_when_never_held(void)
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, a, 0));
 }
 
+//cfusa:test REQ-DISC-022
+//cfusa:sec-test REQ-DISC-022
 static void test_claim_release_is_unconditional(void)
 {
     rcp_discovery_claim_t claim;
@@ -896,6 +917,8 @@ static void test_cache_starts_empty(void)
     rcp_discovery_cache_destroy(&cache);
 }
 
+//cfusa:test REQ-DISC-023
+//cfusa:test REQ-DISC-030
 static void test_cache_put_then_find(void)
 {
     rcp_discovery_cache_t cache;
@@ -913,6 +936,7 @@ static void test_cache_put_then_find(void)
     rcp_discovery_cache_destroy(&cache);
 }
 
+//cfusa:test REQ-DISC-023
 static void test_cache_put_updates_existing_entry_in_place(void)
 {
     rcp_discovery_cache_t cache;
@@ -932,6 +956,7 @@ static void test_cache_put_updates_existing_entry_in_place(void)
     rcp_discovery_cache_destroy(&cache);
 }
 
+//cfusa:test REQ-DISC-030
 static void test_cache_find_miss_returns_null(void)
 {
     rcp_discovery_cache_t cache;
@@ -943,6 +968,7 @@ static void test_cache_find_miss_returns_null(void)
     rcp_discovery_cache_destroy(&cache);
 }
 
+//cfusa:test REQ-DISC-023
 static void test_cache_grows_past_initial_capacity(void)
 {
     rcp_discovery_cache_t cache;
@@ -960,6 +986,7 @@ static void test_cache_grows_past_initial_capacity(void)
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-DISC-024
 static void test_strerror_unique_nonempty(void)
 {
     rcp_discovery_errc_t codes[] = {

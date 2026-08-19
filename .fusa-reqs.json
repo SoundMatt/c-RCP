@@ -3798,8 +3798,8 @@
     },
     {
       "id": "REQ-DISC-023",
-      "title": "The discovery result cache stores at most one entry per server_stream_id",
-      "text": "rcp_discovery_cache_put() shall overwrite an existing entry whose server_stream_id matches result's in place, and otherwise append a new entry growing internal storage as needed; rcp_discovery_cache_find() shall return a pointer to the matching entry or NULL if none is on record.",
+      "title": "rcp_discovery_cache_put() stores at most one entry per server_stream_id",
+      "text": "rcp_discovery_cache_put() shall overwrite an existing entry whose server_stream_id matches result's in place, and otherwise append a new entry growing internal storage as needed. Split 2026-08-19 (issue #533) from this id's own find()-half -- see REQ-DISC-030 for that.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -10879,6 +10879,18 @@
       "status": "partial",
       "tc18": "§12.3, TC18.txt L2447-L2450 and L2481-L2483 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation.",
       "tc18_master_id": "TC18-12.3-002"
+    },
+    {
+      "id": "REQ-DISC-030",
+      "title": "rcp_discovery_cache_find() returns the matching entry or NULL",
+      "text": "rcp_discovery_cache_find() shall return a pointer to the matching entry or NULL if none is on record. Split 2026-08-19 (issue #533) from REQ-DISC-023 -- see that id for the split rationale.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§12.6.2 (\"For each RC Server the RC Client can read the register map full or partially and maintain a table of relevant discovered RC Servers and their endpoints.\"), TC18.txt L2780-2781",
+      "tc18_master_id": "TC18-12.6.2-002"
     },
     {
       "id": "REQ-E2E-028",
