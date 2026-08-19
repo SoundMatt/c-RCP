@@ -154,6 +154,36 @@ static void test_rcp_cfg_consistent_when_satisfied(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
+/* MC/DC closure: request_streams_consistent()'s own "ep->ep_used &&
+ * ep->has_stream_assoc && ep->request_stream_index == i" only ever
+ * reaches its own has_stream_assoc condition through
+ * test_rcp_cfg_consistent_when_satisfied above, which always sets it
+ * true -- its own independent effect (an in-use endpoint that is
+ * otherwise eligible, ep_used and request_stream_index both matching,
+ * but genuinely has no stream association) was never demonstrated.
+ * REQ-LIFECYCLE-038's own bullet-3 rule exists specifically to catch
+ * this: an orphaned, unbound stream must be flagged inconsistent even
+ * when a same-indexed endpoint superficially looks like a match. */
+static void test_rcp_cfg_inconsistent_endpoint_lacks_stream_assoc_despite_matching_index(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1] = {
+        { true, true, true, false, 0 }, /* ep_used, request_stream_index==0 -- but
+                                            has_stream_assoc is false */
+    };
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true, 0 },
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
 static void test_rcp_cfg_null_snapshot_is_inconsistent(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(NULL));
@@ -312,6 +342,30 @@ static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_on
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
+}
+
+/* MC/DC closure: "target == HW_UNCONFIGURED && from == RCP_CONFIGURED"
+ * (the RCP_CONFIGURED -> HW_UNCONFIGURED demotion gate) only ever
+ * reaches this line with from==RCP_CONFIGURED true -- by elimination,
+ * genuinely so: from==target is caught by this function's own no-op
+ * shortcut before this line is ever reached (line 149), and
+ * from==HW_CONFIGURED is caught by the sibling check just above.
+ * rcp_lifecycle_state_t has exactly three real values, so once those
+ * two are excluded, from can ONLY be RCP_CONFIGURED whenever this line
+ * actually runs -- the second condition's own independent effect is
+ * genuinely unreachable through any real state value. The only way to
+ * demonstrate it is a corrupted/out-of-range *state -- itself a
+ * meaningful defensive case, matching this project's own established
+ * (rcp_pwrmode_t)99 idiom (tests/test_power.c) for the identical
+ * situation in a sibling module. */
+static void test_transition_from_corrupted_state_to_hw_unconfigured_is_rejected(void)
+{
+    rcp_lifecycle_state_t state = (rcp_lifecycle_state_t)0x99;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
+    TEST_ASSERT_EQUAL((rcp_lifecycle_state_t)0x99, state); /* unchanged */
 }
 
 /* Same closed gap as the advance above, but for the mirror-image
@@ -477,6 +531,22 @@ static void test_hw_unconfigured_accepts_discovery_abb_under_ntscf(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
+}
+
+/* MC/DC closure: "avtp_subtype != RCP_AVTP_SUBTYPE_NTSCF ||
+ * byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID" only ever
+ * reaches this line with avtp_subtype==NTSCF in every existing
+ * HW_UNCONFIGURED test (RCP_AVTP_SUBTYPE_TSCF is dropped earlier, one
+ * line up, before this check is ever reached) -- so the first
+ * condition's own independent effect was never demonstrated. A third,
+ * unrecognized AVTP subtype (neither NTSCF nor TSCF) while
+ * HW_UNCONFIGURED must be dropped outright, matching every other
+ * addressed-wrong case here. */
+static void test_hw_unconfigured_drops_unrecognized_avtp_subtype(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+        (uint8_t)0x7Fu, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_hw_unconfigured_drops_wrong_byte_bus_id(void)
@@ -839,6 +909,7 @@ int main(void)
     RUN_TEST(test_rcp_cfg_inconsistent_missing_stream_assoc);
     RUN_TEST(test_rcp_cfg_inconsistent_missing_response_stream);
     RUN_TEST(test_rcp_cfg_consistent_when_satisfied);
+    RUN_TEST(test_rcp_cfg_inconsistent_endpoint_lacks_stream_assoc_despite_matching_index);
     RUN_TEST(test_rcp_cfg_null_snapshot_is_inconsistent);
 
     RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plausible);
@@ -848,6 +919,7 @@ int main(void)
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_fails_when_implausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_requires_authorization);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_accepts_valid_stream_association);
+    RUN_TEST(test_transition_from_corrupted_state_to_hw_unconfigured_is_rejected);
     RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized);
     RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_accepts_valid_stream_association);
     RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_requires_root_client);
@@ -858,6 +930,7 @@ int main(void)
     RUN_TEST(test_transition_same_state_is_noop_success);
 
     RUN_TEST(test_hw_unconfigured_accepts_discovery_abb_under_ntscf);
+    RUN_TEST(test_hw_unconfigured_drops_unrecognized_avtp_subtype);
     RUN_TEST(test_hw_unconfigured_drops_wrong_byte_bus_id);
     RUN_TEST(test_hw_unconfigured_drops_non_abb_message_type);
     RUN_TEST(test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0);
