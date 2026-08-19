@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.464.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-SHMEM-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged all 9 (now 10) `REQ-SHMEM-*` requirements (`src/shmem.c`/`include/rcp/shmem.h`) against `CONTRIBUTING.md`'s "Writing a requirement" convention -- the 2 proxy-flagged ids plus a full read of the other 7. First Group 4 (residual) batch against issue #533's tracker; Groups 1-3 and all 11 Group 2 per-endpoint prefixes were confirmed already complete (merged via PRs #561-574, #553-559) during this session's own reconciliation pass -- several of those completions had landed without a corresponding tracker comment, which this entry also corrects for the record.
+
+**Split: 1 id -> 2 (`REQ-SHMEM-010`).** `REQ-SHMEM-005` bundled two different functions' post-close contracts under one id: `send()`'s immediate `RCP_ERR_CLOSED` (kept as `-005`) and `recv()`'s own separate "closed once drained" contract (split to `-010`) -- the `REQ-AUTH-009`/`REQ-GPIO-012` shape, one id naming multiple functions. Both halves were already independently tested in `tests/test_shmem.c` (`test_send_recv_on_closed_side_returns_closed`, `test_recv_on_open_side_returns_closed_once_peer_closes_and_drains`), just not separately id'd or tagged.
+
+**Confirmed atomic despite the flag:** `REQ-SHMEM-003` ("the pair's two directions shall be independent... never be observed by that same side's own recv()") -- a single symmetric architectural property of the shared core's two FIFOs, not two independently-alterable behaviors; its "2 shalls" restate one concept for TC18-traceability clarity, matching the tracker's own "legitimate multi-clause-but-still-atomic text" category.
+
+**Confirmed atomic, not proxy-flagged (7/9):** `REQ-SHMEM-001`, `-002`, `-004`, `-006`, `-007`, `-008`, `-009` -- each already one function's one complete contract.
+
+**Verification:** full clean rebuild + 67/67 test suite passing; ASan/UBSan (CI's exact flags) clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 2` each unchanged (1272/1272 traced, 512/512 functions). The split mutation-tested: `shmem_side_recv()`'s post-close detection weakened to always report `RCP_ERR_TIMEOUT`, confirmed exactly the two tests tagged `REQ-SHMEM-010` failed (and no others), then restored byte-identical.
+
+Not closing issue #533 -- Group 4's remaining ~34 prefixes (`REQ-E2E-*`, `REQ-LIFECYCLE-*`, `REQ-MOCK-*`, `REQ-CMP-*`, `REQ-PWRMODE-*`, and ~29 smaller ones) remain.
+
 ### v0.463.0 -- 2026-08-19 (test: MC/DC-closure round 2 -- udp.c 83.3% -> 91.7% (1 closed), and exhaustive unreachability proofs for the remaining 17 decisions in server.c/ep_spi.c/adapt.c/cli.c/tsn.c/watchdog.c/udp.c)
 
 Dedicated follow-up to v0.462.0's sweep, targeting exactly the 7 files (18 decisions) that sweep left with real gaps or made zero progress on (`tsn.c`, `watchdog.c`). Re-examined every one of these with fresh eyes rather than trusting round 1's conclusions at face value -- each finding below was independently re-derived from source first, then cross-checked against round 1's own reasoning where it existed.
