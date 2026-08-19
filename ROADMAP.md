@@ -19106,6 +19106,80 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.475.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533
+batch REQ-LIFECYCLE-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged REQ-LIFECYCLE-* (39, src/lifecycle.c) -- 9 proxy-flagged
+(REQ-LIFECYCLE-004, 007, 008, 009, 015, 017, 018, 019, 020).
+
+All 9 flagged ids confirmed atomic -- no splits, no text trims this
+batch. Each bundles one function's complete decision/branch table
+across the lifecycle state machine's states or input domain via
+multiple "shall"s purely for completeness, the same pattern
+established throughout this audit (e.g. the just-merged
+REQ-PWRMODE-004/005/007/008/009/012 batch, PR #594):
+REQ-LIFECYCLE-004/007 are rcp_lifecycle_check_hw_cfg()/
+rcp_lifecycle_check_rcp_cfg()'s complete contracts (normal-plausible
+case + NULL-snapshot edge case); REQ-LIFECYCLE-008/009 are
+rcp_lifecycle_transition()'s complete HW_UNCONFIGURED->HW_CONFIGURED
+and HW_CONFIGURED->RCP_CONFIGURED branches (success path gated by
+the plausibility check + failure path); REQ-LIFECYCLE-015 is
+rcp_lifecycle_should_accept()'s complete HW_UNCONFIGURED-state
+decision table (DROP on bad subtype/BBID, REJECT on right
+subtype/BBID but wrong ACF type); REQ-LIFECYCLE-017 is that same
+function's RCP_CONFIGURED-state TSCF/time-sync drop rule (its
+HW_CONFIGURED prose is explanatory, citing the separately-tracked
+REQ-LIFECYCLE-028, not a second in-scope behavior);
+REQ-LIFECYCLE-018/019/020 are rcp_lifecycle_field_writable()'s
+complete 3-state decision tables, one per field kind (HW_GENERIC,
+FUNCTIONAL_W, FUNCTIONAL_W_STAR).
+
+File-header tagging fixed in both test files. tests/test_lifecycle.c
+(REQ-LIFECYCLE-001..021/039, plus a //cfusa:sec-test block for
+CYBERSECURITY.md Section 1.5 Layer 5 covering
+REQ-LIFECYCLE-018/019/020) had its stacked header removed and
+per-function tags applied across its 49 real test functions; the
+out-of-scope REQ-WIREERR-004/REQ-RMAP-025/REQ-AVTP-029 header lines
+were left untouched. tests/test_tc18_gaps_server.c is a large
+integration-test file whose header bundled REQ-LIFECYCLE-022..038
+together with REQ-SRV-015..018, REQ-SEQ-012..014, and
+REQ-TIMED-012/013; only the REQ-LIFECYCLE-* header lines were touched
+and relocated per-function, leaving the other prefixes' header lines
+untouched, per the established REQ-WDG-010/REQ-PWRMODE-batch
+precedent (both already relocated in this same file by earlier
+batches, likewise left untouched).
+
+A small few functions carry multiple ids where their own comments
+explicitly demonstrate several already-fixed gates together in one
+coherent scenario, e.g.
+test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated
+(REQ-LIFECYCLE-026/033/035),
+test_hw_configured_write_access_now_requires_unicast_and_authorization
+(REQ-LIFECYCLE-027/030/036), and
+test_hw_configured_rejects_gbb_addressed_to_ep0 (REQ-LIFECYCLE-029/033,
+per that function's own citation that REQ-LIFECYCLE-029's text was
+reconciled against this exact EP0-addressed case).
+
+MC/DC-closure and out-of-scope-prefix tests left deliberately
+untagged (no in-scope requirement's own text describes the specific
+branch/edge-case each demonstrates, or the test's real subject is a
+different, already-covered prefix): in test_lifecycle.c, the
+authorization-widening tests for the HW_UNCONFIGURED<->HW_CONFIGURED
+transitions and the unicast/error-classification/read-only-field
+tests (real subject REQ-LIFECYCLE-031/024/027/REQ-RMAP-025, each out
+of scope for this file's own given tag set) and one bullet-3 MC/DC
+endpoint test (real subject REQ-LIFECYCLE-038, out of scope for this
+file); in test_tc18_gaps_server.c, two REQ-RMAP-049-scoped
+response_stream_index-range tests and one has_stream_assoc-gating
+MC/DC test.
+
+Verification: full clean rebuild + 67/67 test suite passing;
+ASan/UBSan clean, 67/67; pinned cfusa v0.6.2: check 0 errors, trace
+--req-coverage 100/--sec-tested 100 both pass -- 1274/1274 traced
+(unchanged, no split), 512/512 functions annotated.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.474.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533
 batch REQ-E2E-*: requirement-atomicity audit, Group 4 residual)
 
