@@ -1,13 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-LOAN-001
-//cfusa:test REQ-LOAN-002
-//cfusa:test REQ-LOAN-003
-//cfusa:test REQ-LOAN-004
-//cfusa:test REQ-LOAN-005
-//cfusa:test REQ-LOAN-006
-//cfusa:test REQ-LOAN-007
-//cfusa:test REQ-LOAN-008
-//cfusa:test REQ-LOAN-009
 #include "unity.h"
 
 #include <rcp/alloc.h>

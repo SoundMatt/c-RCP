@@ -18,11 +18,6 @@
  * c-rcp binary (i.e. main() itself, not just rcp_cli_run()) against
  * `relay conform --strict`.
  */
-//cfusa:test REQ-CLI-001
-//cfusa:test REQ-CLI-002
-//cfusa:test REQ-CLI-003
-//cfusa:test REQ-CLI-004
-//cfusa:test REQ-CLI-005
 //cfusa:test REQ-CLI-006
 #include "unity.h"
 
@@ -67,6 +62,8 @@ static int run_capture(int argc, char **argv, char *out_buf, size_t out_cap,
 
 /* ── version ───────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CLI-001
+//cfusa:test REQ-CLI-005
 static void test_version_text_contains_tool_and_versions(void)
 {
     char *argv[] = {"version"};
@@ -78,6 +75,8 @@ static void test_version_text_contains_tool_and_versions(void)
     TEST_ASSERT_NOT_NULL(strstr(out, RELAY_SPEC_VERSION));
 }
 
+//cfusa:test REQ-CLI-001
+//cfusa:test REQ-CLI-005
 static void test_version_json_has_required_fields(void)
 {
     char *argv[] = {"version", "--format", "json"};
@@ -95,6 +94,7 @@ static void test_version_json_has_required_fields(void)
 
 /* ── capabilities ──────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CLI-002
 static void test_capabilities_is_always_json_and_lists_mandatory_commands(void)
 {
     char *argv[] = {"capabilities"};
@@ -110,6 +110,7 @@ static void test_capabilities_is_always_json_and_lists_mandatory_commands(void)
     TEST_ASSERT_NOT_NULL(strstr(out, "\"adapt\":true"));
 }
 
+//cfusa:test REQ-CLI-002
 static void test_capabilities_honestly_omits_send(void)
 {
     /* This port implements only the three mandatory commands -- "send" (an
@@ -122,6 +123,7 @@ static void test_capabilities_honestly_omits_send(void)
     TEST_ASSERT_NULL(strstr(out, "\"send\""));
 }
 
+//cfusa:test REQ-CLI-002
 static void test_capabilities_transports_honestly_omits_tls(void)
 {
     /* c-RCP-05: tls.h/tls.c were removed outright at v0.78.0 (no
@@ -134,6 +136,7 @@ static void test_capabilities_transports_honestly_omits_tls(void)
     TEST_ASSERT_NULL(strstr(out, "\"tls\""));
 }
 
+//cfusa:test REQ-CLI-002
 static void test_capabilities_transports_lists_real_backends(void)
 {
     char *argv[] = {"capabilities"};
@@ -157,6 +160,7 @@ static void test_capabilities_transports_lists_real_backends(void)
  * feature names, closing that previously-unadvertised-capability gap on
  * this real consumer surface (no prior test in this file inspected
  * "features" content at all). */
+//cfusa:test REQ-CLI-002
 static void test_capabilities_features_lists_all_five_table_18_names(void)
 {
     char *argv[] = {"capabilities"};
@@ -175,6 +179,8 @@ static void test_capabilities_features_lists_all_five_table_18_names(void)
 
 /* ── status ────────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CLI-003
+//cfusa:test REQ-CLI-005
 static void test_status_json_has_required_fields(void)
 {
     char *argv[] = {"status", "--format", "json"};
@@ -188,6 +194,8 @@ static void test_status_json_has_required_fields(void)
     TEST_ASSERT_NOT_NULL(strstr(out, "\"details\":{}"));
 }
 
+//cfusa:test REQ-CLI-003
+//cfusa:test REQ-CLI-005
 static void test_status_text_form(void)
 {
     char *argv[] = {"status"};
@@ -200,12 +208,14 @@ static void test_status_text_form(void)
 
 /* ── error handling / exit codes (§11.3) ───────────────────────────────────── */
 
+//cfusa:test REQ-CLI-004
 static void test_no_args_returns_invalid_args(void)
 {
     char out[512], err[512];
     TEST_ASSERT_EQUAL(RCP_CLI_INVALID_ARGS, run_capture(0, NULL, out, sizeof(out), err, sizeof(err)));
 }
 
+//cfusa:test REQ-CLI-004
 static void test_unknown_command_returns_invalid_args(void)
 {
     char *argv[] = {"bogus"};
@@ -215,6 +225,8 @@ static void test_unknown_command_returns_invalid_args(void)
     TEST_ASSERT_NOT_NULL(strstr(err, "bogus"));
 }
 
+//cfusa:test REQ-CLI-004
+//cfusa:test REQ-CLI-005
 static void test_bad_format_value_returns_invalid_args(void)
 {
     char *argv[] = {"version", "--format", "xml"};
@@ -223,6 +235,8 @@ static void test_bad_format_value_returns_invalid_args(void)
     TEST_ASSERT_EQUAL(RCP_CLI_INVALID_ARGS, run_capture(3, argv, out, sizeof(out), err, sizeof(err)));
 }
 
+//cfusa:test REQ-CLI-004
+//cfusa:test REQ-CLI-005
 static void test_format_with_no_value_returns_invalid_args(void)
 {
     char *argv[] = {"version", "--format"};

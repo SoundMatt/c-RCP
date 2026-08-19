@@ -1,12 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-SCHED-001
-//cfusa:test REQ-SCHED-002
-//cfusa:test REQ-SCHED-003
-//cfusa:test REQ-SCHED-004
-//cfusa:test REQ-SCHED-005
-//cfusa:test REQ-SCHED-006
-//cfusa:test REQ-SCHED-007
-//cfusa:test REQ-SCHED-008
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -22,6 +14,7 @@ void tearDown(void) {}
 
 /* ── Request kind classification ──────────────────────────────────────────── */
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_standard_when_not_repurposed(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_STANDARD,
@@ -29,6 +22,7 @@ static void test_classify_standard_when_not_repurposed(void)
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_STANDARD, rcp_sched_classify(false, 0x00u));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_cancellation(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_CANCELLATION,
@@ -39,6 +33,7 @@ static void test_classify_cancellation(void)
                            rcp_sched_classify(true, RCP_REQUEST_TYPE_CLEAR_SINGLE));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_triggered(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_TRIGGERED,
@@ -47,11 +42,13 @@ static void test_classify_triggered(void)
                            rcp_sched_classify(true, RCP_REQUEST_TYPE_TRIGGERED_SAFETY));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_timed(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_TIMED, rcp_sched_classify(true, RCP_REQUEST_TYPE_TIMED));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_compound_and_compound_wait(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_COMPOUND,
@@ -64,12 +61,14 @@ static void test_classify_compound_and_compound_wait(void)
                            rcp_sched_classify(true, RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_chained(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_CHAINED,
                            rcp_sched_classify(true, RCP_REQUEST_TYPE_CHAINED));
 }
 
+//cfusa:test REQ-SCHED-001
 static void test_classify_unrecognized_opcode_falls_back_to_standard(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_SCHED_KIND_STANDARD, rcp_sched_classify(true, 0x77u));
@@ -77,6 +76,7 @@ static void test_classify_unrecognized_opcode_falls_back_to_standard(void)
 
 /* ── Priority rank + total ordering ───────────────────────────────────────── */
 
+//cfusa:test REQ-SCHED-002
 static void test_rank_ordering_matches_roadmap(void)
 {
     TEST_ASSERT_GREATER_THAN_UINT8(rcp_sched_kind_rank(RCP_SCHED_KIND_TRIGGERED),
@@ -93,6 +93,7 @@ static void test_rank_ordering_matches_roadmap(void)
                                     rcp_sched_kind_rank(RCP_SCHED_KIND_CHAINED));
 }
 
+//cfusa:test REQ-SCHED-003
 static void test_compare_higher_kind_first(void)
 {
     rcp_sched_entry_t cancel = {RCP_SCHED_KIND_CANCELLATION, 100};
@@ -104,6 +105,7 @@ static void test_compare_higher_kind_first(void)
     TEST_ASSERT_TRUE(rcp_sched_compare(&standard, &cancel) > 0);
 }
 
+//cfusa:test REQ-SCHED-003
 static void test_compare_fifo_within_equal_kind(void)
 {
     rcp_sched_entry_t first = {RCP_SCHED_KIND_COMPOUND, 5};
@@ -113,6 +115,7 @@ static void test_compare_fifo_within_equal_kind(void)
     TEST_ASSERT_TRUE(rcp_sched_compare(&second, &first) > 0);
 }
 
+//cfusa:test REQ-SCHED-003
 static void test_compare_equal_entries(void)
 {
     rcp_sched_entry_t a = {RCP_SCHED_KIND_TIMED, 42};
@@ -123,6 +126,7 @@ static void test_compare_equal_entries(void)
 
 /* ── Multi-request-per-frame handling ─────────────────────────────────────── */
 
+//cfusa:test REQ-SCHED-004
 static void test_split_frame_members_multiple(void)
 {
     rcp_bytes_t m1;
@@ -149,6 +153,7 @@ static void test_split_frame_members_multiple(void)
     rcp_bytes_free(&m2);
 }
 
+//cfusa:test REQ-SCHED-004
 static void test_split_frame_members_out_cap_still_counts(void)
 {
     rcp_bytes_t m1;
@@ -170,6 +175,7 @@ static void test_split_frame_members_out_cap_still_counts(void)
     rcp_bytes_free(&m2);
 }
 
+//cfusa:test REQ-SCHED-005
 static void test_split_frame_members_malformed_returns_zero(void)
 {
     uint8_t bad_type[8] = {0};
@@ -185,18 +191,22 @@ static void test_split_frame_members_malformed_returns_zero(void)
                                                                 offsets, 4));
 }
 
+//cfusa:test REQ-SCHED-006
 static void test_split_frame_members_empty(void)
 {
     size_t offsets[1] = {0};
     TEST_ASSERT_EQUAL_size_t(0, rcp_sched_split_frame_members(NULL, 0, offsets, 1));
 }
 
+//cfusa:test REQ-SCHED-007
 static void test_frame_timing_consistent_ntscf_always_true(void)
 {
     bool mixed[2] = {true, false};
     TEST_ASSERT_TRUE(rcp_sched_frame_timing_consistent(false, mixed, 2));
 }
 
+//cfusa:test REQ-SCHED-007
+//cfusa:test REQ-SCHED-008
 static void test_frame_timing_consistent_tscf_uniform(void)
 {
     bool all_timed[3] = {true, true, true};
@@ -207,6 +217,7 @@ static void test_frame_timing_consistent_tscf_uniform(void)
     TEST_ASSERT_TRUE(rcp_sched_frame_timing_consistent(true, NULL, 0));
 }
 
+//cfusa:test REQ-SCHED-008
 static void test_frame_timing_consistent_tscf_mixed_rejected(void)
 {
     bool mixed[3] = {true, false, true};

@@ -1,12 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-TSN-001
-//cfusa:test REQ-TSN-002
-//cfusa:test REQ-TSN-003
-//cfusa:test REQ-TSN-004
-//cfusa:test REQ-TSN-005
-//cfusa:test REQ-TSN-006
-//cfusa:test REQ-TSN-007
-//cfusa:test REQ-TSN-008
 /* SO_PRIORITY is a glibc extension -- same _DEFAULT_SOURCE requirement
  * as tsn.c's own file header, and for the identical reason (must be the
  * literal first thing in the translation unit). */
@@ -71,6 +63,7 @@ static void test_default_config_values(void)
 
 /* ── PCP map ────────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TSN-001
 static void test_default_pcp_map_mirrors_sched_kind_rank(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
@@ -81,6 +74,7 @@ static void test_default_pcp_map_mirrors_sched_kind_rank(void)
     }
 }
 
+//cfusa:test REQ-TSN-001
 static void test_cancellation_maps_to_highest_default_pcp(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
@@ -90,6 +84,7 @@ static void test_cancellation_maps_to_highest_default_pcp(void)
                       rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_STANDARD));
 }
 
+//cfusa:test REQ-TSN-002
 static void test_pcp_for_fails_safe_on_out_of_range_kind(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
@@ -124,6 +119,7 @@ static void test_pcp_for_fails_safe_on_out_of_range_kind(void)
  * unsigned here, and no unsigned value is ever < 0 -- there is no
  * legitimate (non-UB-relying) cast that produces the missing vector.
  * No fake/whitebox test is added to force it. */
+//cfusa:test REQ-TSN-002
 static void test_pcp_for_fails_safe_on_negative_kind(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
@@ -134,6 +130,7 @@ static void test_pcp_for_fails_safe_on_negative_kind(void)
 
 /* ── Frame classification ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TSN-003
 static void test_classify_standard_frame(void)
 {
     rcp_bytes_t frame = make_standard_frame();
@@ -141,6 +138,7 @@ static void test_classify_standard_frame(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TSN-003
 static void test_classify_cancellation_frame(void)
 {
     rcp_bytes_t frame = make_cancellation_frame();
@@ -171,6 +169,7 @@ static void test_classify_cancellation_frame(void)
  * rcp_acf_peek_msg_type()'s own contract ever grows a second failure
  * mode), not a testing gap; no fake/whitebox test is added to force it. */
 
+//cfusa:test REQ-TSN-003
 static void test_classify_malformed_frame_fails_safe_to_standard(void)
 {
     TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(NULL, 0));
@@ -186,6 +185,7 @@ static void test_classify_malformed_frame_fails_safe_to_standard(void)
  * rcp_avtp_decode_ntscf() itself to parse -- distinct from the malformed
  * (non-NTSCF/TSCF-subtype) junk bytes test_classify_malformed_frame_...
  * above already covers. */
+//cfusa:test REQ-TSN-003
 static void test_classify_ntscf_decode_failure_fails_safe_to_standard(void)
 {
     rcp_bytes_t frame = make_standard_frame();
@@ -199,6 +199,7 @@ static void test_classify_ntscf_decode_failure_fails_safe_to_standard(void)
  * itself fails the very next guard (payload_len == 0 -> fail-safe
  * Standard), covering both the TSCF success branch and that guard in one
  * frame. */
+//cfusa:test REQ-TSN-003
 static void test_classify_tscf_frame_with_empty_body_fails_safe_to_standard(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -213,6 +214,7 @@ static void test_classify_tscf_frame_with_empty_body_fails_safe_to_standard(void
 }
 
 /* TSCF's own decode failure, mirroring the NTSCF case above. */
+//cfusa:test REQ-TSN-003
 static void test_classify_tscf_decode_failure_fails_safe_to_standard(void)
 {
     rcp_avtp_tscf_header_t hdr = {0};
@@ -239,6 +241,7 @@ static void test_classify_tscf_decode_failure_fails_safe_to_standard(void)
  * compound-request repurposing trick requires, so
  * rcp_compound_peek_request_type() correctly reports
  * RCP_COMPOUND_ERR_NOT_REPURPOSED and classification fails safe. */
+//cfusa:test REQ-TSN-003
 static void test_classify_non_repurposed_gbb_frame_fails_safe_to_standard(void)
 {
     rcp_acf_gbb_header_t hdr = {0};
@@ -265,6 +268,7 @@ static void test_classify_non_repurposed_gbb_frame_fails_safe_to_standard(void)
 
 /* ── Transport wrapper ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TSN-004
 static void test_send_applies_pcp_then_delegates_to_inner(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
@@ -295,6 +299,7 @@ static void test_send_applies_pcp_then_delegates_to_inner(void)
  * option (tsn.c's own RCP_TSN_SO_PRIORITY guard), so this test -- and
  * its getsockopt() verification -- only compiles/runs on this repo's
  * own ubuntu CI jobs. */
+//cfusa:test REQ-TSN-004
 static void test_send_sets_so_priority_to_the_frames_own_pcp(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
@@ -327,6 +332,7 @@ static void test_send_sets_so_priority_to_the_frames_own_pcp(void)
 }
 #endif /* __linux__ */
 
+//cfusa:test REQ-TSN-005
 static void test_recv_delegates_to_inner(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
@@ -345,6 +351,7 @@ static void test_recv_delegates_to_inner(void)
     rcp_avtp_transport_release(inner);
 }
 
+//cfusa:test REQ-TSN-006
 static void test_close_delegates_to_inner(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
@@ -359,6 +366,7 @@ static void test_close_delegates_to_inner(void)
     rcp_avtp_transport_release(inner);
 }
 
+//cfusa:test REQ-TSN-007
 static void test_constructor_mirrors_inner_time_sync_supported(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(false, 1);

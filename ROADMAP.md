@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.466.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
+REQ-CLI-*/REQ-WIREERR-*/REQ-SCHED-*/REQ-TSN-*/REQ-LOAN-*: requirement-
+atomicity audit, Group 4 residual)
+
+Triaged 5 prefixes (38 requirements total: src/cli.c,
+src/request_sequencer.c/src/ep_pwm.c/src/request.c/src/mock.c for REQ-
+WIREERR-*, src/scheduler.c, src/tsn.c, src/loan.c).
+
+No splits needed -- all 38 confirmed atomic. Every flagged id checked
+against its actual source: REQ-CLI-003 (one command's document-emission
+function), REQ-WIREERR-005/006/007 (each one wire-error enum-to-enum mapping
+function), REQ-SCHED-001/003/007 (each one function's complete branch/tie-
+break/early-exit contract, -007/-008 already correctly co-tagged as the same
+function's two halves), REQ-TSN-004 (one function's conditional-priority-
+plus-unconditional-delegate contract), REQ-LOAN-006 (one double-free-safety
+property already co-tagged on its one function alongside -004). Same "one
+function's complete input-domain behavior" pattern established throughout
+this audit.
+
+REQ-WIREERR-* was already fully clean -- correctly per-function tagged
+across its 6 source/test files, no changes needed at all.
+
+Real, in-scope fix found in the other 4: file-header tagging, not per-
+function. tests/test_cli.c, tests/test_scheduler.c, tests/test_tsn.c,
+tests/test_loan.c all had their //cfusa:test tags stacked in one block near
+the top of the file rather than above the specific test functions they
+describe. Relocated every tag to its actual covering test(s) in all four
+files. test_tsn.c/test_loan.c were partially already fixed (from this
+session's earlier MC/DC-closure pass, which added some per-function tags
+without removing the stale file-header block) -- the redundant header block
+removed, the rest left as-is. REQ-CLI-006 (main()'s argv/stdout/stderr
+forwarding, untestable in-process per this file's own existing doc comment)
+kept its tag next to that explanatory paragraph rather than orphaning it,
+since no test function exists to hold it.
+
+Verification: full clean rebuild + 67/67 test suite passing (tag-only edit,
+no test behavior changed); ASan/UBSan clean, 67/67; pinned cfusa v0.6.2:
+check 0 errors, trace --req-coverage 100/--sec-tested 2 each unchanged
+(1272/1272 traced, 512/512 functions).
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.465.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
 REQ-ALLOC-*: requirement-atomicity audit, Group 4 residual)
 
