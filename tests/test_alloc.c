@@ -1,10 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-ALLOC-001
-//cfusa:test REQ-ALLOC-002
-//cfusa:test REQ-ALLOC-003
-//cfusa:test REQ-ALLOC-004
-//cfusa:test REQ-ALLOC-005
-//cfusa:test REQ-ALLOC-006
 #include "unity.h"
 
 #include <rcp/alloc.h>
@@ -16,6 +10,7 @@ void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a hook across tes
 
 /* ── Default passthrough (no hooks installed) ────────────────────────────── */
 
+//cfusa:test REQ-ALLOC-003
 static void test_malloc_default_behaves_like_libc_malloc(void)
 {
     void *p = rcp_malloc(16);
@@ -23,6 +18,7 @@ static void test_malloc_default_behaves_like_libc_malloc(void)
     rcp_free(p);
 }
 
+//cfusa:test REQ-ALLOC-004
 static void test_calloc_default_zero_initializes(void)
 {
     uint8_t *p = (uint8_t *)rcp_calloc(8, 1);
@@ -33,6 +29,7 @@ static void test_calloc_default_zero_initializes(void)
     rcp_free(p);
 }
 
+//cfusa:test REQ-ALLOC-006
 static void test_realloc_default_behaves_like_libc_realloc(void)
 {
     uint8_t *p = (uint8_t *)rcp_malloc(4);
@@ -46,6 +43,7 @@ static void test_realloc_default_behaves_like_libc_realloc(void)
     rcp_free(grown);
 }
 
+//cfusa:test REQ-ALLOC-005
 static void test_free_null_is_a_safe_no_op(void)
 {
     rcp_free(NULL); /* must not crash */
@@ -64,6 +62,11 @@ static void *counting_calloc(size_t nmemb, size_t size) { g_calloc_calls++; retu
 static void *counting_realloc(void *ptr, size_t size) { g_realloc_calls++; return realloc(ptr, size); }
 static void  counting_dealloc(void *ptr) { g_free_calls++; free(ptr); }
 
+//cfusa:test REQ-ALLOC-001
+//cfusa:test REQ-ALLOC-003
+//cfusa:test REQ-ALLOC-004
+//cfusa:test REQ-ALLOC-005
+//cfusa:test REQ-ALLOC-006
 static void test_set_hooks_routes_every_call_through_the_installed_hook(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -101,6 +104,10 @@ static void test_set_hooks_routes_every_call_through_the_installed_hook(void)
 /* A hooks value with only SOME members set falls back to libc for the
  * others -- a caller intercepting malloc() alone need not reimplement
  * calloc()/free() just to install one hook. */
+//cfusa:test REQ-ALLOC-001
+//cfusa:test REQ-ALLOC-003
+//cfusa:test REQ-ALLOC-004
+//cfusa:test REQ-ALLOC-005
 static void test_set_hooks_partial_falls_back_to_libc_for_unset_members(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -123,6 +130,7 @@ static void test_set_hooks_partial_falls_back_to_libc_for_unset_members(void)
 
 /* rcp_alloc_set_hooks(NULL) is documented as equivalent to
  * rcp_alloc_reset_hooks(). */
+//cfusa:test REQ-ALLOC-001
 static void test_set_hooks_null_resets_to_default(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -145,6 +153,7 @@ static void *failing_malloc(size_t size) { (void)size; return NULL; }
 static void *failing_calloc(size_t nmemb, size_t size) { (void)nmemb; (void)size; return NULL; }
 static void *failing_realloc(void *ptr, size_t size) { (void)ptr; (void)size; return NULL; }
 
+//cfusa:test REQ-ALLOC-003
 static void test_installed_malloc_hook_can_simulate_allocation_failure(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -155,6 +164,7 @@ static void test_installed_malloc_hook_can_simulate_allocation_failure(void)
     TEST_ASSERT_NULL(rcp_malloc(16));
 }
 
+//cfusa:test REQ-ALLOC-004
 static void test_installed_calloc_hook_can_simulate_allocation_failure(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -168,6 +178,7 @@ static void test_installed_calloc_hook_can_simulate_allocation_failure(void)
 /* This is REQ-FRAG-016's own fault-injection technique -- see
  * test_reassembler_alloc_failure_is_distinct_and_preserves_state() in
  * test_fragment.c. */
+//cfusa:test REQ-ALLOC-006
 static void test_installed_realloc_hook_can_simulate_allocation_failure(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -180,6 +191,7 @@ static void test_installed_realloc_hook_can_simulate_allocation_failure(void)
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-ALLOC-002
 static void test_reset_hooks_restores_the_libc_passthrough(void)
 {
     rcp_alloc_hooks_t hooks = {0};
@@ -195,6 +207,7 @@ static void test_reset_hooks_restores_the_libc_passthrough(void)
     rcp_free(p);
 }
 
+//cfusa:test REQ-ALLOC-002
 static void test_reset_hooks_is_a_safe_no_op_when_nothing_was_installed(void)
 {
     void *p;

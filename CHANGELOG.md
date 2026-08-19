@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.465.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-ALLOC-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged all 6 `REQ-ALLOC-*` requirements (`src/alloc.c`/`include/rcp/alloc.h`) against `CONTRIBUTING.md`'s "Writing a requirement" convention.
+
+**No splits needed -- all 6 confirmed atomic.** Each of the 4 proxy-flagged ids (`-001`, `-003`, `-004`, `-005`) maps to exactly one self-contained function (`rcp_alloc_set_hooks()`, `rcp_malloc()`, `rcp_calloc()`, `rcp_free()` respectively), with the "2 shalls" simply describing that one function's complete if/else contract (hook installed vs. libc fallback, or an edge case fully handled within the same function body) -- the same "one function's complete input-domain behavior" pattern already established across this audit (`REQ-GPIO-004`, `REQ-SHMEM-003`). Confirmed by direct source read: `src/alloc.c`'s four hook-routing functions are each a two-line `if (hook) return hook(...); return libc_fn(...);` body with no secondary function involved.
+
+**Real, in-scope fix found instead: `tests/test_alloc.c` used file-header tagging, not per-function.** All 6 `//cfusa:test` tags sat in one block above the file's `#include`s rather than above the specific test functions they describe -- exactly the anti-pattern issue #533's own scope calls out ("Move/duplicate the tags so each stands directly above the exact function/test it describes, not a file header"). Relocated each tag to its actual covering test(s): single-function tests got one tag (`test_malloc_default_behaves_like_libc_malloc` -> `REQ-ALLOC-003`, etc.); the three hook-installation tests that exercise multiple allocator functions in one test body kept multiple tags each, matching this session's own precedent for genuinely multi-requirement tests (e.g. `REQ-SHMEM-005`/`-010`'s shared test).
+
+**Verification:** full clean rebuild + 67/67 test suite passing (no test behavior changed, tag-only edit); ASan/UBSan clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 2` each unchanged (1272/1272 traced, 512/512 functions -- same totals as before, confirming no coverage was lost by the relocation).
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.464.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-SHMEM-*: requirement-atomicity audit, Group 4 residual)
 
 Triaged all 9 (now 10) `REQ-SHMEM-*` requirements (`src/shmem.c`/`include/rcp/shmem.h`) against `CONTRIBUTING.md`'s "Writing a requirement" convention -- the 2 proxy-flagged ids plus a full read of the other 7. First Group 4 (residual) batch against issue #533's tracker; Groups 1-3 and all 11 Group 2 per-endpoint prefixes were confirmed already complete (merged via PRs #561-574, #553-559) during this session's own reconciliation pass -- several of those completions had landed without a corresponding tracker comment, which this entry also corrects for the record.
