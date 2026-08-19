@@ -1,16 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-CHAIN-001
-//cfusa:test REQ-CHAIN-002
-//cfusa:test REQ-CHAIN-003
-//cfusa:test REQ-CHAIN-004
-//cfusa:test REQ-CHAIN-005
-//cfusa:test REQ-CHAIN-006
-//cfusa:test REQ-CHAIN-007
-//cfusa:test REQ-CHAIN-008
-//cfusa:test REQ-CHAIN-009
-//cfusa:test REQ-CHAIN-010
-//cfusa:test REQ-CHAIN-011
-//cfusa:test REQ-CHAIN-012
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -24,6 +12,7 @@ void tearDown(void) {}
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CHAIN-001
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a = rcp_chained_strerror(RCP_CHAINED_OK);
@@ -51,6 +40,8 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Chain member encode/decode ───────────────────────────────────────────── */
 
+//cfusa:test REQ-CHAIN-004
+//cfusa:test REQ-CHAIN-007
 static void test_member_round_trip(void)
 {
     rcp_bytes_t frame;
@@ -81,6 +72,8 @@ static void test_member_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CHAIN-004
+//cfusa:test REQ-CHAIN-007
 static void test_member_round_trip_continue_on_error(void)
 {
     rcp_bytes_t frame;
@@ -105,6 +98,7 @@ static void test_member_round_trip_continue_on_error(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CHAIN-005
 static void test_decode_rejects_short_frame(void)
 {
     uint8_t buf[4] = {0};
@@ -122,6 +116,7 @@ static void test_decode_rejects_short_frame(void)
 
 /* REQ-CHAIN-003: rcp_chained_encode_member() returns a zeroed rcp_bytes_t
  * when payload_len exceeds RCP_ACF_MAX_PAYLOAD. */
+//cfusa:test REQ-CHAIN-003
 static void test_encode_rejects_oversized_payload(void)
 {
     static uint8_t oversized[RCP_ACF_MAX_PAYLOAD + 1];
@@ -140,6 +135,7 @@ static void test_encode_rejects_oversized_payload(void)
  * same byte-pattern technique already established for the sibling
  * modules (test_request_compound.c's own
  * test_peek_request_type_bad_msg_type()). */
+//cfusa:test REQ-CHAIN-005
 static void test_decode_rejects_bad_msg_type(void)
 {
     uint8_t            buf[RCP_ACF_GBB_HEADER_LEN];
@@ -167,6 +163,7 @@ static void test_decode_rejects_bad_msg_type(void)
  * RCP_ACF_ERR_SHORT_FRAME before mtv is ever inspected -- the
  * bad-msg-type test above doesn't hit that check because it returns
  * even earlier, on the msg-type mismatch itself. */
+//cfusa:test REQ-CHAIN-006
 static void test_decode_rejects_non_repurposed_mtv(void)
 {
     rcp_bytes_t        frame;
@@ -191,6 +188,7 @@ static void test_decode_rejects_non_repurposed_mtv(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CHAIN-007
 static void test_decode_rejects_unknown_request_type(void)
 {
     rcp_bytes_t frame;
@@ -230,6 +228,8 @@ static void test_decode_rejects_unknown_request_type(void)
 
 #define TS_OFF RCP_ACF_ABB_HEADER_LEN
 
+//cfusa:test REQ-CHAIN-002
+//cfusa:test REQ-CHAIN-004
 static void test_chained_wire_sub_field_offsets(void)
 {
     rcp_bytes_t frame = rcp_chained_encode_member(7, 0x1234, RCP_CHAINED_CS_ABORT_ON_ERROR, 1,
@@ -252,6 +252,7 @@ static void test_chained_wire_sub_field_offsets(void)
 
 /* Table 9: reserved "All bits shall be written as 0, else the request
  * shall be rejected". */
+//cfusa:test REQ-CHAIN-012
 static void test_chained_decode_rejects_nonzero_reserved(void)
 {
     size_t offsets[5] = {1, 2, 3, 6, 7};
@@ -278,6 +279,7 @@ static void test_chained_decode_rejects_nonzero_reserved(void)
     }
 }
 
+//cfusa:test REQ-CHAIN-011
 static void test_chained_exec_delay_elapsed(void)
 {
     TEST_ASSERT_FALSE(rcp_chained_exec_delay_elapsed(100, 99));
@@ -294,6 +296,7 @@ static void test_chained_exec_delay_elapsed(void)
  * send an error response with error code = CHAIN_ABORTED." So cs is read
  * off the member about to run, about its predecessor's outcome. */
 
+//cfusa:test REQ-CHAIN-010
 static void test_advance_all_ok(void)
 {
     bool aborted = false;
@@ -309,6 +312,7 @@ static void test_advance_all_ok(void)
 }
 
 /* A member with no predecessor at all: the whole chain is ignored. */
+//cfusa:test REQ-CHAIN-008
 static void test_advance_first_member_without_predecessor_is_chain_error(void)
 {
     bool aborted = false;
@@ -324,6 +328,8 @@ static void test_advance_first_member_without_predecessor_is_chain_error(void)
                                                 RCP_CHAINED_CS_CONTINUE_ON_ERROR));
 }
 
+//cfusa:test REQ-CHAIN-009
+//cfusa:test REQ-CHAIN-010
 static void test_advance_abort_on_error_stops_the_chain(void)
 {
     bool aborted = false;
@@ -341,6 +347,7 @@ static void test_advance_abort_on_error_stops_the_chain(void)
     TEST_ASSERT_TRUE(aborted);
 }
 
+//cfusa:test REQ-CHAIN-010
 static void test_advance_continue_on_error_runs_anyway(void)
 {
     bool aborted = false;
@@ -361,6 +368,7 @@ static void test_advance_continue_on_error_runs_anyway(void)
 /* The corrected semantics, stated as the difference from the old ones: an
  * erroring member whose OWN cs is abort-on-error does NOT by itself stop
  * the chain -- it is the successor's cs that decides. */
+//cfusa:test REQ-CHAIN-010
 static void test_advance_erroring_members_own_cs_does_not_decide(void)
 {
     bool aborted = false;
@@ -381,6 +389,8 @@ static void test_advance_erroring_members_own_cs_does_not_decide(void)
     TEST_ASSERT_FALSE(aborted);
 }
 
+//cfusa:test REQ-CHAIN-009
+//cfusa:test REQ-CHAIN-010
 static void test_advance_full_chain_sequence(void)
 {
     /* A 4-member chain: member 0 runs after a fine predecessor and then

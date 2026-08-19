@@ -1,19 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-CANCEL-001
-//cfusa:test REQ-CANCEL-002
-//cfusa:test REQ-CANCEL-003
-//cfusa:test REQ-CANCEL-004
-//cfusa:test REQ-CANCEL-005
-//cfusa:test REQ-CANCEL-006
-//cfusa:test REQ-CANCEL-007
-//cfusa:test REQ-CANCEL-008
-//cfusa:test REQ-CANCEL-009
-//cfusa:test REQ-CANCEL-010
-//cfusa:test REQ-CANCEL-011
-//cfusa:test REQ-CANCEL-012
-//cfusa:test REQ-CANCEL-013
-//cfusa:test REQ-CANCEL-014
-//cfusa:test REQ-CANCEL-015
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -27,6 +12,7 @@ void tearDown(void) {}
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CANCEL-001
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a = rcp_cancel_strerror(RCP_CANCEL_OK);
@@ -54,6 +40,8 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── clear-all (0x05) ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CANCEL-002
+//cfusa:test REQ-CANCEL-004
 static void test_clear_all_round_trip(void)
 {
     rcp_bytes_t frame;
@@ -71,6 +59,7 @@ static void test_clear_all_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CANCEL-004
 static void test_clear_all_decode_rejects_clear_single(void)
 {
     rcp_bytes_t frame;
@@ -86,6 +75,7 @@ static void test_clear_all_decode_rejects_clear_single(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CANCEL-003
 static void test_clear_all_decode_rejects_short_frame(void)
 {
     uint8_t buf[2] = {0};
@@ -99,6 +89,7 @@ static void test_clear_all_decode_rejects_short_frame(void)
 /* Table 11: reserved "All bits shall be written as 0, else the request
  * shall be rejected" -- clear-all carries no sub-field, so all 7
  * trailing message_timestamp octets are reserved. REQ-CANCEL-013. */
+//cfusa:test REQ-CANCEL-013
 static void test_clear_all_decode_rejects_nonzero_reserved(void)
 {
     size_t offsets[7] = {1, 2, 3, 4, 5, 6, 7};
@@ -123,6 +114,7 @@ static void test_clear_all_decode_rejects_nonzero_reserved(void)
  * Octet 4 of the ACF byte_message_info header packs evt[3:0] in bits
  * 7:4, hs in bit 1, cs in bit 0 (acf.c's rcp_acf_pack_header()).
  * REQ-CANCEL-014. */
+//cfusa:test REQ-CANCEL-014
 static void test_clear_all_decode_rejects_nonzero_evt_hs_cs(void)
 {
     uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */
@@ -145,6 +137,8 @@ static void test_clear_all_decode_rejects_nonzero_evt_hs_cs(void)
 
 /* ── clear-single (0x07) ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CANCEL-005
+//cfusa:test REQ-CANCEL-007
 static void test_clear_single_round_trip(void)
 {
     rcp_bytes_t frame;
@@ -165,6 +159,7 @@ static void test_clear_single_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CANCEL-007
 static void test_clear_single_decode_rejects_clear_all(void)
 {
     rcp_bytes_t frame;
@@ -182,6 +177,7 @@ static void test_clear_single_decode_rejects_clear_all(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CANCEL-006
 static void test_clear_single_decode_rejects_bad_msg_type(void)
 {
     uint8_t buf[16] = {0};
@@ -198,6 +194,7 @@ static void test_clear_single_decode_rejects_bad_msg_type(void)
 
 /* ── General cancellation semantics ───────────────────────────────────────── */
 
+//cfusa:test REQ-CANCEL-008
 static void test_is_cancellable_only_when_queued(void)
 {
     TEST_ASSERT_TRUE(rcp_cancel_is_cancellable(RCP_CANCEL_LIFECYCLE_QUEUED));
@@ -205,12 +202,14 @@ static void test_is_cancellable_only_when_queued(void)
     TEST_ASSERT_FALSE(rcp_cancel_is_cancellable(RCP_CANCEL_LIFECYCLE_DONE));
 }
 
+//cfusa:test REQ-CANCEL-009
 static void test_attempt_not_found(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_CANCEL_RESULT_NOT_FOUND,
                            rcp_cancel_attempt(false, RCP_CANCEL_LIFECYCLE_QUEUED));
 }
 
+//cfusa:test REQ-CANCEL-010
 static void test_attempt_not_cancellable(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_CANCEL_RESULT_NOT_CANCELLABLE,
@@ -219,12 +218,14 @@ static void test_attempt_not_cancellable(void)
                            rcp_cancel_attempt(true, RCP_CANCEL_LIFECYCLE_DONE));
 }
 
+//cfusa:test REQ-CANCEL-011
 static void test_attempt_canceled(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_CANCEL_RESULT_CANCELED,
                            rcp_cancel_attempt(true, RCP_CANCEL_LIFECYCLE_QUEUED));
 }
 
+//cfusa:test REQ-CANCEL-012
 static void test_chain_cascade(void)
 {
     /* Canceling position 1 of a chain cascades to positions 1, 2, 3, ...
@@ -256,6 +257,7 @@ static void test_chain_cascade(void)
 
 #define TS_OFF RCP_ACF_ABB_HEADER_LEN
 
+//cfusa:test REQ-CANCEL-005
 static void test_clear_single_wire_sub_field_offsets(void)
 {
     rcp_bytes_t frame = rcp_cancel_encode_clear_single(4, 0xA7u, 11);
@@ -277,6 +279,7 @@ static void test_clear_single_wire_sub_field_offsets(void)
 
 /* Decoding a hand-built spec-shaped octet sequence, so decode is pinned to
  * the specification independently of encode. */
+//cfusa:test REQ-CANCEL-007
 static void test_clear_single_decode_reads_hand_built_spec_layout(void)
 {
     rcp_bytes_t frame;
@@ -302,6 +305,7 @@ static void test_clear_single_decode_reads_hand_built_spec_layout(void)
 
 /* Table 13: reserved "All bits shall be written as 0, else the request
  * shall be rejected". */
+//cfusa:test REQ-CANCEL-007
 static void test_clear_single_decode_rejects_nonzero_reserved(void)
 {
     size_t offsets[6] = {1, 2, 4, 5, 6, 7};
@@ -325,6 +329,7 @@ static void test_clear_single_decode_rejects_nonzero_reserved(void)
 }
 
 /* Table 13: "Evt, hs and cs shall be zero." REQ-CANCEL-015. */
+//cfusa:test REQ-CANCEL-015
 static void test_clear_single_decode_rejects_nonzero_evt_hs_cs(void)
 {
     uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */

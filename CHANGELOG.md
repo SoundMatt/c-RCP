@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.470.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-CANCEL-*/REQ-SEQ-*/REQ-TRIG-*/REQ-CHAIN-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged the conditional-request-layer cluster: `REQ-SEQ-*` (14 requirements, `src/request_sequencer.c`), `REQ-TRIG-*` (13, `src/request_triggered.c`), `REQ-CHAIN-*` (12, `src/request_chained.c`), `REQ-CANCEL-*` (15, `src/request_cancel.c`) -- 54 requirements, 13 proxy-flagged.
+
+**No splits needed -- all 13 flagged ids confirmed atomic.** `REQ-SEQ-001` bundles `rcp_sequencer_table_new()`'s own `count==0` output state with `rcp_sequencer_table_unsupported()`'s classification of that exact state -- one coherent causal fact about the same scenario, already exercised as one test, not two independent claims (`REQ-SEQ-004` separately covers `unsupported()`'s own complete general contract). `REQ-SEQ-005`/`-006` each bundle a main-path clause with a `count==0`/idempotent-call edge case in the same function, the now-familiar pattern. `REQ-TRIG-004`/`REQ-CHAIN-002`/`REQ-CANCEL-004`/`REQ-CANCEL-007`/`REQ-CANCEL-015` each describe one encode/decode function's complete wire-layout-plus-validation contract. `REQ-TRIG-007`/`REQ-CHAIN-007`/`REQ-CHAIN-010`/`REQ-TRIG-009`/`REQ-TRIG-013` each bundle a function's error/success branches or two conditions of the same decision, all one function's complete behavior.
+
+**Real, in-scope fix found in all 4 test files: file-header tagging, not per-function.** `tests/test_request_sequencer.c`, `tests/test_request_triggered.c`, `tests/test_request_chained.c`, `tests/test_request_cancel.c` each had their `//cfusa:test` tags stacked in one block near the top of the file. Relocated every tag to its actual covering test(s) in all four files; several tests' own pre-existing inline comments already named the exact requirement id they covered (`test_encode_rejects_oversized_payload` -> `REQ-CHAIN-003`, `test_clear_all_decode_rejects_nonzero_reserved` -> `REQ-CANCEL-013`, etc.), which the relocation now makes machine-checkable instead of just documented in prose.
+
+**Verification:** full clean rebuild + 67/67 test suite passing (tag-only edit, no test behavior changed); ASan/UBSan clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 2` both pass, unchanged at 1272/1272 traced, 512/512 functions annotated.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.469.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-GRPC-*/REQ-REST-*/REQ-SOMEIP-*/REQ-CAN-*/REQ-DDS-*/REQ-MQTT-*/REQ-LIN-*/REQ-UDS-*/REQ-DOIP-*/REQ-ERR-*/REQ-CORE-*/REQ-RELAY-014: requirement-atomicity audit, Group 4 residual)
 
 Triaged the 9 small protocol-binding stub prefixes (18 requirements: `REQ-GRPC-*`, `REQ-REST-*`, `REQ-SOMEIP-*`, `REQ-CAN-*`, `REQ-DDS-*`, `REQ-MQTT-*`, `REQ-LIN-*`, `REQ-UDS-*`, `REQ-DOIP-*` -- each 2 requirements over one `*_bridge_send()`/`*_default_config()` pair), plus `REQ-ERR-*` (8 requirements, `src/rcp.c`'s sentinel-error surface), `REQ-CORE-*` (2, `rcp_bytes_t`), and `REQ-RELAY-014` (found incidentally alongside `REQ-ERR-*`/`REQ-CORE-*` in the same file) -- 29 requirements total. All 9 protocol-binding prefixes already carry `scope: "tc18"` in `.fusa-reqs.json`, so issue #533's own flagged "confirm TC18-scoped vs. RELAY-generic" triage question for this residual group is already answered for these -- no further scope decision needed.

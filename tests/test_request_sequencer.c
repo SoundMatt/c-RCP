@@ -1,16 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-SEQ-001
-//cfusa:test REQ-SEQ-002
-//cfusa:test REQ-SEQ-003
-//cfusa:test REQ-SEQ-004
-//cfusa:test REQ-SEQ-005
-//cfusa:test REQ-SEQ-006
-//cfusa:test REQ-SEQ-007
-//cfusa:test REQ-SEQ-008
-//cfusa:test REQ-SEQ-009
-//cfusa:test REQ-SEQ-010
-//cfusa:test REQ-SEQ-011
-//cfusa:test REQ-SEQ-013
 #include "unity.h"
 
 #include <rcp/alloc.h>
@@ -21,6 +9,7 @@ void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a fault-injection
 
 /* ── rcp_sequencer_table_new() ────────────────────────────────────────────── */
 
+//cfusa:test REQ-SEQ-001
 static void test_table_new_zero_count_is_unsupported_not_a_failure(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(0);
@@ -32,6 +21,7 @@ static void test_table_new_zero_count_is_unsupported_not_a_failure(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-003
 static void test_table_new_nonzero_count_initializes_power_on_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -57,6 +47,7 @@ static void test_table_new_nonzero_count_initializes_power_on_state(void)
 static void *always_fails(size_t size) { (void)size; return NULL; }
 static void *always_fails2(size_t nmemb, size_t size) { (void)nmemb; (void)size; return NULL; }
 
+//cfusa:test REQ-SEQ-002
 static void test_table_new_returns_zeroed_table_when_state_allocation_fails(void)
 {
     rcp_alloc_hooks_t     hooks = {0};
@@ -78,6 +69,7 @@ static void test_table_new_returns_zeroed_table_when_state_allocation_fails(void
  * own subsequent allocation fails -- the already-allocated state buffer
  * must be freed, not leaked, and the returned table must still be fully
  * zeroed (not a half-populated table with a NULL owner). */
+//cfusa:test REQ-SEQ-002
 static void test_table_new_frees_state_and_returns_zeroed_table_when_owner_allocation_fails(void)
 {
     rcp_alloc_hooks_t     hooks = {0};
@@ -97,6 +89,7 @@ static void test_table_new_frees_state_and_returns_zeroed_table_when_owner_alloc
 
 /* ── rcp_sequencer_table_unsupported() ────────────────────────────────────── */
 
+//cfusa:test REQ-SEQ-004
 static void test_table_unsupported_true_only_for_zero_count(void)
 {
     rcp_sequencer_table_t zero = rcp_sequencer_table_new(0);
@@ -111,6 +104,7 @@ static void test_table_unsupported_true_only_for_zero_count(void)
 
 /* ── rcp_sequencer_table_reset() ──────────────────────────────────────────── */
 
+//cfusa:test REQ-SEQ-005
 static void test_table_reset_restores_power_on_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -129,6 +123,7 @@ static void test_table_reset_restores_power_on_state(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-005
 static void test_table_reset_on_unsupported_table_is_a_no_op(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(0);
@@ -143,6 +138,7 @@ static void test_table_reset_on_unsupported_table_is_a_no_op(void)
 
 /* ── rcp_sequencer_table_free() ───────────────────────────────────────────── */
 
+//cfusa:test REQ-SEQ-006
 static void test_table_free_zeroes_and_is_idempotent(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -158,6 +154,7 @@ static void test_table_free_zeroes_and_is_idempotent(void)
 
 /* ── rcp_sequencer_index_valid() ──────────────────────────────────────────── */
 
+//cfusa:test REQ-SEQ-007
 static void test_index_valid_bounds(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -170,6 +167,7 @@ static void test_index_valid_bounds(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-007
 static void test_index_valid_always_false_for_unsupported_table(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(0);
@@ -181,6 +179,7 @@ static void test_index_valid_always_false_for_unsupported_table(void)
 
 /* ── rcp_sequencer_get_state() / rcp_sequencer_set_state() ───────────────── */
 
+//cfusa:test REQ-SEQ-008
 static void test_get_state_valid_index(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -192,6 +191,7 @@ static void test_get_state_valid_index(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-009
 static void test_get_state_invalid_index_fails_and_leaves_out_untouched(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -203,6 +203,7 @@ static void test_get_state_invalid_index_fails_and_leaves_out_untouched(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-010
 static void test_set_state_valid_index_applies(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -215,6 +216,7 @@ static void test_set_state_valid_index_applies(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-011
 static void test_set_state_invalid_index_fails_and_leaves_table_unchanged(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -229,6 +231,7 @@ static void test_set_state_invalid_index_fails_and_leaves_table_unchanged(void)
 
 /* ── REQ-SEQ-013: ownership (owner get/set, access_permitted) ────────────── */
 
+//cfusa:test REQ-SEQ-013
 static void test_table_new_initializes_owner_unclaimed(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -242,6 +245,7 @@ static void test_table_new_initializes_owner_unclaimed(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-013
 static void test_get_owner_invalid_index_fails_and_leaves_out_untouched(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -253,6 +257,7 @@ static void test_get_owner_invalid_index_fails_and_leaves_out_untouched(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-013
 static void test_set_owner_valid_index_applies(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -268,6 +273,7 @@ static void test_set_owner_valid_index_applies(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-013
 static void test_set_owner_invalid_index_fails_and_leaves_table_unchanged(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -283,6 +289,7 @@ static void test_set_owner_invalid_index_fails_and_leaves_table_unchanged(void)
 /* TC18 §12.7.10 Table 28's own access-control rule: an unclaimed
  * sequencer (the power-on default) is fail-closed, not open-access --
  * see RCP_SEQUENCER_OWNER_UNCLAIMED's own doc comment. */
+//cfusa:test REQ-SEQ-013
 static void test_access_permitted_false_when_unclaimed_regardless_of_requester(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -293,6 +300,7 @@ static void test_access_permitted_false_when_unclaimed_regardless_of_requester(v
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-013
 static void test_access_permitted_true_only_for_the_recorded_owner(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
@@ -307,6 +315,7 @@ static void test_access_permitted_true_only_for_the_recorded_owner(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-SEQ-013
 static void test_access_permitted_invalid_index_is_false(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
