@@ -1,17 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-TRIG-001
-//cfusa:test REQ-TRIG-002
-//cfusa:test REQ-TRIG-003
-//cfusa:test REQ-TRIG-004
-//cfusa:test REQ-TRIG-005
-//cfusa:test REQ-TRIG-006
-//cfusa:test REQ-TRIG-007
-//cfusa:test REQ-TRIG-008
-//cfusa:test REQ-TRIG-009
-//cfusa:test REQ-TRIG-010
-//cfusa:test REQ-TRIG-011
-//cfusa:test REQ-TRIG-012
-//cfusa:test REQ-TRIG-013
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -25,6 +12,7 @@ void tearDown(void) {}
 
 /* ── request_type classification ──────────────────────────────────────────── */
 
+//cfusa:test REQ-TRIG-001
 static void test_is_triggered(void)
 {
     TEST_ASSERT_TRUE(rcp_request_type_is_triggered(RCP_REQUEST_TYPE_TRIGGERED));
@@ -35,6 +23,7 @@ static void test_is_triggered(void)
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TRIG-002
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a = rcp_triggered_strerror(RCP_TRIGGERED_OK);
@@ -59,6 +48,8 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── encode/decode round trip ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-TRIG-004
+//cfusa:test REQ-TRIG-007
 static void test_triggered_request_round_trip(void)
 {
     rcp_triggered_step_t step = {0};
@@ -99,6 +90,8 @@ static void test_triggered_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TRIG-004
+//cfusa:test REQ-TRIG-007
 static void test_safety_request_round_trip(void)
 {
     rcp_triggered_step_t step = {0};
@@ -127,6 +120,7 @@ static void test_safety_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TRIG-003
 static void test_encode_rejects_unrecognized_request_type(void)
 {
     rcp_triggered_step_t step = {0};
@@ -134,6 +128,7 @@ static void test_encode_rejects_unrecognized_request_type(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-TRIG-005
 static void test_decode_rejects_short_frame(void)
 {
     uint8_t buf[4] = {0};
@@ -149,6 +144,7 @@ static void test_decode_rejects_short_frame(void)
                                                          &payload, &payload_len, &txn));
 }
 
+//cfusa:test REQ-TRIG-005
 static void test_decode_rejects_bad_msg_type(void)
 {
     uint8_t buf[16] = {0};
@@ -166,6 +162,7 @@ static void test_decode_rejects_bad_msg_type(void)
                                                          &payload, &payload_len, &txn));
 }
 
+//cfusa:test REQ-TRIG-006
 static void test_decode_rejects_non_repurposed(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -192,6 +189,7 @@ static void test_decode_rejects_non_repurposed(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TRIG-007
 static void test_decode_rejects_unknown_request_type(void)
 {
     rcp_triggered_step_t step = {0};
@@ -217,6 +215,7 @@ static void test_decode_rejects_unknown_request_type(void)
 
 /* ── The trigger-occurrence counter and fire tick ─────────────────────────── */
 
+//cfusa:test REQ-TRIG-008
 static void test_enter_started_resets_counter(void)
 {
     rcp_triggered_runtime_t rt;
@@ -229,6 +228,7 @@ static void test_enter_started_resets_counter(void)
     TEST_ASSERT_TRUE(rt.started);
 }
 
+//cfusa:test REQ-TRIG-009
 static void test_record_occurrence_requires_started(void)
 {
     rcp_triggered_runtime_t rt = {0};
@@ -251,6 +251,7 @@ static void test_record_occurrence_requires_started(void)
  * trigger number of the endpoint addressed by trigger_source_ep" -- so an
  * occurrence from a different endpoint, or a different signal number of
  * the same endpoint, is not this request's trigger and must not count. */
+//cfusa:test REQ-TRIG-009
 static void test_record_occurrence_only_counts_the_selected_trigger(void)
 {
     rcp_triggered_runtime_t rt = {0};
@@ -277,6 +278,7 @@ static void test_record_occurrence_only_counts_the_selected_trigger(void)
  * occur before the request is executed. e.g. '0' results in execution
  * after one trigger signal while a '3' will cause an execution after four
  * occurrences." */
+//cfusa:test REQ-TRIG-010
 static void test_threshold_counts_occurrences_before_execution(void)
 {
     rcp_triggered_runtime_t rt = {0};
@@ -304,6 +306,7 @@ static void test_threshold_counts_occurrences_before_execution(void)
     TEST_ASSERT_TRUE(rcp_triggered_threshold_reached(&step, &rt));
 }
 
+//cfusa:test REQ-TRIG-011
 static void test_exec_delay_elapsed(void)
 {
     rcp_triggered_step_t step = {0};
@@ -314,6 +317,7 @@ static void test_exec_delay_elapsed(void)
     TEST_ASSERT_TRUE(rcp_triggered_exec_delay_elapsed(&step, 101));
 }
 
+//cfusa:test REQ-TRIG-012
 static void test_tick_requires_started_and_threshold(void)
 {
     rcp_triggered_step_t step = {0};
@@ -333,6 +337,8 @@ static void test_tick_requires_started_and_threshold(void)
     TEST_ASSERT_TRUE(rt.started);
 }
 
+//cfusa:test REQ-TRIG-012
+//cfusa:test REQ-TRIG-013
 static void test_tick_fires_only_when_idle(void)
 {
     rcp_triggered_step_t step = {0};
@@ -357,6 +363,7 @@ static void test_tick_fires_only_when_idle(void)
     TEST_ASSERT_EQUAL_UINT32(0, rt.occurrence_count);
 }
 
+//cfusa:test REQ-TRIG-012
 static void test_tick_blocked_until_exec_delay_elapses(void)
 {
     rcp_triggered_step_t step = {0};
@@ -374,6 +381,7 @@ static void test_tick_blocked_until_exec_delay_elapses(void)
     TEST_ASSERT_TRUE(rcp_triggered_tick(&step, &rt, 50, true));
 }
 
+//cfusa:test REQ-TRIG-009
 static void test_counter_free_runs_independent_of_idle(void)
 {
     rcp_triggered_runtime_t rt = {0};
@@ -411,6 +419,7 @@ static void test_counter_free_runs_independent_of_idle(void)
 
 #define TS_OFF RCP_ACF_ABB_HEADER_LEN
 
+//cfusa:test REQ-TRIG-004
 static void test_triggered_wire_sub_field_offsets(void)
 {
     rcp_triggered_step_t step = {0};
@@ -438,6 +447,7 @@ static void test_triggered_wire_sub_field_offsets(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TRIG-004
 static void test_triggered_safety_opcode_is_0x8e(void)
 {
     rcp_triggered_step_t step = {0};
@@ -449,6 +459,7 @@ static void test_triggered_safety_opcode_is_0x8e(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TRIG-007
 static void test_triggered_decode_reads_hand_built_spec_layout(void)
 {
     rcp_triggered_step_t step = {0};
