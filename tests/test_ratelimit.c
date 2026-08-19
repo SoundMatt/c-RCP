@@ -1,21 +1,11 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-RL-001
-//cfusa:test REQ-RL-002
-//cfusa:test REQ-RL-003
-//cfusa:test REQ-RL-004
-//cfusa:test REQ-RL-005
-//cfusa:test REQ-RL-006
 // Security-relevant subset (CYBERSECURITY.md §1.6, Layer 6 — Rate
 // Limiting): per-(stream_id, byte_bus_id) token-bucket admission
 // control mitigating request-flood DoS, with safety-tagged requests
 // exempt by default. See CYBERSECURITY.md §3 (Request-flood DoS row).
-//cfusa:sec-test REQ-RL-003
-//cfusa:sec-test REQ-RL-004
-//cfusa:test REQ-RL-007
-//cfusa:test REQ-RL-008
-//cfusa:test REQ-RL-009
-//cfusa:test REQ-RL-010
-//cfusa:test REQ-RL-011
+// Each rate-limit test function below carries its own security-test
+// marker alongside its regular test marker where relevant, placed at
+// that function instead of listed here.
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -78,6 +68,7 @@ static void test_first_use_seeds_a_full_bucket(void)
 
 //cfusa:test REQ-RL-003
 //cfusa:test REQ-RL-008
+//cfusa:sec-test REQ-RL-003
 static void test_allow_returns_false_when_bucket_exhausted(void)
 {
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
@@ -120,6 +111,7 @@ static void test_tokens_refill_over_time(void)
 /* ── Safety exemption ─────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-RL-004
+//cfusa:sec-test REQ-RL-004
 static void test_safety_tagged_bypasses_bucket_when_exempt(void)
 {
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();

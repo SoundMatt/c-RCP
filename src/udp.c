@@ -429,7 +429,7 @@ size_t rcp_udp_avtp_transport_addr_string(rcp_avtp_transport_t *t, char *buf, si
     return ((size_t)n < buf_len) ? (size_t)n : buf_len - 1;
 }
 
-//cfusa:req REQ-UDP-018
+//cfusa:req REQ-UDP-020
 uint32_t rcp_udp_avtp_transport_last_recv_seq(rcp_avtp_transport_t *t)
 {
     rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)t;

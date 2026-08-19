@@ -4,25 +4,6 @@
  * rcp_udp_avtp_transport_ok() reports the transport isn't available
  * (currently: Windows, which only has the stub implementation -- see
  * ROADMAP.md). */
-//cfusa:test REQ-UDP-001
-//cfusa:test REQ-UDP-002
-//cfusa:test REQ-UDP-003
-//cfusa:test REQ-UDP-004
-//cfusa:test REQ-UDP-005
-//cfusa:test REQ-UDP-006
-//cfusa:test REQ-UDP-007
-//cfusa:test REQ-UDP-008
-//cfusa:test REQ-UDP-009
-//cfusa:test REQ-UDP-010
-//cfusa:test REQ-UDP-011
-//cfusa:test REQ-UDP-012
-//cfusa:test REQ-UDP-013
-//cfusa:test REQ-UDP-014
-//cfusa:test REQ-UDP-015
-//cfusa:test REQ-UDP-016
-//cfusa:test REQ-UDP-017
-//cfusa:test REQ-UDP-018
-//cfusa:test REQ-UDP-019
 #include "unity.h"
 
 #include <rcp/avtp.h>
@@ -95,6 +76,8 @@ static rcp_avtp_transport_t *bind_or_ignore(void)
     return srv;
 }
 
+//cfusa:test REQ-UDP-001
+//cfusa:test REQ-UDP-005
 static void test_dial_send_recv_roundtrip(void)
 {
     rcp_avtp_transport_t *srv;
@@ -125,6 +108,10 @@ static void test_dial_send_recv_roundtrip(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-002
+//cfusa:test REQ-UDP-006
+//cfusa:test REQ-UDP-007
+//cfusa:test REQ-UDP-008
 static void test_bind_learns_peer_and_replies(void)
 {
     rcp_avtp_transport_t *srv;
@@ -169,6 +156,7 @@ static void test_bind_learns_peer_and_replies(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-009
 static void test_recv_times_out_when_empty(void)
 {
     rcp_avtp_transport_t *srv;
@@ -185,6 +173,7 @@ static void test_recv_times_out_when_empty(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-010
 static void test_recv_into_too_small_buffer_returns_busy(void)
 {
     rcp_avtp_transport_t *srv;
@@ -214,6 +203,7 @@ static void test_recv_into_too_small_buffer_returns_busy(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-011
 static void test_send_recv_after_close_returns_closed(void)
 {
     rcp_avtp_transport_t *srv;
@@ -265,6 +255,7 @@ static void *close_unblock_recv_thread(void *arg)
  * within one poll slice, without ever touching the fd out from under it"
  * contract: a background thread is parked in recv() when close() runs on
  * the same transport from this (the main test) thread. */
+//cfusa:test REQ-UDP-012
 static void test_close_unblocks_in_progress_recv(void)
 {
     rcp_avtp_transport_t *srv;
@@ -292,6 +283,7 @@ static void test_close_unblocks_in_progress_recv(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-004
 static void test_addr_string_and_port_report_bound_address(void)
 {
     rcp_avtp_transport_t *srv;
@@ -316,6 +308,7 @@ static void test_addr_string_and_port_report_bound_address(void)
 /* REQ-UDP-002: a NULL or empty addr binds INADDR_ANY (0.0.0.0), not a
  * specific interface -- every other bind() test in this file passes
  * "127.0.0.1" explicitly, leaving this branch untested. */
+//cfusa:test REQ-UDP-002
 static void test_bind_null_addr_binds_inaddr_any(void)
 {
     rcp_avtp_transport_t *srv = rcp_udp_avtp_transport_bind(NULL, 0, false);
@@ -336,6 +329,7 @@ static void test_bind_null_addr_binds_inaddr_any(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-002
 static void test_bind_empty_addr_binds_inaddr_any(void)
 {
     rcp_avtp_transport_t *srv = rcp_udp_avtp_transport_bind("", 0, false);
@@ -360,6 +354,7 @@ static void test_bind_empty_addr_binds_inaddr_any(void)
  * underlying bind() call itself fails, not just when socket() fails.
  * Binding the exact same address:port a still-open transport already
  * holds is a portable, reliable way to force a genuine EADDRINUSE. */
+//cfusa:test REQ-UDP-003
 static void test_bind_failure_is_not_ok(void)
 {
     rcp_avtp_transport_t *first;
@@ -387,6 +382,7 @@ static void test_bind_failure_is_not_ok(void)
  * so port() must take the fd<0 branch and return 0 without ever
  * reaching getsockname() -- distinct from every existing port() call,
  * which reaches getsockname() and succeeds. */
+//cfusa:test REQ-UDP-004
 //cfusa:test REQ-UDP-004
 static void test_port_returns_zero_for_fd_from_failed_bind(void)
 {
@@ -417,6 +413,7 @@ static void test_port_returns_zero_for_fd_from_failed_bind(void)
  * zero-capacity output buffer -- a case no existing caller in this
  * file passes) is exercised anywhere else. */
 //cfusa:test REQ-UDP-004
+//cfusa:test REQ-UDP-004
 static void test_addr_string_returns_zero_for_fd_from_failed_bind(void)
 {
     rcp_avtp_transport_t *first;
@@ -441,6 +438,7 @@ static void test_addr_string_returns_zero_for_fd_from_failed_bind(void)
     rcp_avtp_transport_release(first);
 }
 
+//cfusa:test REQ-UDP-004
 //cfusa:test REQ-UDP-004
 static void test_addr_string_returns_zero_for_zero_capacity_buffer(void)
 {
@@ -497,6 +495,7 @@ static void test_addr_string_returns_zero_for_zero_capacity_buffer(void)
  * even declare on that platform. */
 #if !defined(_WIN32)
 //cfusa:test REQ-UDP-004
+//cfusa:test REQ-UDP-004
 static void test_port_returns_zero_when_fd_invalid_underneath_transport(void)
 {
     rcp_avtp_transport_t *srv;
@@ -530,6 +529,8 @@ static void test_port_returns_zero_when_fd_invalid_underneath_transport(void)
 }
 #endif /* !_WIN32 */
 
+//cfusa:test REQ-UDP-003
+//cfusa:test REQ-UDP-013
 static void test_dial_unreachable_host_still_ok_at_construct_time(void)
 {
     /* connect() on a UDP socket only validates the address family/format,
@@ -545,6 +546,7 @@ static void test_dial_unreachable_host_still_ok_at_construct_time(void)
     rcp_avtp_transport_release(cli);
 }
 
+//cfusa:test REQ-UDP-003
 static void test_dial_bad_address_is_not_ok(void)
 {
     rcp_avtp_transport_t *cli = rcp_udp_avtp_transport_dial("not-an-address", 12345, false);
@@ -555,6 +557,8 @@ static void test_dial_bad_address_is_not_ok(void)
 /* ── Annex J encapsulation sequence number codec: pure, socket-free ──────
  * (rcp_udp_annexj_wrap()/_unwrap(), udp.h's own file header). */
 
+//cfusa:test REQ-UDP-015
+//cfusa:test REQ-UDP-016
 static void test_annexj_wrap_unwrap_roundtrip(void)
 {
     static const uint8_t avtpdu[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
@@ -584,6 +588,7 @@ static void test_annexj_wrap_unwrap_roundtrip(void)
     rcp_bytes_free(&wrapped);
 }
 
+//cfusa:test REQ-UDP-015
 static void test_annexj_wrap_empty_avtpdu(void)
 {
     rcp_bytes_t   wrapped = rcp_udp_annexj_wrap(42u, NULL, 0);
@@ -602,6 +607,7 @@ static void test_annexj_wrap_empty_avtpdu(void)
     rcp_bytes_free(&wrapped);
 }
 
+//cfusa:test REQ-UDP-016
 static void test_annexj_unwrap_rejects_short_datagram(void)
 {
     static const uint8_t too_short[3] = {0x00, 0x00, 0x00};
@@ -630,6 +636,7 @@ static void test_annexj_unwrap_rejects_short_datagram(void)
  * well-formed Annex J frame) -- Windows has no real UDP transport
  * implementation at all (see this file's own header), so this is
  * POSIX-only, matching bind_or_ignore()'s own platform gating. */
+//cfusa:test REQ-UDP-018
 static void test_recv_drops_short_datagram_and_keeps_waiting(void)
 {
     rcp_avtp_transport_t *srv;
@@ -683,6 +690,8 @@ static void test_recv_drops_short_datagram_and_keeps_waiting(void)
 /* ── Send-side sequence numbers increment monotonically over a real
  * dial()/bind() pair, and the receiver's own last_recv_seq() reports
  * exactly what was sent (REQ-UDP-017/018). */
+//cfusa:test REQ-UDP-017
+//cfusa:test REQ-UDP-020
 static void test_send_seq_increments_and_is_observable_on_receive(void)
 {
     rcp_avtp_transport_t *srv;
@@ -724,12 +733,14 @@ static void test_send_seq_increments_and_is_observable_on_receive(void)
 
 /* ── Default control-port (Annex J, 17221) convenience wrappers
  * (REQ-UDP-019). */
+//cfusa:test REQ-UDP-019
 static void test_control_port_constant_is_17221(void)
 {
     TEST_ASSERT_EQUAL_UINT16(17221u, RCP_UDP_ANNEX_J_CONTROL_PORT);
     TEST_ASSERT_EQUAL_UINT16(17220u, RCP_UDP_ANNEX_J_CONTINUOUS_PORT);
 }
 
+//cfusa:test REQ-UDP-019
 static void test_bind_default_port_binds_control_port(void)
 {
     rcp_avtp_transport_t *srv = rcp_udp_avtp_transport_bind_default_port("127.0.0.1", false);
@@ -742,6 +753,7 @@ static void test_bind_default_port_binds_control_port(void)
     rcp_avtp_transport_release(srv);
 }
 
+//cfusa:test REQ-UDP-019
 static void test_dial_default_port_targets_control_port(void)
 {
     /* Same "connect() only validates address family/format" caveat as
@@ -790,6 +802,7 @@ static void test_dial_default_port_targets_control_port(void)
  * itself #if defined(_WIN32)-gated and only ever runs on this repo's own
  * windows-2022 CI job, mirroring how bind_or_ignore() IGNOREs the rest
  * of this file's own POSIX-only tests there instead. */
+//cfusa:test REQ-UDP-014
 static void test_win32_stub_dial_and_bind_are_not_ok_and_return_closed(void)
 {
     rcp_avtp_transport_t *dialed;

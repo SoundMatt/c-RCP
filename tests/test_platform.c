@@ -1,7 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-PLATFORM-001
-//cfusa:test REQ-PLATFORM-002
-//cfusa:test REQ-PLATFORM-003
 /* Direct unit tests for the internal, codebase-wide portability primitives
  * (src/platform.h, src/platform.c, rcp/clock.h): mutex/condvar mutual
  * exclusion, thread start, and the monotonic clock. Every module needing
@@ -22,6 +19,7 @@ void tearDown(void) {}
 
 /* ── Mutex / condvar ───────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PLATFORM-001
 static void test_mutex_lock_unlock_roundtrip(void)
 {
     rcp_mutex_t m;
@@ -32,6 +30,7 @@ static void test_mutex_lock_unlock_roundtrip(void)
     TEST_PASS(); /* must not deadlock or crash */
 }
 
+//cfusa:test REQ-PLATFORM-001
 static void test_cond_signal_wakes_waiter_same_thread_polling(void)
 {
     /* Single-threaded smoke test: timedwait_until with an already-past
@@ -63,6 +62,7 @@ static void thread_fn(void *arg)
     *flag = 1;
 }
 
+//cfusa:test REQ-PLATFORM-002
 static void test_thread_start_joinable_runs_and_joins(void)
 {
     rcp_thread_t t;
@@ -84,6 +84,7 @@ static void detached_thread_fn(void *arg)
     *flag = 1;
 }
 
+//cfusa:test REQ-PLATFORM-002
 static void test_thread_start_detached_runs(void)
 {
     int rc;
@@ -101,6 +102,7 @@ static void test_thread_start_detached_runs(void)
 
 /* ── Monotonic clock ───────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PLATFORM-003
 static void test_monotonic_ms_never_decreases(void)
 {
     uint64_t a = rcp_monotonic_ms();

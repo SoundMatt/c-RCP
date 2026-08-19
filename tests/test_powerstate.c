@@ -1,19 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-PWR-001
-//cfusa:test REQ-PWR-002
-//cfusa:test REQ-PWR-003
-//cfusa:test REQ-PWR-004
-//cfusa:test REQ-PWR-005
-//cfusa:test REQ-PWR-006
-//cfusa:test REQ-PWR-007
-//cfusa:test REQ-PWR-008
-//cfusa:test REQ-PWR-009
-//cfusa:test REQ-PWR-010
-//cfusa:test REQ-PWR-011
-//cfusa:test REQ-PWR-012
-//cfusa:test REQ-PWR-013
-//cfusa:test REQ-PWR-014
-//cfusa:test REQ-PWR-015
 #include "unity.h"
 
 #include <rcp/powerstate.h>
@@ -435,6 +420,7 @@ static void test_wake_via_pin_cold_when_handshake_not_started(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+//cfusa:test REQ-PWR-008
 static void test_wake_via_pin_requires_sleep(void)
 {
     rcp_avtp_addr_t endpoints[] = {ADDR};
@@ -470,6 +456,7 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
  * test_handshake_begin_unknown_endpoint() immediately below). b/len
  * content is irrelevant here -- find_entry() fails before either is
  * ever inspected. */
+//cfusa:test REQ-PWR-007
 static void test_apply_wakeup_echo_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
@@ -482,6 +469,7 @@ static void test_apply_wakeup_echo_unknown_endpoint(void)
 
 /* REQ-PWR-014: same convention, for rcp_powerstate_manager_
  * handshake_resume_queues()'s own untracked-endpoint branch. */
+//cfusa:test REQ-PWR-014
 static void test_handshake_resume_queues_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
@@ -494,12 +482,14 @@ static void test_handshake_resume_queues_unknown_endpoint(void)
 /* REQ-PWR-015: rcp_powerstate_manager_destroy(NULL) is documented as a
  * safe no-op -- every other test in this file destroys a real, non-NULL
  * manager, leaving this specific clause untested. */
+//cfusa:test REQ-PWR-015
 static void test_manager_destroy_null_is_a_safe_no_op(void)
 {
     rcp_powerstate_manager_destroy(NULL); /* must not crash */
     TEST_PASS();
 }
 
+//cfusa:test REQ-PWR-006
 static void test_handshake_begin_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
