@@ -499,6 +499,7 @@ static void test_dispatch_kicks_the_watchdog_even_when_the_request_is_rejected(v
  * (power.h deliberately never touches server.h) puts that responsibility
  * on -- every registered endpoint is re-enabled once the handshake's own
  * resume-queues step succeeds. */
+//cfusa:test REQ-PWRMODE-019
 static void test_pwrmode_resume_reenables_all_endpoints(void)
 {
     rcp_mock_server_t      *srv = rcp_mock_server_new();

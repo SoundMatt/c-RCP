@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.473.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
+REQ-PWRMODE-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged REQ-PWRMODE-* (28, src/power.c/src/powerstate.c/
+src/ep_wakeup.c/src/server.c/src/mock.c) -- 6 proxy-flagged.
+
+All 6 flagged ids confirmed atomic -- each bundles one state-machine
+function's complete transition-table/branch behavior
+(REQ-PWRMODE-004/005/007/008/009/012), the same pattern established
+throughout this audit. No split needed this batch.
+
+File-header tagging fixed across 3 test files. tests/test_power.c
+(its own dedicated file, REQ-PWRMODE-001..013) had its 13-tag header
+removed and per-function tags applied across all 32 real test
+functions, including test_handshake_steps_reject_out_of_order_calls,
+one test that demonstrates all three of REQ-PWRMODE-007/008/009's own
+"else, leave hs unchanged and return false" out-of-order-rejection
+branches, tagged with all three. tests/test_tc18_gaps_server.c is a
+large shared-header file bundling many unrelated prefixes together
+(REQ-LIFECYCLE-*/REQ-SRV-*/REQ-SEQ-*/etc.); only its REQ-PWRMODE-014..
+028 header lines were touched, relocated per-function, leaving every
+other prefix's lines untouched per the established REQ-WDG-010-batch
+precedent.
+
+One cross-file correction: REQ-PWRMODE-019. test_tc18_gaps_server.c's
+own header claimed this id, but no test in that file actually
+exercises it -- its own comment explicitly states the real
+composition point (rcp_mock_server_pwrmode_resume()) is "tested
+directly in test_mock.c's test_pwrmode_resume_reenables_all_
+endpoints()", matching issue tracker item #123's own prior
+investigation. The stale header claim was removed outright (not
+relocated within that file); the real, previously-untagged test in
+test_mock.c now carries the tag instead.
+
+Verification: full clean rebuild + 67/67 test suite passing;
+ASan/UBSan clean, 67/67; pinned cfusa v0.6.2: check 0 errors, trace
+--req-coverage 100/--sec-tested 100 both pass -- 1274/1274 traced
+(unchanged, no split), 512/512 functions annotated.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.472.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
 REQ-FI-*/REQ-RL-*/REQ-PLATFORM-*/REQ-UDP-*/REQ-PWR-*: requirement-
 atomicity audit, Group 4 residual)

@@ -1,17 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-PWRMODE-001
-//cfusa:test REQ-PWRMODE-002
-//cfusa:test REQ-PWRMODE-003
-//cfusa:test REQ-PWRMODE-004
-//cfusa:test REQ-PWRMODE-005
-//cfusa:test REQ-PWRMODE-006
-//cfusa:test REQ-PWRMODE-007
-//cfusa:test REQ-PWRMODE-008
-//cfusa:test REQ-PWRMODE-009
-//cfusa:test REQ-PWRMODE-010
-//cfusa:test REQ-PWRMODE-011
-//cfusa:test REQ-PWRMODE-012
-//cfusa:test REQ-PWRMODE-013
 #include "unity.h"
 
 #include <rcp/lifecycle.h>
@@ -24,6 +11,7 @@ void tearDown(void) {}
 
 /* ── rcp_pwrmode_string / rcp_pwrmode_strerror ───────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-001
 static void test_pwrmode_string_unique_nonempty(void)
 {
     const rcp_pwrmode_t modes[] = {
@@ -42,11 +30,13 @@ static void test_pwrmode_string_unique_nonempty(void)
     }
 }
 
+//cfusa:test REQ-PWRMODE-001
 static void test_pwrmode_string_unknown_nonnull(void)
 {
     TEST_ASSERT_NOT_NULL(rcp_pwrmode_string((rcp_pwrmode_t)99));
 }
 
+//cfusa:test REQ-PWRMODE-002
 static void test_pwrmode_strerror_nonnull(void)
 {
     TEST_ASSERT_NOT_NULL(rcp_pwrmode_strerror(RCP_PWRMODE_OK));
@@ -56,12 +46,14 @@ static void test_pwrmode_strerror_nonnull(void)
 
 /* ── rcp_pwrmode_cold_start_lifecycle_target ─────────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-003
 static void test_cold_start_target_is_hw_unconfigured_with_nothing_recovered(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED,
                       rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_HW_UNCONFIGURED));
 }
 
+//cfusa:test REQ-PWRMODE-003
 static void test_cold_start_target_returns_the_recovered_state_unchanged(void)
 {
     /* REQ-PWRMODE-014 (TC18 §12.3, §12.4.1): "After a cold start the RC
@@ -73,6 +65,7 @@ static void test_cold_start_target_returns_the_recovered_state_unchanged(void)
                       rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_RCP_CONFIGURED));
 }
 
+//cfusa:test REQ-PWRMODE-003
 static void test_cold_start_target_falls_back_on_an_unrecognized_recovered_state(void)
 {
     /* Fail-safe: a corrupt/unrecognized recovered_state (e.g. a garbled
@@ -84,6 +77,7 @@ static void test_cold_start_target_falls_back_on_an_unrecognized_recovered_state
 
 /* ── rcp_pwrmode_transition ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_normal_to_standby_is_hot(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_NORMAL;
@@ -94,6 +88,7 @@ static void test_transition_normal_to_standby_is_hot(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_standby_to_normal_is_hot(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_STANDBY;
@@ -103,6 +98,7 @@ static void test_transition_standby_to_normal_is_hot(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_normal_to_sleep_is_cold(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_NORMAL;
@@ -113,6 +109,7 @@ static void test_transition_normal_to_sleep_is_cold(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_standby_to_sleep_is_cold(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_STANDBY;
@@ -122,6 +119,7 @@ static void test_transition_standby_to_sleep_is_cold(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_any_to_unpowered_is_cold(void)
 {
     rcp_pwrmode_t             mode;
@@ -151,6 +149,7 @@ static void test_transition_any_to_unpowered_is_cold(void)
  * only way to reach this line with the whole OR false -- and is itself
  * a meaningful defensive case: corrupted/uninitialized state must be
  * rejected, not silently treated as an implicit UNPOWERED. */
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_to_unpowered_from_invalid_mode_is_rejected(void)
 {
     rcp_pwrmode_t mode = (rcp_pwrmode_t)99;
@@ -160,6 +159,7 @@ static void test_transition_to_unpowered_from_invalid_mode_is_rejected(void)
     TEST_ASSERT_EQUAL((rcp_pwrmode_t)99, mode); /* left untouched on rejection */
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_unpowered_to_normal_is_cold(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_UNPOWERED;
@@ -170,6 +170,7 @@ static void test_transition_unpowered_to_normal_is_cold(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_same_mode_is_noop_hot(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
@@ -180,6 +181,7 @@ static void test_transition_same_mode_is_noop_hot(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_sleep_to_normal_is_rejected(void)
 {
     rcp_pwrmode_t mode = RCP_PWRMODE_SLEEP;
@@ -189,6 +191,7 @@ static void test_transition_sleep_to_normal_is_rejected(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode); /* unchanged on failure */
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_standby_to_sleep_direct_via_standby_is_ok_but_skip_rejected(void)
 {
     /* StandBy -> Sleep is a permitted direct transition (see above); what
@@ -206,6 +209,7 @@ static void test_transition_standby_to_sleep_direct_via_standby_is_ok_but_skip_r
                        rcp_pwrmode_transition(&mode, RCP_PWRMODE_SLEEP, NULL));
 }
 
+//cfusa:test REQ-PWRMODE-004
 static void test_transition_out_start_kind_may_be_null(void)
 {
     rcp_pwrmode_t mode = RCP_PWRMODE_NORMAL;
@@ -219,6 +223,7 @@ static void test_transition_out_start_kind_may_be_null(void)
 /* As of the REQ-PWRMODE-020 fix (TC18 §12.4.1: a network wake "will...
  * proceed as before", i.e. the same handshake a pin wake runs, not a
  * skip), true for every path -- not just RCP_PWRMODE_WAKE_VIA_PIN. */
+//cfusa:test REQ-PWRMODE-005
 static void test_hotstart_required_true_for_every_path(void)
 {
     TEST_ASSERT_TRUE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_PIN));
@@ -227,6 +232,9 @@ static void test_hotstart_required_true_for_every_path(void)
 
 /* ── rcp_pwrmode_handshake_* ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-006
+//cfusa:test REQ-PWRMODE-010
+//cfusa:test REQ-PWRMODE-011
 static void test_handshake_init_state(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -239,6 +247,8 @@ static void test_handshake_init_state(void)
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_has_failed(&hs));
 }
 
+//cfusa:test REQ-PWRMODE-009
+//cfusa:test REQ-PWRMODE-010
 static void test_handshake_full_success_sequence(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -258,6 +268,7 @@ static void test_handshake_full_success_sequence(void)
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_has_failed(&hs));
 }
 
+//cfusa:test REQ-PWRMODE-008
 static void test_handshake_wakeup_attempt_pending_before_limit(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -273,6 +284,8 @@ static void test_handshake_wakeup_attempt_pending_before_limit(void)
     TEST_ASSERT_EQUAL_UINT32(2, hs.wakeup_attempts);
 }
 
+//cfusa:test REQ-PWRMODE-008
+//cfusa:test REQ-PWRMODE-011
 static void test_handshake_wakeup_attempt_fails_at_repeat_limit(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -286,6 +299,7 @@ static void test_handshake_wakeup_attempt_fails_at_repeat_limit(void)
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_has_failed(&hs));
 }
 
+//cfusa:test REQ-PWRMODE-008
 static void test_handshake_zero_repeat_limit_fails_first_attempt(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -305,6 +319,7 @@ static void test_handshake_zero_repeat_limit_fails_first_attempt(void)
  * message repetition, which cannot even begin until step (a) actually
  * advances). Repeated false polls stay retriable indefinitely; the
  * first true poll then advances normally. */
+//cfusa:test REQ-PWRMODE-007
 static void test_handshake_iface_reenabled_retries_until_network_available(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -327,6 +342,9 @@ static void test_handshake_iface_reenabled_retries_until_network_available(void)
     TEST_ASSERT_EQUAL_UINT32(1, hs.wakeup_attempts);
 }
 
+//cfusa:test REQ-PWRMODE-007
+//cfusa:test REQ-PWRMODE-008
+//cfusa:test REQ-PWRMODE-009
 static void test_handshake_steps_reject_out_of_order_calls(void)
 {
     rcp_pwrmode_handshake_t hs;
@@ -347,6 +365,7 @@ static void test_handshake_steps_reject_out_of_order_calls(void)
 
 /* ── rcp_pwrmode_wake_from_sleep ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_requires_sleep_mode(void)
 {
     rcp_pwrmode_t mode = RCP_PWRMODE_NORMAL;
@@ -361,6 +380,7 @@ static void test_wake_from_sleep_requires_sleep_mode(void)
  * falls back to the module's documented safe default, COLD, matching
  * test_wake_from_sleep_via_pin_hot_only_when_handshake_complete()'s own
  * "handshake not yet complete -> cold" case exactly. */
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_network_cold_without_handshake(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
@@ -375,6 +395,7 @@ static void test_wake_from_sleep_via_network_cold_without_handshake(void)
 /* ...but a completed handshake yields hot for a network wake exactly as
  * it already did for a pin wake -- REQ-PWRMODE-020's own point: both
  * paths now share one rule. */
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_network_hot_when_handshake_complete(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
@@ -393,6 +414,7 @@ static void test_wake_from_sleep_via_network_hot_when_handshake_complete(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_pin_hot_only_when_handshake_complete(void)
 {
     rcp_pwrmode_t             mode;
@@ -412,6 +434,7 @@ static void test_wake_from_sleep_via_pin_hot_only_when_handshake_complete(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_pin_cold_when_handshake_incomplete(void)
 {
     rcp_pwrmode_t             mode;
@@ -427,6 +450,7 @@ static void test_wake_from_sleep_via_pin_cold_when_handshake_incomplete(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_pin_cold_when_handshake_failed(void)
 {
     rcp_pwrmode_t             mode;
@@ -444,6 +468,7 @@ static void test_wake_from_sleep_via_pin_cold_when_handshake_failed(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+//cfusa:test REQ-PWRMODE-012
 static void test_wake_from_sleep_via_pin_null_handshake_is_cold(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
@@ -456,6 +481,7 @@ static void test_wake_from_sleep_via_pin_null_handshake_is_cold(void)
 
 /* ── rcp_pwrmode_check_entry ──────────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWRMODE-013
 static void test_check_entry_ok_when_all_clear(void)
 {
     rcp_pwrmode_entry_gate_t gate = { true, true, true };
@@ -463,6 +489,7 @@ static void test_check_entry_ok_when_all_clear(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_OK, rcp_pwrmode_check_entry(&gate));
 }
 
+//cfusa:test REQ-PWRMODE-013
 static void test_check_entry_refused_when_wup_status_uncleared(void)
 {
     rcp_pwrmode_entry_gate_t gate = { false, true, true };
@@ -470,6 +497,7 @@ static void test_check_entry_refused_when_wup_status_uncleared(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&gate));
 }
 
+//cfusa:test REQ-PWRMODE-013
 static void test_check_entry_refused_when_endpoint_not_idle(void)
 {
     rcp_pwrmode_entry_gate_t gate = { true, false, true };
@@ -477,6 +505,7 @@ static void test_check_entry_refused_when_endpoint_not_idle(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&gate));
 }
 
+//cfusa:test REQ-PWRMODE-013
 static void test_check_entry_refused_when_response_queue_nonempty(void)
 {
     rcp_pwrmode_entry_gate_t gate = { true, true, false };
@@ -484,6 +513,7 @@ static void test_check_entry_refused_when_response_queue_nonempty(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&gate));
 }
 
+//cfusa:test REQ-PWRMODE-013
 static void test_check_entry_refused_on_null_gate(void)
 {
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(NULL));
