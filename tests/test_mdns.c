@@ -1,15 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-MDNS-001
-//cfusa:test REQ-MDNS-002
-//cfusa:test REQ-MDNS-003
-//cfusa:test REQ-MDNS-004
-//cfusa:test REQ-MDNS-005
-//cfusa:test REQ-MDNS-006
-//cfusa:test REQ-MDNS-007
-//cfusa:test REQ-MDNS-008
-//cfusa:test REQ-MDNS-009
-//cfusa:test REQ-MDNS-010
-//cfusa:test REQ-MDNS-011
 #include "unity.h"
 
 #include "../src/mem_bounded.h"
@@ -156,12 +145,15 @@ static void count_cb(const rcp_mdns_discovery_event_t *ev, void *user_data)
  * rcp_mdns_discoverer_destroy() elsewhere in this file passes a real,
  * non-NULL discoverer; the d==NULL no-op branch itself was never
  * exercised. */
+//cfusa:test REQ-MDNS-010
 static void test_discoverer_destroy_null_is_a_safe_no_op(void)
 {
     rcp_mdns_discoverer_destroy(NULL); /* must not crash */
     TEST_PASS();
 }
 
+//cfusa:test REQ-MDNS-001
+//cfusa:test REQ-MDNS-004
 //cfusa:test REQ-MDNS-010
 //cfusa:test REQ-MDNS-011
 static void test_static_discoverer_emits_on_start(void)
@@ -188,6 +180,7 @@ static void added_cb(const rcp_mdns_discovery_event_t *ev, void *user_data)
     g_added[g_added_len++] = ev->info.server_stream_id;
 }
 
+//cfusa:test REQ-MDNS-002
 static void test_start_fires_added_event_per_record(void)
 {
     size_t n;
@@ -217,6 +210,7 @@ static void stop_after_first_cb(const rcp_mdns_discovery_event_t *ev, void *user
     rcp_mdns_discoverer_stop(g_stop_target);
 }
 
+//cfusa:test REQ-MDNS-003
 static void test_stop_terminates_discovery(void)
 {
     size_t n;
@@ -243,6 +237,7 @@ static void first_info_cb(const rcp_mdns_discovery_event_t *ev, void *user_data)
     }
 }
 
+//cfusa:test REQ-MDNS-005
 static void test_server_info_carries_host_port_stream_id(void)
 {
     size_t n;
@@ -264,6 +259,7 @@ static void test_server_info_carries_host_port_stream_id(void)
     rcp_mdns_discoverer_destroy(disc);
 }
 
+//cfusa:test REQ-MDNS-006
 static void test_make_instance_name_follows_convention(void)
 {
     char buf[128];
@@ -323,6 +319,7 @@ static void test_withdraw_removes_record(void)
     TEST_ASSERT_FALSE(announcer_has(&ann, sid, NULL));
 }
 
+//cfusa:test REQ-MDNS-009
 static void test_announcer_destroy_dispatches_through_vtable(void)
 {
     test_announcer_t ann;

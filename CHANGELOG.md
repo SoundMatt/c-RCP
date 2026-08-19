@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.468.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-MDNS-*/REQ-L2-*/REQ-FRAG-*: requirement-atomicity audit, Group 4 residual)
+
+Triaged 3 prefixes (40 requirements total: `src/mdns.c` for `REQ-MDNS-*`, `src/l2.c` for `REQ-L2-*`, `src/fragment.c` for `REQ-FRAG-*`). Batched together to amortize this week's CI-infrastructure overhead across fewer PR/CI cycles.
+
+**No splits needed -- all 40 confirmed atomic.** Every flagged id checked against its actual source: `REQ-MDNS-009/010/011` (each one function's complete contract -- vtable-dispatch-plus-NULL-no-op for `_announcer_destroy()`/`_discoverer_destroy()`, allocate-and-report for the static discoverer constructor); `REQ-L2-002/006/007/008` (each one function's complete branch behavior); `REQ-FRAG-002/003/006/016` (each one function's complete precondition/error-code contract). `REQ-L2-003`/`REQ-L2-010` are co-tagged on the same constructor region but were confirmed **not** a duplicate pair: `-003` is the general "never NULL except on this module's own allocation failure" contract, `-010` is the specific "CAP_NET_RAW denial leaves it cleanly not-ok()" scenario -- two independently true, independently testable facts about the same code, not one fact under two numbers (distinguished from this audit's earlier, genuine near-duplicate retirements, e.g. `REQ-RMAP-059/061`->`REQ-RMAP-085`).
+
+**Real, in-scope fix found in all 3: file-header tagging, not per-function.** `tests/test_mdns.c`, `tests/test_l2.c`, `tests/test_fragment.c` all had their `//cfusa:test` tags stacked in one block near the top of the file rather than above the specific test functions they describe. Relocated every tag to its actual covering test(s) in all three files. `test_mdns.c` was partially already fixed (from this session's earlier MC/DC-closure pass, which added some per-function tags -- `REQ-MDNS-007/008/010/011` -- without removing the stale file-header block); the redundant header removed, those left as-is. `tests/l2_veth_roundtrip_test.c` (the separate, Linux-only, privileged, non-ctest `REQ-L2-006/007/008` program) was checked and left untouched -- it has no `RUN_TEST`-registered functions at all, just one `main()` exercising the whole scenario, so a file-header tag there is the correct placement, not the anti-pattern.
+
+**One genuine coverage gap found and fixed:** `REQ-FRAG-008` (`rcp_fragment_reassembler_init()`'s not-collecting/empty-buffer postcondition) had no dedicated test -- every existing test in `test_fragment.c` calls `init()` and then immediately feeds a fragment, so none of them observe the raw post-init state on its own. Added `test_reassembler_init_starts_empty_and_not_collecting()`.
+
+**Verification:** full clean rebuild + 67/67 test suite passing (one new test added, no existing test behavior changed); ASan/UBSan clean, 67/67; pinned `cfusa` v0.6.2: `check` 0 errors, `trace --req-coverage 100`/`--sec-tested 2` both pass (1272/1272 requirements traced, 512/512 functions annotated).
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.467.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-WDG-*: requirement-atomicity audit, Group 4 residual)
 
 Triaged all 12 `REQ-WDG-*` requirements (`src/watchdog.c`, plus `src/mock.c`'s dispatch-level watchdog kicking).
