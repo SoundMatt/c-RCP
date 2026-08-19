@@ -16,21 +16,6 @@
 //cfusa:test REQ-LIFECYCLE-036
 //cfusa:test REQ-LIFECYCLE-037
 //cfusa:test REQ-LIFECYCLE-038
-//cfusa:test REQ-PWRMODE-014
-//cfusa:test REQ-PWRMODE-015
-//cfusa:test REQ-PWRMODE-016
-//cfusa:test REQ-PWRMODE-017
-//cfusa:test REQ-PWRMODE-018
-//cfusa:test REQ-PWRMODE-019
-//cfusa:test REQ-PWRMODE-020
-//cfusa:test REQ-PWRMODE-021
-//cfusa:test REQ-PWRMODE-022
-//cfusa:test REQ-PWRMODE-023
-//cfusa:test REQ-PWRMODE-024
-//cfusa:test REQ-PWRMODE-025
-//cfusa:test REQ-PWRMODE-026
-//cfusa:test REQ-PWRMODE-027
-//cfusa:test REQ-PWRMODE-028
 //cfusa:test REQ-SRV-015
 //cfusa:test REQ-SRV-016
 //cfusa:test REQ-SRV-017
@@ -710,6 +695,7 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
 
 /* ── §12.3 / §12.4.1: cold start recovers the configured lifecycle state ──── */
 
+//cfusa:test REQ-PWRMODE-014
 static void test_cold_start_target_recovers_the_configured_lifecycle_state(void)
 {
     /* REQ-PWRMODE-014 (TC18 §12.3, §12.4.1): "After a cold start the RC
@@ -734,6 +720,7 @@ static void test_cold_start_target_recovers_the_configured_lifecycle_state(void)
 
 /* ── §12.4: register-map config and wake sources survive StandBy ──────────── */
 
+//cfusa:test REQ-PWRMODE-015
 static void test_standby_is_classified_hot_so_configuration_is_retained(void)
 {
     rcp_regmap_general_t           map;
@@ -777,6 +764,8 @@ static void test_standby_is_classified_hot_so_configuration_is_retained(void)
  * asserts -- kept (renamed) rather than deleted, since it directly pins
  * both corrections together, matching how the two gaps were originally
  * discovered as one combined deviation pin. */
+//cfusa:test REQ-PWRMODE-016
+//cfusa:test REQ-PWRMODE-017
 static void test_hotstart_now_has_network_check_and_records_responder_stream(void)
 {
     rcp_pwrmode_handshake_t   hs;
@@ -834,6 +823,7 @@ static void test_hotstart_now_has_network_check_and_records_responder_stream(voi
 
 /* ── §12.4.1: what actually terminates WakeUp repetition ───────────────────── */
 
+//cfusa:test REQ-PWRMODE-018
 static void test_wakeup_repetition_ignores_other_valid_avtpdus(void)
 {
     const rcp_byte_bus_id_t bus = (rcp_byte_bus_id_t)3u;
@@ -883,6 +873,7 @@ static void test_wakeup_repetition_ignores_other_valid_avtpdus(void)
  * pin/EP-signal wake does (skipping only step (a)'s literal interface
  * re-enable, a hardware-level nuance this module's state machine does
  * not represent specially) -- not skip the handshake outright. */
+//cfusa:test REQ-PWRMODE-020
 static void test_network_wake_now_requires_the_same_handshake_as_pin(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
@@ -941,6 +932,7 @@ static void test_sleep_entry_is_request_only_with_no_network_path(void)
     rcp_bytes_free(&req);
 }
 
+//cfusa:test REQ-PWRMODE-021
 static void test_network_sleep_cannot_be_wired_to_standby(void)
 {
     rcp_pwrmode_entry_gate_t gate = {true, true, true};
@@ -961,6 +953,7 @@ static void test_network_sleep_cannot_be_wired_to_standby(void)
     TEST_ASSERT_NOT_EQUAL(RCP_PWRMODE_STANDBY, mode);
 }
 
+//cfusa:test REQ-PWRMODE-022
 static void test_network_sleep_applies_the_same_conditions_as_a_normal_request(void)
 {
     rcp_pwrmode_entry_gate_t satisfied = {true, true, true};
@@ -1027,6 +1020,7 @@ static void test_sleep_request_moves_one_endpoint_only(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+//cfusa:test REQ-PWRMODE-023
 static void test_sleepcmd_requires_root_client_authorization(void)
 {
     rcp_lifecycle_writer_ctx_t authorized;
@@ -1049,6 +1043,7 @@ static void test_sleepcmd_requires_root_client_authorization(void)
 
 /* ── §12.5: commit_entry re-checks the gate, closing the lost-wakeup race ──── */
 
+//cfusa:test REQ-PWRMODE-024
 static void test_commit_entry_re_checks_the_gate_and_aborts_the_race(void)
 {
     rcp_pwrmode_entry_gate_t gate = {true, true, true};
@@ -1076,6 +1071,7 @@ static void test_commit_entry_re_checks_the_gate_and_aborts_the_race(void)
 
 /* ── §12.5: the mode change happens only once the response has been sent ──── */
 
+//cfusa:test REQ-PWRMODE-026
 static void test_commit_entry_requires_the_response_to_have_been_sent(void)
 {
     rcp_pwrmode_entry_gate_t gate = {true, true, true};
@@ -1155,6 +1151,7 @@ static void test_commit_entry_mode_target_routing_independence(void)
 
 /* ── §12.5: the network-sleep return value IS the LPS-suppression signal ──── */
 
+//cfusa:test REQ-PWRMODE-027
 static void test_network_sleep_refusal_return_value_gates_the_lps_confirmation(void)
 {
     rcp_pwrmode_entry_gate_t refusing  = {false, true, true};
@@ -1182,6 +1179,7 @@ static void test_network_sleep_refusal_return_value_gates_the_lps_confirmation(v
 
 /* ── §12.5: the gate's fields are documented server-wide aggregates ───────── */
 
+//cfusa:test REQ-PWRMODE-025
 static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
 {
     rcp_pwrmode_entry_gate_t gate;
@@ -1220,6 +1218,7 @@ static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
 
 /* ── §13.7.2.3 step 1: admission suspends during the sleep drain ──────────── */
 
+//cfusa:test REQ-PWRMODE-028
 static void test_admission_is_suspended_during_the_sleep_drain(void)
 {
     rcp_server_endpoint_t wakeup_ep;
