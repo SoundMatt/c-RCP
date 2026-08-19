@@ -10577,8 +10577,8 @@
     },
     {
       "id": "REQ-MOCK-026",
-      "title": "rcp_mock_server_dispatch_frame() applies chain sequencing across a frame's members in order",
-      "text": "rcp_mock_server_dispatch_frame() shall, for each chained member it encounters, call rcp_chained_advance() with whether any request precedes it in this frame, whether that predecessor finalized with an error, and that member's own cs bit -- reporting RCP_MOCK_DISPATCH_CHAIN_ERROR for a chained member with no predecessor and RCP_MOCK_DISPATCH_CHAIN_ABORTED for one the chain state excludes, in both cases without dispatching that member to its endpoint. rcp_mock_server_watchdog_purge() shall apply rcp_server_endpoint_watchdog_purge() to the addressed endpoint and return how many requests it purged.",
+      "title": "rcp_mock_server_watchdog_purge() purges pending requests on the addressed endpoint",
+      "text": "rcp_mock_server_watchdog_purge() shall apply rcp_server_endpoint_watchdog_purge() to the addressed endpoint and return how many requests it purged. (This entry's own text previously also described rcp_mock_server_dispatch_frame()'s chain-sequencing CHAIN_ERROR/CHAIN_ABORTED behavior -- already REQ-MOCK-029's own separate, correctly-tagged requirement, and dispatch_frame() itself is tagged REQ-MOCK-019/REQ-MOCK-020/REQ-MOCK-029 at the source, never REQ-MOCK-026. Trimmed to this id's own actual, sole tagged implementation.)",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
