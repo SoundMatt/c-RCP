@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.460.0 -- 2026-08-19 (test: close power.c's remaining MC/DC gaps,
+69.6% -> 100%)
+
+Test-only follow-up to v0.459.0's regmap.c batch, closing task #137's second
+file. Two decisions, both reached the same way by every existing test before
+this: `rcp_pwrmode_transition()`'s `target==UNPOWERED && (mode==NORMAL ||
+mode==STANDBY || mode==SLEEP)` check (missing 3/4 conditions) and
+`rcp_pwrmode_commit_entry()`'s `(mode!=NORMAL && mode!=STANDBY) ||
+(target!=STANDBY && target!=SLEEP)` routing-validity check (missing all 4).
+
+**`rcp_pwrmode_transition()`**: `test_transition_any_to_unpowered_is_cold`
+already exercises all three real starting modes transitioning to UNPOWERED,
+but every one of those gives the same TRUE outcome -- no FALSE vector ever
+existed to pair against, and none can: `rcp_pwrmode_t` only has 4 values,
+and mode==UNPOWERED itself is intercepted by the earlier `*mode==target`
+check before this line is ever reached. The only way to reach this decision
+with the whole OR false is an out-of-range mode value -- which this test
+file already has as an established idiom (`(rcp_pwrmode_t)99`, used for
+`rcp_pwrmode_string()`'s own defensive default case) and is itself a
+meaningful defensive case: corrupted/uninitialized power-mode state must be
+rejected, not silently treated as an implicit UNPOWERED transition.
+
+**`rcp_pwrmode_commit_entry()`**: every existing test reaches this check the
+same way (mode==NORMAL, target==SLEEP), so none of its four conditions ever
+had an independence pair. Added four calls, each a real, meaningful case in
+its own right, not just coverage padding: STANDBY->SLEEP (a real valid COLD
+transition), NORMAL->STANDBY (a real valid HOT transition), NORMAL->NORMAL
+via this entry path (must be refused -- this path exists only to enter
+standby/sleep), and SLEEP->SLEEP via this entry path (already asleep; re-
+committing entry on a stale/duplicate request must be refused, not silently
+treated as a no-op).
+
+power.c MC/DC (measured via `llvm-cov`, matching `ci.yml`'s own `mcdc` job):
+69.6% (16/23) -> **100%** (23/23). No source touched -- `tests/test_power.c`
+and `tests/test_tc18_gaps_server.c` only.
+
+Verified: full 67-test suite (Release) + ASan/UBSan (CI's exact flags) both
+clean, `cfusa check` 0 errors, `cfusa trace --req-coverage 100`/`--sec-
+tested 2` unchanged at 1271/1271 traced and 37/1271 sec-tested (test-only
+change, no new `//cfusa:req`/`//cfusa:test` tags needed -- both files'
+functions already carry them).
+
 ### v0.459.0 -- 2026-08-19 (fix: stack buffer overflow when count >
 MAX_ENTRIES in regmap.c's row-typed apply_reconfig()/dispatcher paths; MC/DC
 gap closure, regmap.c 74.7% -> 78.1%)

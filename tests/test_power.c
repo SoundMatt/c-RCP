@@ -140,6 +140,26 @@ static void test_transition_any_to_unpowered_is_cold(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
+/* MC/DC closure: rcp_pwrmode_transition()'s own "target==UNPOWERED &&
+ * (mode==NORMAL || mode==STANDBY || mode==SLEEP)" check has never had a
+ * FALSE vector to pair against test_transition_any_to_unpowered_is_cold's
+ * three TRUE ones above -- the only other value a real rcp_pwrmode_t
+ * could hold there is UNPOWERED itself, which the earlier *mode==target
+ * check already intercepts before this line is ever reached. An
+ * out-of-range mode value (this file's own established idiom, see
+ * test_pwrmode_string_unknown_nonnull above) is the
+ * only way to reach this line with the whole OR false -- and is itself
+ * a meaningful defensive case: corrupted/uninitialized state must be
+ * rejected, not silently treated as an implicit UNPOWERED. */
+static void test_transition_to_unpowered_from_invalid_mode_is_rejected(void)
+{
+    rcp_pwrmode_t mode = (rcp_pwrmode_t)99;
+
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_INVALID_TRANSITION,
+                      rcp_pwrmode_transition(&mode, RCP_PWRMODE_UNPOWERED, NULL));
+    TEST_ASSERT_EQUAL((rcp_pwrmode_t)99, mode); /* left untouched on rejection */
+}
+
 static void test_transition_unpowered_to_normal_is_cold(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_UNPOWERED;
@@ -486,6 +506,7 @@ int main(void)
     RUN_TEST(test_transition_normal_to_sleep_is_cold);
     RUN_TEST(test_transition_standby_to_sleep_is_cold);
     RUN_TEST(test_transition_any_to_unpowered_is_cold);
+    RUN_TEST(test_transition_to_unpowered_from_invalid_mode_is_rejected);
     RUN_TEST(test_transition_unpowered_to_normal_is_cold);
     RUN_TEST(test_transition_same_mode_is_noop_hot);
     RUN_TEST(test_transition_sleep_to_normal_is_rejected);
