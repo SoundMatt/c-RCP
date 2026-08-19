@@ -1,15 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-TIMED-001
-//cfusa:test REQ-TIMED-002
-//cfusa:test REQ-TIMED-003
-//cfusa:test REQ-TIMED-004
-//cfusa:test REQ-TIMED-005
-//cfusa:test REQ-TIMED-006
-//cfusa:test REQ-TIMED-007
-//cfusa:test REQ-TIMED-008
-//cfusa:test REQ-TIMED-009
-//cfusa:test REQ-TIMED-010
-//cfusa:test REQ-TIMED-011
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -24,6 +13,7 @@ void tearDown(void) {}
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TIMED-001
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a = rcp_timed_strerror(RCP_TIMED_OK);
@@ -56,6 +46,7 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* REQ-RMAP-030: a single bit now, not a required pair (this function's
  * own former two-bit-pair check retired alongside REQ-RMAP-004..008). */
+//cfusa:test REQ-TIMED-002
 static void test_feature_enabled_requires_the_time_sync_bit(void)
 {
     TEST_ASSERT_FALSE(rcp_timed_feature_enabled(0));
@@ -67,6 +58,8 @@ static void test_feature_enabled_requires_the_time_sync_bit(void)
 
 /* ── encode/decode round trip ─────────────────────────────────────────────── */
 
+//cfusa:test REQ-TIMED-003
+//cfusa:test REQ-TIMED-005
 static void test_timed_request_round_trip(void)
 {
     rcp_bytes_t frame;
@@ -92,6 +85,8 @@ static void test_timed_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TIMED-003
+//cfusa:test REQ-TIMED-005
 static void test_timed_request_zero_payload(void)
 {
     rcp_bytes_t frame;
@@ -189,6 +184,7 @@ static void test_tscf_request_rejects_oversized_payload(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-TIMED-004
 static void test_decode_rejects_short_frame(void)
 {
     uint8_t buf[4] = {0};
@@ -203,6 +199,7 @@ static void test_decode_rejects_short_frame(void)
                                                      &payload_len, &txn));
 }
 
+//cfusa:test REQ-TIMED-005
 static void test_decode_rejects_unknown_request_type(void)
 {
     rcp_bytes_t frame;
@@ -225,6 +222,7 @@ static void test_decode_rejects_unknown_request_type(void)
 
 /* ── Admission ─────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-TIMED-006
 static void test_too_far_future_beyond_horizon(void)
 {
     TEST_ASSERT_TRUE(rcp_timed_too_far(2000, 1000, 500));
@@ -232,12 +230,14 @@ static void test_too_far_future_beyond_horizon(void)
     TEST_ASSERT_FALSE(rcp_timed_too_far(1000, 1000, 0));
 }
 
+//cfusa:test REQ-TIMED-006
 static void test_too_far_past_never_too_far(void)
 {
     TEST_ASSERT_FALSE(rcp_timed_too_far(500, 1000, 0));
     TEST_ASSERT_FALSE(rcp_timed_too_far(0, 1000, 0));
 }
 
+//cfusa:test REQ-TIMED-006
 static void test_too_far_wraparound_safe(void)
 {
     /* presentation_time is reduced modulo 2^48, so "just after the
@@ -249,18 +249,21 @@ static void test_too_far_wraparound_safe(void)
     TEST_ASSERT_TRUE(rcp_timed_too_far(pt, now, 5));
 }
 
+//cfusa:test REQ-TIMED-007
 static void test_admit_gptp_fail_takes_priority(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_TIMED_REJECT_GPTP_FAIL, rcp_timed_admit(false, 100000, 0, 10));
     TEST_ASSERT_EQUAL_INT(RCP_TIMED_REJECT_GPTP_FAIL, rcp_timed_admit(false, 0, 0, 0xFFFFFFFFull));
 }
 
+//cfusa:test REQ-TIMED-008
 static void test_admit_presentation_time_too_far(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR,
                            rcp_timed_admit(true, 2000, 1000, 500));
 }
 
+//cfusa:test REQ-TIMED-008
 static void test_admit_accept(void)
 {
     TEST_ASSERT_EQUAL_INT(RCP_TIMED_ACCEPT, rcp_timed_admit(true, 1200, 1000, 500));
@@ -323,6 +326,7 @@ static void test_wire_error_matches_admit_across_inputs(void)
 
 #define TS_OFF RCP_ACF_ABB_HEADER_LEN
 
+//cfusa:test REQ-TIMED-003
 static void test_timed_wire_sub_field_offsets(void)
 {
     rcp_bytes_t frame = rcp_timed_encode_request(7, 0x0000112233445566ull, 1, NULL, 0);
@@ -344,6 +348,7 @@ static void test_timed_wire_sub_field_offsets(void)
 
 /* The reserved octet stays zero even for the largest encodable
  * presentation_time -- i.e. the field really is 48 bits, not 56. */
+//cfusa:test REQ-TIMED-003
 static void test_timed_reserved_octet_stays_zero_at_max(void)
 {
     rcp_bytes_t frame = rcp_timed_encode_request(0, RCP_TIMED_PRESENTATION_TIME_MAX, 0, NULL, 0);
@@ -359,6 +364,7 @@ static void test_timed_reserved_octet_stays_zero_at_max(void)
 
 /* A presentation_time above the 48-bit maximum is rejected rather than
  * silently truncated into a different instant. */
+//cfusa:test REQ-TIMED-003
 static void test_timed_encode_rejects_out_of_range_presentation_time(void)
 {
     rcp_bytes_t frame = rcp_timed_encode_request(0, RCP_TIMED_PRESENTATION_TIME_MAX + 1ull, 0,
@@ -368,6 +374,7 @@ static void test_timed_encode_rejects_out_of_range_presentation_time(void)
 
 /* Table 10: reserved "All bits shall be written as 0, else the request
  * shall be rejected". */
+//cfusa:test REQ-TIMED-009
 static void test_timed_decode_rejects_nonzero_reserved_octet(void)
 {
     rcp_bytes_t frame;
@@ -392,6 +399,7 @@ static void test_timed_decode_rejects_nonzero_reserved_octet(void)
  * shall be rejected with error code = UNSUPPORTED_CMD". cs is octet 4
  * bit 0 and hs octet 4 bit 1 of the shared byte_message_info header
  * (acf.h's Table 4 layout). */
+//cfusa:test REQ-TIMED-010
 static void test_timed_decode_rejects_hs_or_cs_set(void)
 {
     rcp_bytes_t frame;
@@ -426,6 +434,7 @@ static void test_timed_decode_rejects_hs_or_cs_set(void)
 
 /* The full 48-bit range round-trips: a value needing more than 32 bits is
  * recovered exactly, which the pre-v0.102.0 encoding could not do. */
+//cfusa:test REQ-TIMED-005
 static void test_timed_round_trips_beyond_32_bits(void)
 {
     rcp_bytes_t frame;
@@ -447,6 +456,7 @@ static void test_timed_round_trips_beyond_32_bits(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-TIMED-011
 static void test_timed_due(void)
 {
     TEST_ASSERT_TRUE(rcp_timed_due(1000, 1000));  /* exactly due */

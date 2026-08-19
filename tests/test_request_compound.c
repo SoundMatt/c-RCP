@@ -1,33 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-CMP-001
-//cfusa:test REQ-CMP-002
-//cfusa:test REQ-CMP-003
-//cfusa:test REQ-CMP-004
-//cfusa:test REQ-CMP-005
-//cfusa:test REQ-CMP-006
-//cfusa:test REQ-CMP-007
-//cfusa:test REQ-CMP-008
-//cfusa:test REQ-CMP-009
-//cfusa:test REQ-CMP-010
-//cfusa:test REQ-CMP-011
-//cfusa:test REQ-CMP-012
-//cfusa:test REQ-CMP-013
-//cfusa:test REQ-CMP-014
-//cfusa:test REQ-CMP-015
-//cfusa:test REQ-CMP-016
-//cfusa:test REQ-CMP-017
-//cfusa:test REQ-CMP-018
-//cfusa:test REQ-CMP-019
-//cfusa:test REQ-CMP-020
-//cfusa:test REQ-CMP-021
-//cfusa:test REQ-CMP-022
-//cfusa:test REQ-CMP-023
-//cfusa:test REQ-CMP-024
-//cfusa:test REQ-CMP-025
-//cfusa:test REQ-CMP-026
-//cfusa:test REQ-CMP-027
-//cfusa:test REQ-CMP-028
-//cfusa:test REQ-CMP-029
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -43,6 +14,7 @@ void tearDown(void) {}
 
 /* ── request_type classification ──────────────────────────────────────────── */
 
+//cfusa:test REQ-CMP-001
 static void test_is_safety(void)
 {
     TEST_ASSERT_FALSE(rcp_request_type_is_safety(RCP_REQUEST_TYPE_COMPOUND));
@@ -52,6 +24,7 @@ static void test_is_safety(void)
     TEST_ASSERT_FALSE(rcp_request_type_is_safety(RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE));
 }
 
+//cfusa:test REQ-CMP-002
 static void test_is_compound(void)
 {
     TEST_ASSERT_TRUE(rcp_request_type_is_compound(RCP_REQUEST_TYPE_COMPOUND));
@@ -60,6 +33,7 @@ static void test_is_compound(void)
     TEST_ASSERT_FALSE(rcp_request_type_is_compound(RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE));
 }
 
+//cfusa:test REQ-CMP-003
 static void test_is_compound_wait(void)
 {
     TEST_ASSERT_TRUE(rcp_request_type_is_compound_wait(RCP_REQUEST_TYPE_COMPOUND_WAIT));
@@ -70,6 +44,7 @@ static void test_is_compound_wait(void)
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-CMP-004
 static void test_strerror_never_null_and_distinct(void)
 {
     const char *a = rcp_compound_strerror(RCP_COMPOUND_OK);
@@ -94,6 +69,7 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── rcp_compound_peek_request_type() ─────────────────────────────────────── */
 
+//cfusa:test REQ-CMP-007
 static void test_peek_request_type_reads_compound_opcode(void)
 {
     rcp_compound_step_t step = {0};
@@ -115,6 +91,7 @@ static void test_peek_request_type_reads_compound_opcode(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CMP-005
 static void test_peek_request_type_short_frame(void)
 {
     uint8_t rt = 0;
@@ -124,6 +101,7 @@ static void test_peek_request_type_short_frame(void)
                            rcp_compound_peek_request_type(buf, sizeof(buf), &rt));
 }
 
+//cfusa:test REQ-CMP-006
 static void test_peek_request_type_bad_msg_type(void)
 {
     uint8_t rt = 0;
@@ -136,6 +114,7 @@ static void test_peek_request_type_bad_msg_type(void)
                            rcp_compound_peek_request_type(buf, sizeof(buf), &rt));
 }
 
+//cfusa:test REQ-CMP-007
 static void test_peek_request_type_not_repurposed_when_mtv_nonzero(void)
 {
     uint8_t rt = 0;
@@ -151,6 +130,8 @@ static void test_peek_request_type_not_repurposed_when_mtv_nonzero(void)
 
 /* ── Compound / compound-wait request encode/decode ───────────────────────── */
 
+//cfusa:test REQ-CMP-010
+//cfusa:test REQ-CMP-015
 static void test_compound_request_round_trip(void)
 {
     rcp_compound_step_t step = {0};
@@ -193,6 +174,8 @@ static void test_compound_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CMP-010
+//cfusa:test REQ-CMP-015
 static void test_compound_wait_safety_request_round_trip(void)
 {
     rcp_compound_step_t step = {0};
@@ -235,6 +218,7 @@ static void test_compound_wait_safety_request_round_trip(void)
 /* REQ-CMP-009: rcp_compound_encode_request() returns a zeroed rcp_bytes_t
  * for a payload exceeding RCP_ACF_MAX_PAYLOAD, same technique as the
  * sibling oversized-payload test in test_request_chained.c. */
+//cfusa:test REQ-CMP-009
 static void test_encode_request_rejects_oversized_payload(void)
 {
     static uint8_t oversized[RCP_ACF_MAX_PAYLOAD + 1];
@@ -248,6 +232,7 @@ static void test_encode_request_rejects_oversized_payload(void)
     TEST_ASSERT_EQUAL_size_t(0, frame.len);
 }
 
+//cfusa:test REQ-CMP-008
 static void test_encode_request_rejects_unrecognized_request_type(void)
 {
     rcp_compound_step_t step = {0};
@@ -257,6 +242,7 @@ static void test_encode_request_rejects_unrecognized_request_type(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+//cfusa:test REQ-CMP-011
 static void test_decode_request_rejects_short_frame(void)
 {
     uint8_t out_rt = 0;
@@ -274,6 +260,7 @@ static void test_decode_request_rejects_short_frame(void)
                                                         &out_tn));
 }
 
+//cfusa:test REQ-CMP-012
 static void test_decode_request_rejects_bad_msg_type(void)
 {
     uint8_t out_rt = 0;
@@ -294,6 +281,7 @@ static void test_decode_request_rejects_bad_msg_type(void)
                                                         &out_tn));
 }
 
+//cfusa:test REQ-CMP-013
 static void test_decode_request_rejects_non_repurposed_timestamp(void)
 {
     rcp_compound_step_t step = {0};
@@ -323,6 +311,7 @@ static void test_decode_request_rejects_non_repurposed_timestamp(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CMP-014
 static void test_decode_request_rejects_unknown_request_type(void)
 {
     rcp_bytes_t frame;
@@ -349,6 +338,8 @@ static void test_decode_request_rejects_unknown_request_type(void)
 
 /* ── clear-non-safestate (0x06) ────────────────────────────────────────────── */
 
+//cfusa:test REQ-CMP-016
+//cfusa:test REQ-CMP-017
 static void test_clear_non_safestate_round_trip(void)
 {
     rcp_bytes_t frame;
@@ -368,6 +359,7 @@ static void test_clear_non_safestate_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CMP-018
 static void test_clear_non_safestate_decode_rejects_compound_request(void)
 {
     rcp_compound_step_t step = {0};
@@ -388,6 +380,7 @@ static void test_clear_non_safestate_decode_rejects_compound_request(void)
 /* Table 12: reserved "All bits shall be written as 0, else the request
  * shall be rejected" -- clear-non-safestate carries no sub-field, so
  * all 7 trailing message_timestamp octets are reserved. REQ-CMP-028. */
+//cfusa:test REQ-CMP-028
 static void test_clear_non_safestate_decode_rejects_nonzero_reserved(void)
 {
     size_t offsets[7] = {1, 2, 3, 4, 5, 6, 7};
@@ -413,6 +406,7 @@ static void test_clear_non_safestate_decode_rejects_nonzero_reserved(void)
  * request shall be rejected with error code = UNSUPPORTED_CMD." Octet 4
  * packs evt[3:0] in bits 7:4, hs in bit 1, cs in bit 0 (acf.c's
  * rcp_acf_pack_header()). REQ-CMP-029. */
+//cfusa:test REQ-CMP-029
 static void test_clear_non_safestate_decode_rejects_nonzero_evt_hs_cs(void)
 {
     uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */
@@ -436,6 +430,7 @@ static void test_clear_non_safestate_decode_rejects_nonzero_evt_hs_cs(void)
 
 /* ── The advance guard, delay timer, and tick ─────────────────────────────── */
 
+//cfusa:test REQ-CMP-019
 static void test_advance_guard_true_when_in_start_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -450,6 +445,7 @@ static void test_advance_guard_true_when_in_start_state(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-019
 static void test_advance_guard_false_when_not_in_start_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -466,6 +462,7 @@ static void test_advance_guard_false_when_not_in_start_state(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-019
 static void test_advance_guard_false_for_invalid_sequencer_index(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -483,6 +480,7 @@ static void test_advance_guard_false_for_invalid_sequencer_index(void)
  * may move it out of 0, even for a step whose own start_state also
  * happens to be 0, the one case a naive current==step->start_state
  * comparison would otherwise have matched. */
+//cfusa:test REQ-CMP-019
 static void test_advance_guard_false_when_sequencer_disabled(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -499,6 +497,7 @@ static void test_advance_guard_false_when_sequencer_disabled(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-020
 static void test_exec_delay_elapsed(void)
 {
     rcp_compound_step_t step = {0};
@@ -509,6 +508,7 @@ static void test_exec_delay_elapsed(void)
     TEST_ASSERT_TRUE(rcp_compound_exec_delay_elapsed(&step, 1001));
 }
 
+//cfusa:test REQ-CMP-021
 static void test_compound_tick_advances_only_after_delay_and_guard_both_hold(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -533,6 +533,7 @@ static void test_compound_tick_advances_only_after_delay_and_guard_both_hold(voi
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-022
 static void test_compound_tick_guard_blocks_advance_even_after_delay_elapses(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -555,6 +556,7 @@ static void test_compound_tick_guard_blocks_advance_even_after_delay_elapses(voi
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-023
 static void test_compound_wait_tick_advances_only_on_condition_met_and_guard(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -579,6 +581,7 @@ static void test_compound_wait_tick_advances_only_on_condition_met_and_guard(voi
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-024
 static void test_compound_wait_tick_guard_blocks_advance_even_on_match(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -602,6 +605,7 @@ static void test_compound_wait_tick_guard_blocks_advance_even_on_match(void)
  * sentinel (TC18 v0.5.1_RC §11.2.2.1) -- rcp_compound_tick() still
  * returns true (the tick executed successfully) but leaves the
  * sequencer's actual state untouched. */
+//cfusa:test REQ-CMP-021
 static void test_compound_tick_next_state_zero_leaves_state_unchanged_but_returns_true(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -621,6 +625,7 @@ static void test_compound_tick_next_state_zero_leaves_state_unchanged_but_return
 }
 
 /* Same sentinel, for rcp_compound_wait_tick() (REQ-CMP-023). */
+//cfusa:test REQ-CMP-023
 static void test_compound_wait_tick_next_state_zero_leaves_state_unchanged_but_returns_true(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -664,6 +669,7 @@ static void test_compound_wait_tick_next_state_zero_leaves_state_unchanged_but_r
  * header. */
 #define TS_OFF RCP_ACF_ABB_HEADER_LEN
 
+//cfusa:test REQ-CMP-010
 static void test_compound_wire_sub_field_offsets(void)
 {
     rcp_compound_step_t step = {0};
@@ -691,6 +697,7 @@ static void test_compound_wire_sub_field_offsets(void)
     rcp_bytes_free(&frame);
 }
 
+//cfusa:test REQ-CMP-010
 static void test_compound_wait_safety_wire_sub_field_offsets(void)
 {
     rcp_compound_step_t step = {0};
@@ -762,6 +769,7 @@ static void test_evt_round_trips_independently_of_step_subfields(void)
 
 /* Table 6/Table 7: "If set to 0xFFFF it indicates infinite repetition" --
  * a two-octet all-ones value, not a one-octet 0xFF. */
+//cfusa:test REQ-CMP-010
 static void test_repeat_infinite_sentinel_is_two_octets_of_ones(void)
 {
     rcp_compound_step_t step = {0};
@@ -784,6 +792,7 @@ static void test_repeat_infinite_sentinel_is_two_octets_of_ones(void)
 
 /* Decoding a spec-shaped octet sequence built by hand, so decode is
  * verified against the specification independently of encode. */
+//cfusa:test REQ-CMP-015
 static void test_decode_reads_hand_built_spec_layout(void)
 {
     rcp_compound_step_t step = {0};
@@ -826,6 +835,7 @@ static void test_decode_reads_hand_built_spec_layout(void)
 
 /* ── start_state == 0: "execute in any state" (§11.2.2.1) ─────────────────── */
 
+//cfusa:test REQ-CMP-025
 static void test_start_condition_zero_start_state_matches_any_state(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -846,6 +856,7 @@ static void test_start_condition_zero_start_state_matches_any_state(void)
     rcp_sequencer_table_free(&table);
 }
 
+//cfusa:test REQ-CMP-025
 static void test_start_condition_nonzero_start_state_requires_exact_match(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
@@ -863,6 +874,7 @@ static void test_start_condition_nonzero_start_state_requires_exact_match(void)
 
 /* A sequencer this server does not have models a disabled sequencer,
  * which prohibits execution -- including for start_state == 0. */
+//cfusa:test REQ-CMP-025
 static void test_start_condition_false_for_unknown_sequencer(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(2);

@@ -19106,6 +19106,63 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.471.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
+REQ-DISC-*/REQ-CMP-*/REQ-TIMED-*: requirement-atomicity audit, Group 4
+residual)
+
+Triaged REQ-DISC-* (29 requirements, src/discovery.c), REQ-CMP-* (29,
+src/request_compound.c), REQ-TIMED-* (13, src/request_timed.c) -- 71
+requirements, 13 proxy-flagged.
+
+One genuine split: REQ-DISC-023. Its text bundled two different
+functions' behavior under one id -- rcp_discovery_cache_put()'s
+overwrite-or-append contract and rcp_discovery_cache_find()'s
+lookup-or-NULL contract -- joined only by a derived invariant ("at
+most one entry per server_stream_id") that isn't itself a function's
+own behavior. Split into REQ-DISC-023 (kept for put()) and new
+REQ-DISC-030 (for find()), matching this audit's established
+split-and-mutation-test discipline: find()'s own tags relocated in
+src/discovery.c/tests/test_discovery.c, mutation-tested (forced
+find() to always report a miss -- caught immediately, a SIGSEGV in
+the very next test exercising it, an even stronger signal than a
+graceful assertion failure), then reverted byte-identical.
+Incidentally found and fixed: REQ-DISC-023's own file-header tag had
+also been carried by rcp_discovery_cache_init()/_destroy()/_len(),
+none of which that id's text ever described at all -- removed from
+those three (no dedicated requirement covers their own trivial,
+no-edge-case behavior, matching this audit's established precedent
+for not inventing formal requirements around self-evident
+constructors/getters).
+
+Every other flagged id (12 of 13) confirmed atomic -- several are
+proxy false positives: REQ-CMP-029/REQ-TIMED-009/REQ-TIMED-010's 2+
+"shall" count comes from a quoted TC18 table's own "All bits shall be
+written as 0..." prose embedded in the requirement text for citation
+purposes, not a second requirement clause. The rest bundle one
+function's complete branch/edge-case behavior
+(REQ-CMP-007/010/019/021/023/025, REQ-TIMED-003/005/006,
+REQ-DISC-028), the same one-function's-complete-behavior pattern
+established throughout this audit.
+
+File-header tagging anti-pattern fixed in all 3 test files
+(test_discovery.c, test_request_compound.c, test_request_timed.c).
+test_discovery.c additionally carried a //cfusa:sec-test block (the
+security-test coverage metric, CYBERSECURITY.md §1.4 Layer 4
+first-claimant-wins bootstrap-claim admission) with the same
+anti-pattern -- relocated per-function alongside each claim test's
+own //cfusa:test tag. test_request_compound.c/test_request_timed.c
+were each partially already fixed (a handful of tags already
+correctly per-function from earlier work); the redundant header
+removed, those left as-is.
+
+Verification: full clean rebuild + 67/67 test suite passing;
+ASan/UBSan clean, 67/67; pinned cfusa v0.6.2: check 0 errors, trace
+--req-coverage 100/--sec-tested 2 both pass -- 1273/1273 traced (1272
++ the new split id), 512/512 functions annotated, sec-tested
+unchanged at 37 requirements.
+
+Not closing issue #533 -- Group 4's remaining prefixes continue.
+
 ### v0.470.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch
 REQ-CANCEL-*/REQ-SEQ-*/REQ-TRIG-*/REQ-CHAIN-*: requirement-atomicity audit,
 Group 4 residual)
