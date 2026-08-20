@@ -342,7 +342,7 @@ jobs:
           name: coverage-info
           path: coverage.info
 
-  # ── LLVM MC/DC (real condition/decision coverage, informational only) ────────
+  # ── LLVM MC/DC (real condition/decision coverage, ratchet-gated) ─────────────
   #
   # Issue #518 (c-RCP-16) item 3: real MC/DC evidence per ISO 26262-6:2018
   # Table 12 (MC/DC is "++" recommended at ASIL-C/D), distinct from the
@@ -364,13 +364,20 @@ jobs:
   # block directly instead of routing through cfusa's broken parser, so
   # the number below is genuine, tool-independent MC/DC evidence today.
   #
-  # Informational only, by this issue's own suggested sequencing ("land
-  # it first as a reported, non-gating CI metric ... before considering
-  # any hard threshold") -- matches how `cfusa trace --req-coverage` was
-  # rolled out informationally between v0.2.0 and v0.53.0 before becoming
-  # a hard gate. No step in this job fails the build.
+  # Ratchet-gated as of issue #599 (c-RCP-23a): this job was landed
+  # informational-only (no step failing the build) by this issue's own
+  # original suggested sequencing, matching how `cfusa trace
+  # --req-coverage` was rolled out informationally between v0.2.0 and
+  # v0.53.0 before becoming a hard gate. Issue #599 closes that gap the
+  # same way this file's own "Coverage regression gate (line floor, not
+  # DAL-B)" step (issue #520 / c-RCP-19) already closed it for LCOV line
+  # coverage: a ratchet floor, not a 100% gate -- it hard-fails only on
+  # *regression* below a measured baseline, so it does not block on this
+  # project's genuine, not-yet-closed path to 100% MC/DC. See the "MC/DC
+  # regression gate" step at the end of this job for the floor itself and
+  # its provenance comment.
   mcdc:
-    name: MC/DC coverage (LLVM, informational)
+    name: MC/DC coverage (LLVM, ratchet-gated)
     runs-on: ubuntu-22.04
     needs: build-and-test
     steps:
@@ -423,7 +430,7 @@ jobs:
             -sources "${srcs[@]}" \
             > mcdc-export.json
 
-      - name: Summarize MC/DC totals (non-gating)
+      - name: Summarize MC/DC totals
         run: |
           python3 - <<'PYEOF'
           import json
@@ -443,20 +450,25 @@ jobs:
               f"Real LLVM MC/DC (condition/decision) coverage: "
               f"{mcdc.get('percent', 0):.2f}% "
               f"({mcdc.get('covered')}/{mcdc.get('count')} condition "
-              f"independence pairs) across src/*.c -- informational, "
-              f"not a gate. For comparison, branch coverage over the "
+              f"independence pairs) across src/*.c -- ratchet-gated "
+              f"(regression-only, not a 100% gate; see the gate step "
+              f"below). For comparison, branch coverage over the "
               f"same instrumented binaries: "
               f"{branch.get('percent', 0):.2f}%. See job header for why "
               f"this is measured directly via llvm-cov rather than "
               f"cfusa coverage --mcdc-file (SoundMatt/c-FuSa#129)."
           )
-          print(f"::notice title=MC/DC Coverage (informational)::{note}")
+          print(f"::notice title=MC/DC Coverage::{note}")
           with open("mcdc-summary.md", "w") as f:
-              f.write("### MC/DC coverage (informational, not a gate)\n\n")
+              f.write("### MC/DC coverage (ratchet-gated, not a 100% gate)\n\n")
               f.write(note + "\n")
           PYEOF
           cat mcdc-summary.md >> "$GITHUB_STEP_SUMMARY"
 
+      # Uploaded *before* the gate step below so a failing gate still
+      # leaves this diagnostic artifact inspectable -- matching how
+      # `cfusa-report`'s informational DAL-B report step runs ahead of
+      # its own hard "Coverage regression gate" step in this same file.
       - name: Upload MC/DC report
         uses: actions/upload-artifact@v4
         with:
@@ -464,6 +476,52 @@ jobs:
           path: |
             mcdc-summary.json
             mcdc-export.json
+
+      # The real gate (issue #599 / c-RCP-23a): hard-fails if MC/DC
+      # condition/decision coverage drops below a floor set comfortably
+      # under the currently-measured percentage, mirroring this file's
+      # own "Coverage regression gate (line floor, not DAL-B)" step
+      # (issue #520 / c-RCP-19) -- a ratchet against regression, not a
+      # claim of 100% MC/DC (this project is not there yet; see
+      # AUDIT_PACK.md §3). Reads mcdc-summary.json already written by
+      # the step above rather than recomputing anything.
+      #
+      # Floor set at 93% (issue #599 / c-RCP-23a): AUDIT_PACK.md §3 had
+      # recorded 64.4% (437/679) from issue #546's session, but that was
+      # stale -- PRs #581-584 (regmap.c/power.c, e2e.c/lifecycle.c, a
+      # 27-file/179-decision batch, and a udp.c round 2) closed most of
+      # the gap afterward without anyone re-running this job or updating
+      # the doc. A fresh local re-measurement (Apple Clang 21, same
+      # flags/mechanism as this job, 67/67 tests passing) immediately
+      # before this PR gives 655/687 = 95.34%. 93% keeps a real
+      # cross-toolchain margin below that re-measured number (this job
+      # itself runs clang-18 on ubuntu-22.04, not Apple Clang 21) --
+      # same rationale this file's own line-coverage floor above uses
+      # for its own margin.
+      - name: MC/DC regression gate (ratchet floor, not 100% -- issue #599 / c-RCP-23a)
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          import sys
+
+          floor = 93.0  # see step name's comment above for provenance
+
+          summary = json.load(open("mcdc-summary.json"))
+          actual = summary["mcdc_percent"]
+
+          if actual is None or actual < floor:
+              print(f"::error::MC/DC coverage regression: {actual}% < floor {floor}% "
+                    f"({summary['mcdc_condition_pairs_covered']}/"
+                    f"{summary['mcdc_condition_pairs_total']} condition "
+                    f"independence pairs). This is a ratchet floor (issue "
+                    f"#599 / c-RCP-23a), not a 100% gate -- if this drop is "
+                    f"an intentional tradeoff, lower the floor explicitly "
+                    f"with a provenance comment matching this step's own "
+                    f"convention; do not just delete or skip this step.")
+              sys.exit(1)
+
+          print(f"OK: {actual:.2f}% >= floor {floor}%")
+          PYEOF
 
   # ── Build c-FuSa binary (shared by all cfusa-* jobs) ─────────────────────────
   cfusa-build:
