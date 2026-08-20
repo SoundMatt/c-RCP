@@ -34,6 +34,78 @@ the rationale.
 
 ## Releases
 
+### v0.477.0 -- 2026-08-20 (docs+test: [c-RCP-23b] issue #604 -- re-confirm watchdog.c's 33% MC/DC gap as structurally unreachable, not closable)
+
+Follow-up to issue #599 (c-RCP-23a)'s ratchet gate: issue #604 tasked
+this session with closing `watchdog.c`'s 33.3% (1/3) MC/DC gap --
+`wd_result_equal()`'s 2nd/3rd condition-independence pairs -- via "two
+additional test vectors," per that issue's own Suggested Approach
+section. A fresh clang-instrumented re-measurement (Apple Clang 21,
+`-fcoverage-mcdc`, 67/67 tests passing) first reproduced the cited
+33.3% (1/3) exactly, and confirmed the codebase-wide total unchanged
+at 655/687 = 95.34%, before any further work -- per this session's own
+instruction not to trust a cited number without reproducing it fresh.
+
+That reproduction is as far as issue #604's suggested fix goes: its
+premise is incorrect, and predates PR #584 (v0.463.0), which already
+proved this exact gap structurally unreachable ("correlated-output-
+field tracing for watchdog.c") and documented it in that release's own
+CHANGELOG.md entry. `wd_result_equal()`'s one and only call site
+(`evaluate_stream()`) always compares a stream's freshly-computed
+`rcp_e2e_wd_result_t` against that same stream's own previous one;
+`rcp_e2e_wd_evaluate()` (`e2e.c`) derives `enter_safe_state`/`notify`
+from `overflowed` and two per-stream config constants that never
+change after construction (no reconfigure API exists) -- so whenever
+`a.overflowed == b.overflowed` holds, the other two fields are
+*provably* already equal too. No sequence of calls through
+`rcp_watchdog_keeper_t`'s public API can ever produce the missing
+vectors; adding "two test vectors" as the issue suggested is not
+possible without a fake/whitebox test forcing an input `wd_result_equal()`
+(a `static` helper) can never actually receive in practice -- which
+this codebase's own established discipline (`tests/test_watchdog.c`'s
+pre-existing MC/DC note, itself from PR #583/#584) already declines to
+do.
+
+This session re-derived that same proof independently from source
+(not by trusting the pre-existing comment or PR #584 at face value),
+then added empirical confirmation beyond the analytical argument:
+mutation-testing `wd_result_equal()` three ways -- deleting the
+`enter_safe_state` clause, deleting the `notify` clause, and inverting
+the `enter_safe_state` comparison's polarity (`==` -> `!=`) -- and
+re-running the full 67-test suite against each. All three are
+*undetected* mutants (67/67 still pass against every one), direct
+empirical evidence that no black-box test reachable through the public
+API can ever supply the missing pairs. Each mutation was applied,
+measured, and reverted cleanly; `git diff` confirms `src/watchdog.c`
+is byte-identical to HEAD after the exercise.
+
+**No source or test-logic change was made** -- there is nothing left
+to correctly add. `tests/test_watchdog.c`'s existing MC/DC note is
+extended with a short addendum recording this re-confirmation and its
+mutation-test evidence; `AUDIT_PACK.md`'s MC/DC section is updated to
+describe issue #604 as resolved-by-confirmation (structurally
+unreachable), replacing the sentence that previously framed it as an
+open, closable gap. `watchdog.c` remains at 33.3% (1/3) by design,
+alongside this codebase's other already-documented structurally-
+unreachable gaps (`cli.c`/`tsn.c`/`adapt.c`/`ep_spi.c`/`server.c`/
+`udp.c`, per PR #584's own CHANGELOG.md entry).
+
+Verified: full 67-test suite (Debug, MC/DC-instrumented: clang
+`-fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc`, matching
+`ci.yml`'s `mcdc` job exactly) clean; codebase-wide MC/DC unchanged at
+655/687 = 95.34%, `watchdog.c` unchanged at 1/3 = 33.3% -- both exactly
+as before this session, confirmed rather than assumed; the issue #599
+ratchet gate's 93% floor still passes with room to spare (95.34% > 93%,
+no regression since nothing changed). `cfusa check` 0 errors, `cfusa
+trace --req-coverage 100`/`--sec-tested 2` unchanged at 1274/1274
+traced and 37/1274 sec-tested.
+
+Version bump 0.476.0 -> 0.477.0 + ROADMAP.md entry per release-gate
+convention, despite this being a documentation/verification-only
+change -- matching this project's own convention of a real release
+entry for a real, checkable conclusion (see PR #584's own "prove
+remaining N unreachable" precedent), not a silently-dropped issue.
+
 ### v0.476.0 -- 2026-08-19 (docs(fusa): [c-RCP-18-tracker] issue #533 batch REQ-MOCK-*: requirement-atomicity audit, Group 4 residual)
 
 Triaged `REQ-MOCK-*` (33, `src/mock.c`) -- 10 proxy-flagged (`REQ-MOCK-003`, `007`, `009`, `012`, `020`, `021`, `022`, `023`, `025`, `026`).
