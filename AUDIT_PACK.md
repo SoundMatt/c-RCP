@@ -28,7 +28,7 @@ TC18 protocol and its own measured evidence.
 | SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
 | Freedom-from-Interference Argument | `FREEDOM_FROM_INTERFERENCE.md` | Added c-RCP-16 item 4 (issue #518) — QM/ASIL-A/B co-existence analysis for the single-binary partition above |
 | Tool Qualification Evidence | `qualify-report.json` (auto-generated, `cfusa qualify`) | CI gate — self-qualified, see §2a |
-| MC/DC Coverage (informational) | `mcdc-summary.json`/`mcdc-export.json` (CI artifact, `ci.yml`'s `mcdc` job) | Added c-RCP-16 item 3 (issue #518) — genuine LLVM condition/decision coverage, non-gating; see §3 |
+| MC/DC Coverage (ratchet-gated) | `mcdc-summary.json`/`mcdc-export.json` (CI artifact, `ci.yml`'s `mcdc` job) | Added c-RCP-16 item 3 (issue #518) — genuine LLVM condition/decision coverage; ratchet-gated against regression by issue #599 / c-RCP-23a; see §3 |
 
 ---
 
@@ -77,7 +77,7 @@ obligates:
 | Replay/staleness detection | The retired CRC-16 sequence-counter/replay-window mechanism has no TC18 counterpart in this codebase (`include/rcp/e2e.h`'s own file header records this explicitly) | **Not implemented in this library** — see `HARA.md` H-004/`tara.md` TS-002. Also an open item, not a derogation. |
 | Formal proofs of absence of deadlock | TLA+ liveness proofs deferred to an ASIL-C/D upgrade path | TLC exhaustive model check on bounded state spaces (`tla/`, `FORMAL_VERIFICATION.md`) covering the lifecycle FSM and the E2E safe-point/watchdog mechanism |
 | MISRA C:2012 mandatory + required compliance | Advisory rules selectively noted | `cfusa lint` clean on mandatory/required rules |
-| 100% MC/DC structural coverage | Branch coverage is captured (`lcov --rc branch_coverage=1`, both `ci.yml`'s `coverage` job and `release.yml`); real MC/DC is now measured (informationally, non-gating) by `ci.yml`'s `mcdc` job (c-RCP-16 item 3, issue #518) | See §3 |
+| 100% MC/DC structural coverage | Branch coverage is captured (`lcov --rc branch_coverage=1`, both `ci.yml`'s `coverage` job and `release.yml`); real MC/DC is now measured and gated against regression (a ratchet floor, not 100%) by `ci.yml`'s `mcdc` job (c-RCP-16 item 3, issue #518; ratchet gate added issue #599, c-RCP-23a) | See §3 |
 
 Unlike the ASIL-D-requirement rows above (a deliberate, reasoned choice
 to not pursue a higher rigor level for an already-implemented
@@ -440,22 +440,39 @@ upstream LLVM's `CoverageExporterJson.cpp`, which emits positional
 arrays instead — filed and tracked as SoundMatt/c-FuSa#129). The `mcdc`
 job reads `llvm-cov export`'s own `totals.mcdc` block directly instead,
 so the number is genuine MC/DC evidence today, not blocked on that
-upstream fix. Verified end-to-end locally (Apple Clang 21, same flags/mechanism the
-`ci.yml` job uses with `clang-18` on Ubuntu — the exact percentage is
-expected to vary marginally by LLVM version and is CI's own
-`mcdc-summary.json` artifact's job to report on each run, not this
-document's) against the current 67-test suite (`src/*.c` only,
-matching the `coverage` job's own exclusion of
-`tests/`/`unity/`/`_deps/`): **64.4% MC/DC condition-pair coverage
-(437/679)**, against 83.7% branch coverage over the same instrumented
-binaries — the two numbers diverging by ~19 points is itself the
-concrete demonstration of why a branch-coverage proxy is not a
-substitute for real MC/DC evidence at ASIL-C/D (ISO 26262-6:2018
-Table 12). Per this issue's own suggested sequencing, the job is
-**informational only** — no step in it fails the build; whether/when
-to introduce a hard MC/DC threshold is deliberately left as a future
-decision, matching how `cfusa trace --req-coverage` was rolled out
-informationally before becoming a hard gate between v0.2.0 and v0.53.0.
+upstream fix.
+
+The current MC/DC percentage is **not hand-copied into this document**
+— it is reported by the `mcdc` job's own CI step summary and
+`mcdc-summary.json`/`mcdc-export.json` artifacts on every run, exactly
+mirroring the reasoning this section already applies to the LCOV
+line/branch numbers earlier in this section ("reported there rather than
+hand-copied into this document, so this document cannot go stale
+relative to the actual measured number the way copying a snapshot
+would"). This document previously stated a hand-typed figure here —
+**64.4% MC/DC condition-pair coverage (437/679)** — captured during
+issue #546's session. PRs #581-584 (a `regmap.c`/`power.c` safety-
+mechanism batch, `e2e.c`/`lifecycle.c`, a 27-file/179-decision batch,
+and a `udp.c` round 2) subsequently closed most of the gap those
+numbers reflected, but nobody re-ran the `mcdc` job and updated this
+sentence afterward — so it sat materially stale (~31 points low) until
+issue #599 (c-RCP-23a) caught it. That is the concrete reason this
+section now points at the CI artifact instead of asserting a fresher
+snapshot of its own: a second hand-typed number here would only reset
+the same staleness clock.
+
+**MC/DC regression gate (issue #599 / c-RCP-23a).** The `mcdc` job's
+final step hard-fails the build if MC/DC coverage drops below a floor
+set with margin under the last re-measured percentage — see that
+step's own provenance comment in `ci.yml` for the exact number and
+its derivation. This mirrors the existing "Coverage regression gate
+(line floor, not DAL-B)" step (issue #520 / c-RCP-19), which applies
+the identical ratchet pattern to LCOV line coverage. Like that gate,
+this is a regression floor, not a 100% MC/DC claim — whether/when to
+raise the floor further (or pursue 100%) remains a future decision.
+Issue #604 (c-RCP-23b) tracks the highest-priority per-file gap:
+`watchdog.c` at 33% MC/DC, the one file below 100% that implements this
+project's sole ASIL-C safety goal, SG-001.
 
 **Platform-conditional carve-out (issue #520 category 3).** `ci.yml`'s
 `coverage` job runs on `ubuntu-22.04` only. Three first-party files
@@ -503,9 +520,10 @@ If c-RCP is used in an airborne system under DO-178C DAL-B:
   informational only (see §1)
 - Tool qualification: `cfusa` is a Tool Qualification Level analysis
   tool — see `qualify-report.json`
-- Decision coverage: MC/DC required at DAL-B — real, non-gating MC/DC
-  measurement now exists (§3's `mcdc` job); no hard threshold yet, see
-  §3 for the current measured percentage
+- Decision coverage: MC/DC required at DAL-B — real MC/DC measurement
+  now exists and is gated against regression (§3's `mcdc` job; ratchet
+  floor added issue #599, c-RCP-23a — not a 100% gate), see §3 for
+  where the current measured percentage is reported
 - Structural coverage artifacts: `coverage-report.json`, regenerated
   every tagged release
 - Gap report: `do178-gap-report.json` (auto-generated, `cfusa do178 --dal b`)
@@ -533,6 +551,7 @@ All of the following gates run on every tagged release
 | DO-178C report | `cfusa do178 --dal b` | Gap report generated |
 | IEC 62443 report | `cfusa iec62443 --sl SL-2` | Gap report generated |
 | Coverage | `cfusa coverage` | Line/function/branch reported (see §3) |
+| MC/DC coverage (ratchet) | `ci.yml` `mcdc` job (`llvm-cov`) | No regression below floor (see §3); not a 100% gate |
 | SCI (Software Change Impact) | `cfusa sci` | Generated every release |
 | Audit pack | `cfusa audit-pack` | Generated (`audit-pack.zip`) |
 | Release badge | `cfusa badge` | Generated |
