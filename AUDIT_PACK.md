@@ -476,9 +476,43 @@ its derivation. This mirrors the existing "Coverage regression gate
 the identical ratchet pattern to LCOV line coverage. Like that gate,
 this is a regression floor, not a 100% MC/DC claim — whether/when to
 raise the floor further (or pursue 100%) remains a future decision.
-Issue #604 (c-RCP-23b) tracks the highest-priority per-file gap:
+Issue #604 (c-RCP-23b) tracked the highest-priority per-file gap:
 `watchdog.c` at 33% MC/DC, the one file below 100% that implements this
-project's sole ASIL-C safety goal, SG-001.
+project's sole ASIL-C safety goal, SG-001. **Resolved as a confirmed
+structurally-unreachable gap, not a closable one.** Issue #604's own
+suggested approach — "two additional test vectors... will close it to
+3/3" — predates and does not account for PR #584's own finding on this
+exact function (`wd_result_equal()`'s 2nd/3rd conditions, "correlated-
+output-field tracing for watchdog.c"), already published in that PR's
+CHANGELOG.md entry: `wd_result_equal()`'s one and only call site
+(`evaluate_stream()`) always compares a stream's freshly-computed
+`rcp_e2e_wd_result_t` against that same stream's own previous one, and
+`rcp_e2e_wd_evaluate()` (`e2e.c`) derives `enter_safe_state`/`notify`
+from `overflowed` and two config constants that never change post-
+construction (no reconfigure API) — so whenever `a.overflowed ==
+b.overflowed` is true, the other two fields are *provably* already
+equal too, making the missing condition-independence pairs
+unreachable through any input the public API can produce. c-RCP-23b's
+own re-investigation (issue #604) independently re-derived this same
+proof from source with fresh eyes, then went a step further and
+empirically confirmed it via mutation testing: with the full 67-test
+suite unchanged, deleting `wd_result_equal()`'s `enter_safe_state`
+clause, deleting its `notify` clause, and inverting the
+`enter_safe_state` comparison's polarity are each an *undetected*
+mutant (100% tests still pass) — direct empirical evidence, not just
+analytical argument, that no black-box test reachable through
+`rcp_watchdog_keeper_t`'s public API can ever supply the missing
+vectors. No test was added: this codebase's own established
+discipline (see `tests/test_watchdog.c`'s pre-existing MC/DC note)
+declines to add a fake/whitebox test that would force the metric
+without demonstrating anything a real caller can trigger. `watchdog.c`
+therefore remains at 33% (1/3) by design, alongside the same-shape
+already-documented gaps in `cli.c`/`tsn.c`/`adapt.c`/`ep_spi.c`/
+`server.c`/`udp.c` (PR #584's CHANGELOG.md entry, v0.463.0). The
+codebase-wide MC/DC total is unaffected by this issue (still reported
+live via the `mcdc` job per the paragraph above, not hand-copied
+here), and the issue #599 ratchet floor is unaffected since nothing
+regressed.
 
 **Platform-conditional carve-out (issue #520 category 3).** `ci.yml`'s
 `coverage` job runs on `ubuntu-22.04` only. Three first-party files

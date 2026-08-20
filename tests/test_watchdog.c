@@ -41,7 +41,21 @@ void tearDown(void) {}
  * anything reaches wd_result_equal()) can produce the missing vector,
  * because doing so would require overflowed to stay equal while a
  * *constant* derived from it changes -- a contradiction, not a gap in
- * test effort. No fake/whitebox test is added to force it. */
+ * test effort. No fake/whitebox test is added to force it.
+ *
+ * Re-confirmed under issue #604 (c-RCP-23b), which re-derived this same
+ * proof from source with fresh eyes rather than trusting this comment
+ * (or PR #584, which first reached this conclusion) at face value, then
+ * went a step further with empirical mutation testing: with this file's
+ * tests otherwise unchanged, each of (a) deleting the enter_safe_state
+ * clause, (b) deleting the notify clause, and (c) inverting the
+ * enter_safe_state comparison's polarity (== -> !=) in src/watchdog.c's
+ * wd_result_equal() is an *undetected* mutant -- the full 67-test suite
+ * still passes 67/67 against every one of the three. That is direct
+ * empirical confirmation, not just analytical argument, that no
+ * black-box test reachable through rcp_watchdog_keeper_t's public API
+ * can ever supply the missing MC/DC vectors. See AUDIT_PACK.md's MC/DC
+ * section for the full writeup. */
 
 static void test_sleep_ms(unsigned ms)
 {
