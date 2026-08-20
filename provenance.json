@@ -4,11 +4,11 @@
   "tool": "c-FuSa",
   "toolVersion": "0.6.2",
   "language": "c",
-  "generatedAt": "2026-08-19T00:34:49Z",
+  "generatedAt": "2026-08-20T19:09:57Z",
   "format": "x-FuSa provenance v1",
-  "module": "c-RCP@0.458.0",
+  "module": "c-RCP@0.477.0",
   "builder": "local",
-  "vcsRevision": "fc0c7277d0ba52d347e9f5c3c27fea649506be38",
+  "vcsRevision": "715d6ac206eee141428002dce8f695bdac32538a",
   "vcsBranch": "main",
   "vcsModified": false
 }
