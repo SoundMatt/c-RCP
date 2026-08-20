@@ -394,6 +394,83 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_request(const uint8_t *b, size_t len,
     return RCP_EP_CAN_OK;
 }
 
+/* ── Fragmented request (issue #611, fragment.h) ───────────────────────────── */
+
+//cfusa:req REQ-CANEP-041
+size_t rcp_ep_can_frame_request_fragment_count(rcp_ep_can_frame_format_t frame_format,
+                                                uint32_t arbitration_id,
+                                                const rcp_ep_can_xl_header_t *xl_header,
+                                                size_t tx_len, size_t max_fragment_payload)
+{
+    size_t combined_len;
+    size_t count;
+
+    if (!encode_preconditions_ok(frame_format, arbitration_id, xl_header, tx_len)) return 0;
+
+    combined_len = prefix_len_for(frame_format) + tx_len;
+    count        = rcp_fragment_plan_count(combined_len, max_fragment_payload);
+    /* Same fixed-capacity ceiling rcp_ep_can_frame_response_fragment_count()
+     * already enforces for its own out_frames array -- see
+     * RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS's own doc comment (ep_can.h). */
+    if (count > RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS) return 0;
+    return count;
+}
+
+//cfusa:req REQ-CANEP-042
+size_t rcp_ep_can_encode_frame_request_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                   rcp_ep_can_frame_format_t frame_format,
+                                                   uint32_t arbitration_id,
+                                                   const rcp_ep_can_xl_header_t *xl_header,
+                                                   const uint8_t *tx_data, size_t tx_len,
+                                                   uint8_t transaction_num,
+                                                   size_t max_fragment_payload,
+                                                   rcp_bytes_t *out_frames)
+{
+    uint8_t                 combined[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t                   combined_len;
+    size_t                   count;
+    rcp_fragment_segment_t   segs[RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS];
+    size_t                   i;
+
+    count = rcp_ep_can_frame_request_fragment_count(frame_format, arbitration_id, xl_header,
+                                                      tx_len, max_fragment_payload);
+    if (count == 0) return 0;
+
+    build_payload(frame_format, arbitration_id, xl_header, tx_data, tx_len, combined,
+                   &combined_len);
+
+    if (rcp_fragment_plan(combined_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
+        return 0;
+    }
+
+    for (i = 0; i < count; i++) {
+        const uint8_t               *slice     = &combined[segs[i].offset];
+        size_t                        slice_len = segs[i].len;
+        rcp_acf_byte_message_info_t  hdr        = {0};
+        rcp_bytes_t                   frame;
+
+        hdr.byte_bus_id              = byte_bus_id;
+        hdr.op                       = RCP_ACF_OP_WRITE;
+        hdr.evt                      = 0; /* TC18 Table 33: plain request in CAN's Row-2, see the file header */
+        hdr.transaction_num          = transaction_num;
+        hdr.ms                       = segs[i].ms ? 1u : 0u;
+        hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
+
+        frame = rcp_acf_encode_abb(&hdr, slice, slice_len);
+
+        if (!frame.data) {
+            size_t j;
+
+            for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
+            return 0;
+        }
+
+        out_frames[i] = frame;
+    }
+
+    return count;
+}
+
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-CANEP-019

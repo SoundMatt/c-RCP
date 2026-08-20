@@ -249,11 +249,17 @@
  * unchanged and remain the right choice whenever the caller already
  * knows (or doesn't need to fragment) a response fits in one ACF message
  * -- fragmentation is opt-in per call, not a behavior change to the
- * existing single-frame codec. There is, as of this fix, no equivalent
- * fragmented *request* path (rcp_ep_can_encode_frame_request() has no
- * `_fragmented` counterpart): a worst-case CAN XL new-payload *write*
- * request cannot be sent in one ACF message and has no multi-message
- * alternative yet -- tracked as a follow-up, not this fix's scope.
+ * existing single-frame codec. FIXED (issue #611):
+ * rcp_ep_can_encode_frame_request_fragmented()/
+ * rcp_ep_can_frame_request_fragment_count() below are the request-side
+ * counterpart of this same milestone's retrofit -- a worst-case CAN XL
+ * new-payload *write* request now has the identical ms/segment_num
+ * multi-message escape hatch the response side already had; see
+ * "Fragmented request" below. Unlike the response side, a request is
+ * never carried as ACF_GBB (rcp_ep_can_encode_frame_request() has no
+ * timed/timestamp parameters), so its fragmented counterpart has no
+ * timed/GBB variant to choose between either -- every fragment is
+ * ACF_ABB, unconditionally.
  *
  * ── Wire layout: TC18 §13.7.11.3 Figure 39 ──────────────────────────────────
  *
@@ -817,6 +823,91 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_request(const uint8_t *b, size_t len,
                                                    const uint8_t **out_tx_data,
                                                    size_t *out_tx_len,
                                                    uint8_t *out_transaction_num);
+
+/* ── Fragmented request (issue #611, fragment.h) ─────────────────────────────
+ *
+ * The request-side counterpart of "Fragmented response" below, closing the
+ * gap the file header's own "There is, as of this fix, no equivalent
+ * fragmented request path" paragraph named. A worst-case CAN XL new-payload
+ * write request (RCP_EP_CAN_XL_MAX_ENCODED_LEN, 2058 octets combined) does
+ * not fit in one ACF message any more than a worst-case response does; the
+ * two functions below give a client the same ms/segment_num fragmentation
+ * escape hatch rcp_ep_can_encode_frame_response_fragmented() already gives a
+ * server. Unlike the response side, a request is never carried as ACF_GBB
+ * (rcp_ep_can_encode_frame_request()'s own signature has no timed/timestamp
+ * parameters -- a request is never itself timestamped, only a response can
+ * be), so there is no timed/GBB variant to choose between here: every
+ * fragment is encoded as ACF_ABB, unconditionally.
+ *
+ * The receiving side needs no new decode function of its own:
+ * rcp_ep_can_decode_reassembled_frame_response() already parses this
+ * module's combined prefix-then-data payload (TC18 §13.7.11.3 Figure 39)
+ * generically -- it inspects only the reassembled bytes themselves, never
+ * the ACF header's own op/rsp bits a caller fed to
+ * rcp_fragment_reassembler_feed() to get there -- so it is reused verbatim
+ * for a reassembled REQUEST's combined payload too, exactly as it already
+ * is for a reassembled response's. Likewise, reassembly itself needs no new
+ * mock.c code: srv's own generic frag_reasm[]/rcp_fragment_reassembler_t
+ * accumulator (mock.h, REQ-E2E-038/039) already reassembles any endpoint
+ * type's fragmented request, CAN included -- see
+ * rcp_mock_server_dispatch_e2e_fragment(). */
+
+/* The number of ACF frames rcp_ep_can_encode_frame_request_fragmented()
+ * would produce for this request's combined prefix-then-data payload (see
+ * the file header's "Wire layout" section) split into fragments of at most
+ * max_fragment_payload octets each -- see fragment.h's
+ * rcp_fragment_plan_count(). Returns 0 under the same conditions
+ * rcp_ep_can_encode_frame_request() already fails encode_preconditions_ok()
+ * for, plus rcp_fragment_plan_count()'s own 0-sentinel conditions
+ * (max_fragment_payload == 0 with a combined payload that doesn't fit in
+ * one fragment; more segments needed than fragment.h's segment_num width
+ * can address), plus RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS (the same fixed
+ * fragment-plan-array ceiling rcp_ep_can_frame_response_fragment_count()
+ * already enforces). A caller uses this to size out_frames before calling
+ * rcp_ep_can_encode_frame_request_fragmented(). */
+//cfusa:req REQ-CANEP-041
+size_t rcp_ep_can_frame_request_fragment_count(rcp_ep_can_frame_format_t frame_format,
+                                                uint32_t arbitration_id,
+                                                const rcp_ep_can_xl_header_t *xl_header,
+                                                size_t tx_len, size_t max_fragment_payload);
+
+/* Encodes a CAN frame write request as one or more ACF_ABB frames,
+ * fragmenting via fragment.h's ms/segment_num mechanism whenever the
+ * combined prefix-then-data payload exceeds max_fragment_payload octets --
+ * into out_frames[0..rcp_ep_can_frame_request_fragment_count(...)) (caller-
+ * allocated, sized by calling that function first). Every fragment shares
+ * byte_bus_id/evt(0)/op(WRITE)/transaction_num with
+ * rcp_ep_can_encode_frame_request() -- frame_format itself lives inside the
+ * combined payload's own leading quadlet (see the file header), not
+ * per-fragment header state, so only the first fragment actually carries
+ * it. Only the ms flag, the read_size_or_segment_num field (meaningful
+ * only on an ms=true fragment -- see acf.h/fragment.h), and each
+ * fragment's own payload slice differ. When the combined payload already
+ * fits in one fragment, this produces exactly one frame identical to what
+ * rcp_ep_can_encode_frame_request() itself would have produced --
+ * fragmentation is a strict superset of the unfragmented path, not a
+ * separate wire format. Returns the number of frames written to
+ * out_frames on success (equal to
+ * rcp_ep_can_frame_request_fragment_count()'s answer), or 0 (out_frames
+ * left entirely untouched) under the same conditions that function
+ * returns 0 for, or on allocation failure partway through (any
+ * already-written out_frames entries are freed before returning). Caller
+ * frees each successfully returned out_frames[i] with rcp_bytes_free().
+ * This function does not itself apply e2e.h's safe-point CRC -- per
+ * fragment.h's own file header, a caller wanting E2E protection wraps
+ * only the final (ms=false) frame (out_frames[count-1]) with
+ * rcp_e2e_wrap() itself, after this function returns -- the identical
+ * caller obligation rcp_ep_can_encode_frame_response_fragmented()'s own
+ * doc comment already states for the response side. */
+//cfusa:req REQ-CANEP-042
+size_t rcp_ep_can_encode_frame_request_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                   rcp_ep_can_frame_format_t frame_format,
+                                                   uint32_t arbitration_id,
+                                                   const rcp_ep_can_xl_header_t *xl_header,
+                                                   const uint8_t *tx_data, size_t tx_len,
+                                                   uint8_t transaction_num,
+                                                   size_t max_fragment_payload,
+                                                   rcp_bytes_t *out_frames);
 
 /* ── Response ───────────────────────────────────────────────────────────────── */
 

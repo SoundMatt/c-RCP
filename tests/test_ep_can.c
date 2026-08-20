@@ -1177,6 +1177,186 @@ static void test_fragment_encode_rejects_bad_preconditions(void)
     TEST_ASSERT_EQUAL_UINT(0, count);
 }
 
+/* ── Fragmented request (issue #611, fragment.h) ─────────────────────────────
+ *
+ * The request-side counterpart of "Fragmented response" above -- same
+ * pure-encode-and-manually-reassemble shape (no mock.c/dispatch
+ * involvement; that composition is exercised separately in
+ * tests/test_tc18_gaps_e2e.c), just for rcp_ep_can_frame_request_fragment_
+ * count()/rcp_ep_can_encode_frame_request_fragmented() and a request's own
+ * tx_data/no-timed-variant shape. */
+
+//cfusa:test REQ-CANEP-041
+static void test_fragment_request_count_zero_for_bad_preconditions(void)
+{
+    /* Invalid frame_format -> encode_preconditions_ok() fails -> 0, same
+     * as rcp_ep_can_frame_response_fragment_count()'s own identical
+     * branch (REQ-CANEP-023). */
+    size_t count = rcp_ep_can_frame_request_fragment_count(
+        (rcp_ep_can_frame_format_t)7, 0x10, NULL, 3, 100);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+/* Same RCP_EP_CAN_MAX_FRAGMENT_SEGMENTS ceiling
+ * rcp_ep_can_frame_response_fragment_count()'s own identical test
+ * (test_fragment_count_zero_when_segment_count_exceeds_max_fragment_segments)
+ * already proves for the response side -- worst-case combined payload
+ * (RCP_EP_CAN_XL_MAX_ENCODED_LEN = 2058 octets) at max_fragment_payload =
+ * 8 needs ceil(2058/8) = 258 segments, one more than the 256-entry
+ * ceiling. */
+//cfusa:test REQ-CANEP-041
+static void test_fragment_request_count_zero_when_segment_count_exceeds_max_fragment_segments(void)
+{
+    rcp_ep_can_xl_header_t xl_hdr = {0};
+    size_t                 count  = rcp_ep_can_frame_request_fragment_count(
+        RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr, RCP_EP_CAN_XL_MAX_DATA_LEN, 8);
+
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+/* The literal worst-case scenario issue #611 names: a full
+ * RCP_EP_CAN_XL_MAX_DATA_LEN (2048)-byte CAN XL write request, whose
+ * combined prefix-then-data payload (RCP_EP_CAN_XL_MAX_ENCODED_LEN, 2058
+ * octets) does not fit within a single ACF message
+ * (RCP_ACF_ABB_MAX_PAYLOAD, 2036 octets) -- the request-side mirror of
+ * test_fragment_worst_case_can_xl_response_round_trip() above, adapted for
+ * a request's own tx_data naming and ACF_ABB-only (never GBB) encoding.
+ * Each fragment is decoded with acf.c's own rcp_acf_decode_abb() directly
+ * (this module deliberately has no rcp_ep_can_decode_frame_request_
+ * fragment() of its own -- see ep_can.h's "Fragmented request" section:
+ * a request fragment's ms/segment_num/payload are plain ACF_ABB fields,
+ * nothing CAN-specific to peel off first), reassembled via fragment.h
+ * directly, then decoded back with rcp_ep_can_decode_reassembled_frame_
+ * response() -- reused verbatim for the request direction, since it
+ * inspects only the reassembled bytes themselves, never op/rsp. */
+//cfusa:test REQ-CANEP-041
+//cfusa:test REQ-CANEP-042
+static void test_fragment_worst_case_can_xl_request_round_trip(void)
+{
+    uint8_t                     tx[RCP_EP_CAN_XL_MAX_DATA_LEN];
+    rcp_ep_can_xl_header_t      xl_hdr_in = {0};
+    rcp_ep_can_xl_header_t      xl_hdr_out;
+    size_t                      i;
+    size_t                      max_fragment_payload = RCP_ACF_ABB_MAX_PAYLOAD;
+    size_t                      count;
+    rcp_bytes_t                 frames[4];
+    rcp_fragment_reassembler_t  reasm;
+    size_t                      combined_len = 4u + 6u + RCP_EP_CAN_XL_MAX_DATA_LEN;
+
+    for (i = 0; i < sizeof(tx); i++) tx[i] = (uint8_t)(i * 3 + 7);
+    xl_hdr_in.sdt  = 0x5;
+    xl_hdr_in.vcid = 0x9;
+    xl_hdr_in.af   = 0xDEADBEEFu;
+
+    count = rcp_ep_can_frame_request_fragment_count(
+        RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr_in, sizeof(tx), max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(2, count); /* ceil(2058 / 2036) = 2 */
+    TEST_ASSERT_TRUE(count <= (sizeof(frames) / sizeof(frames[0])));
+
+    count = rcp_ep_can_encode_frame_request_fragmented(
+        7, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr_in, tx, sizeof(tx), 55,
+        max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(2, count);
+
+    for (i = 0; i < count; i++) TEST_ASSERT_NOT_NULL(frames[i].data);
+
+    rcp_fragment_reassembler_init(&reasm, combined_len);
+    for (i = 0; i < count; i++) {
+        rcp_acf_byte_message_info_t hdr;
+        const uint8_t                *payload;
+        size_t                         payload_len;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+            rcp_acf_decode_abb(frames[i].data, frames[i].len, &hdr, &payload, &payload_len));
+        TEST_ASSERT_EQUAL_UINT8(7, hdr.byte_bus_id);
+        TEST_ASSERT_EQUAL(RCP_ACF_OP_WRITE, (rcp_acf_op_t)hdr.op);
+        TEST_ASSERT_EQUAL_UINT8(55, hdr.transaction_num);
+
+        rc = rcp_fragment_reassembler_feed(&reasm, hdr.ms != 0u, hdr.read_size_or_segment_num,
+                                            payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_TRUE(hdr.ms != 0u);
+            TEST_ASSERT_EQUAL_UINT16((uint16_t)i, hdr.read_size_or_segment_num);
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_TRUE(hdr.ms == 0u);
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t *reassembled;
+        size_t         reassembled_len;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(combined_len, reassembled_len);
+
+        {
+            rcp_ep_can_frame_format_t out_format;
+            uint32_t       out_id = 0;
+            const uint8_t *out_tx = NULL;
+            size_t         out_tx_len = 0;
+
+            TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+                rcp_ep_can_decode_reassembled_frame_response(
+                    reassembled, reassembled_len, &out_format, &out_id,
+                    &xl_hdr_out, &out_tx, &out_tx_len));
+
+            TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, out_format);
+            TEST_ASSERT_EQUAL_UINT32(0x123, out_id);
+            TEST_ASSERT_EQUAL_UINT8(0x5, xl_hdr_out.sdt);
+            TEST_ASSERT_EQUAL_UINT8(0x9, xl_hdr_out.vcid);
+            TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, xl_hdr_out.af);
+            TEST_ASSERT_EQUAL_UINT(sizeof(tx), out_tx_len);
+            TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+        }
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
+//cfusa:test REQ-CANEP-042
+static void test_fragment_request_unfragmented_matches_single_frame_path(void)
+{
+    /* When the combined payload already fits in one fragment, the
+     * fragmented encoder must produce exactly what the plain,
+     * unfragmented encoder would have -- same contract
+     * test_fragment_response_unfragmented_matches_single_frame_path()
+     * above already proves for the response side (REQ-CANEP-035),
+     * mirrored here for the request side under REQ-CANEP-042 (this
+     * requirement was not split the way the response side's was --
+     * see REQ-CANEP-042's own .fusa-reqs.json entry). */
+    uint8_t      tx[3] = {0xAA, 0xBB, 0xCC};
+    rcp_bytes_t  plain;
+    rcp_bytes_t  fragmented[1];
+    size_t       count;
+
+    plain = rcp_ep_can_encode_frame_request(4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, tx,
+                                             sizeof(tx), 9);
+    TEST_ASSERT_NOT_NULL(plain.data);
+
+    count = rcp_ep_can_encode_frame_request_fragmented(
+        4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, tx, sizeof(tx), 9, 1024, fragmented);
+    TEST_ASSERT_EQUAL_UINT(1, count);
+
+    TEST_ASSERT_EQUAL_UINT(plain.len, fragmented[0].len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(plain.data, fragmented[0].data, plain.len);
+
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&fragmented[0]);
+}
+
+//cfusa:test REQ-CANEP-042
+static void test_fragment_request_encode_rejects_bad_preconditions(void)
+{
+    rcp_bytes_t frames[4];
+    size_t      count = rcp_ep_can_encode_frame_request_fragmented(
+        4, (rcp_ep_can_frame_format_t)7, 0x42, NULL, NULL, 0, 9, 1024, frames);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
 static void test_fragment_decode_fragment_rejects_wrong_bus(void)
 {
     uint8_t     rx[3] = {1, 2, 3};
@@ -1508,6 +1688,11 @@ int main(void)
     RUN_TEST(test_fragmented_encode_frees_prior_frames_when_a_later_segment_fails);
     RUN_TEST(test_fragment_response_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_encode_rejects_bad_preconditions);
+    RUN_TEST(test_fragment_request_count_zero_for_bad_preconditions);
+    RUN_TEST(test_fragment_request_count_zero_when_segment_count_exceeds_max_fragment_segments);
+    RUN_TEST(test_fragment_worst_case_can_xl_request_round_trip);
+    RUN_TEST(test_fragment_request_unfragmented_matches_single_frame_path);
+    RUN_TEST(test_fragment_request_encode_rejects_bad_preconditions);
     RUN_TEST(test_fragment_decode_fragment_rejects_wrong_bus);
     RUN_TEST(test_reassembled_decode_rejects_short_frame);
     RUN_TEST(test_reassembled_decode_rejects_bad_arbitration_id);
