@@ -14,6 +14,7 @@
 //cfusa:test REQ-CANEP-037
 //cfusa:test REQ-CANEP-039
 //cfusa:test REQ-CANEP-040
+//cfusa:test REQ-CANEP-041
 //cfusa:test REQ-ISELED-025
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
@@ -1286,6 +1287,179 @@ static void test_can_new_physical_layer_is_selected_per_frame(void)
     rcp_bytes_free(&new_pl);
 }
 
+/* ── CAN endpoint: real mock.c dispatch path (issue #610) ─────────────────────
+ *
+ * Issue #610: rcp_ep_can_encode_frame_response_fragmented()/
+ * rcp_ep_can_decode_frame_response_fragment() (ep_can.h) exist as tested
+ * primitives (test_ep_can.c's own test_fragment_worst_case_can_xl_response_
+ * round_trip et al.) but were never exercised through mock.c's own
+ * dispatcher composition -- mirroring the exact gap ISELED had before
+ * iseled_dispatch_multi_handler()/test_iseled_dispatch_multi_fragment_
+ * response_round_trips() above closed it. The issue's own correction
+ * comment establishes the real mechanism: mock.c never calls any
+ * rcp_ep_*() function directly for ANY endpoint type (confirmed by grep --
+ * deliberate, not a gap), so there is no mock.c code to change here.
+ * Response construction is always the caller's own responsibility, supplied
+ * via a registered handler -- can_dispatch_multi_handler() below is that
+ * handler for CAN, registered through the same rcp_mock_server_add_
+ * endpoint_multi_response()/rcp_mock_server_dispatch_multi_response() entry
+ * points ISELED's own handler already proved.
+ *
+ * can_dispatch_multi_state_t/can_dispatch_multi_handler() mirror iseled_
+ * dispatch_state_t/iseled_dispatch_multi_handler()'s own shape exactly:
+ * decode the incoming request via rcp_ep_can_decode_frame_request(), then
+ * call rcp_ep_can_frame_response_fragment_count()+rcp_ep_can_encode_frame_
+ * response_fragmented() to build the response frame(s) into out_responses[]. */
+typedef struct {
+    rcp_ep_can_frame_format_t response_frame_format;
+    uint32_t                  response_arbitration_id;
+    rcp_ep_can_xl_header_t    response_xl_header;
+    uint8_t                   response_rx_data[RCP_EP_CAN_XL_MAX_DATA_LEN];
+    size_t                    response_rx_len;
+    size_t                    max_fragment_payload;
+} can_dispatch_multi_state_t;
+
+static void can_dispatch_multi_handler(const uint8_t *request, size_t request_len,
+                                        rcp_bytes_t *out_responses, size_t out_cap,
+                                        size_t *out_count, void *user_data)
+{
+    can_dispatch_multi_state_t *st = (can_dispatch_multi_state_t *)user_data;
+    rcp_ep_can_frame_format_t   req_format;
+    uint32_t                    req_id;
+    rcp_ep_can_xl_header_t      req_xl = {0};
+    const uint8_t               *rx_data;
+    size_t                       rx_len;
+    uint8_t                      tn;
+    size_t                       n;
+
+    *out_count = 0;
+    if (rcp_ep_can_decode_frame_request(request, request_len, 0x31u, &req_format, &req_id,
+                                         &req_xl, &rx_data, &rx_len, &tn) != RCP_EP_CAN_OK) {
+        return;
+    }
+
+    n = rcp_ep_can_frame_response_fragment_count(st->response_frame_format,
+                                                  st->response_arbitration_id,
+                                                  &st->response_xl_header, st->response_rx_len,
+                                                  st->max_fragment_payload);
+    if (n == 0u || n > out_cap) return;
+
+    *out_count = rcp_ep_can_encode_frame_response_fragmented(
+        0x31u, st->response_frame_format, st->response_arbitration_id, &st->response_xl_header,
+        st->response_rx_data, st->response_rx_len, tn, false, 0u, st->max_fragment_payload,
+        out_responses);
+}
+
+/* REQ-CANEP-041: the genuinely-multi-fragment counterpart to the plain,
+ * artificially-single-fragment case test_ep_can.c's own unit tests already
+ * cover -- delivered through a real rcp_mock_server_dispatch_multi_response()
+ * call, exactly the shape issue #610's own "Verification expectations"
+ * section asks for. Uses the literal worst case #610 is about, not a toy
+ * size: a full RCP_EP_CAN_XL_MAX_DATA_LEN (2048)-byte CAN XL response,
+ * whose combined prefix-then-data payload (RCP_EP_CAN_XL_MAX_ENCODED_LEN,
+ * 2058 octets) exceeds one ACF message's own real ceiling
+ * (RCP_ACF_MAX_PAYLOAD, 2028 octets) -- forcing ceil(2058/2028) = 2 real
+ * fragments, not a deliberately-shrunk max_fragment_payload. */
+//cfusa:test REQ-CANEP-041
+static void test_can_dispatch_multi_fragment_response_round_trips(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    can_dispatch_multi_state_t  st;
+    rcp_bytes_t                  req;
+    rcp_bytes_t                  responses[4] = {{0}};
+    size_t                       response_count = 0;
+    uint8_t                      reassembled[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t                       reassembled_len = 0;
+    size_t                       i;
+    rcp_ep_can_frame_format_t    out_format;
+    uint32_t                     out_id = 0u;
+    rcp_ep_can_xl_header_t       out_xl;
+    const uint8_t                *out_rx = NULL;
+    size_t                        out_rx_len = 0;
+
+    memset(&st, 0, sizeof(st));
+    st.response_frame_format   = RCP_EP_CAN_FRAME_XL_NEW_PL;
+    st.response_arbitration_id = 0x123u;
+    st.response_xl_header.sdt  = 0x5u;
+    st.response_xl_header.vcid = 0x9u;
+    st.response_xl_header.af   = 0xDEADBEEFu;
+    st.response_rx_len         = RCP_EP_CAN_XL_MAX_DATA_LEN;
+    for (i = 0; i < st.response_rx_len; i++) st.response_rx_data[i] = (uint8_t)(i * 3u + 7u);
+    st.max_fragment_payload    = RCP_ACF_MAX_PAYLOAD;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint_multi_response(
+                                        srv, 0x31u, 0u, true, can_dispatch_multi_handler, &st));
+
+    req = rcp_ep_can_encode_frame_request(0x31u, RCP_EP_CAN_FRAME_CBFF, 0x100u, NULL,
+                                          (const uint8_t *)"\x01\x02", 2u, 0x44u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_multi_response(
+                          srv, 0x31u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                          req.data, req.len, responses, 4u, &response_count));
+
+    /* The point of this test: genuinely MORE than one response frame, not
+     * an artificially-single-fragment case a plain handler already covers
+     * (matching ISELED's own identical framing). */
+    TEST_ASSERT_EQUAL_size_t(2u, response_count);
+
+    for (i = 0; i < response_count; i++) {
+        bool           ms      = false;
+        uint8_t        segnum  = 0u;
+        const uint8_t  *payload = NULL;
+        size_t          payload_len = 0u;
+        bool            timed  = true;
+        uint64_t        ts     = 0u;
+        uint8_t         txn    = 0u;
+
+        TEST_ASSERT_NOT_NULL(responses[i].data);
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+                          rcp_ep_can_decode_frame_response_fragment(
+                              responses[i].data, responses[i].len, 0x31u, &ms, &segnum, &payload,
+                              &payload_len, &timed, &ts, &txn));
+        TEST_ASSERT_EQUAL_UINT8(0x44u, txn);
+        TEST_ASSERT_FALSE(timed);
+
+        /* Every fragment but the last has ms=1 with a strictly
+         * incrementing segment_num starting at 0; the last has ms=0. */
+        if (i + 1u < response_count) {
+            TEST_ASSERT_TRUE(ms);
+            TEST_ASSERT_EQUAL_UINT8((uint8_t)i, segnum);
+        } else {
+            TEST_ASSERT_FALSE(ms);
+        }
+
+        TEST_ASSERT_TRUE(reassembled_len + payload_len <= sizeof(reassembled));
+        rcp_memcpy_bounded(&reassembled[reassembled_len], sizeof(reassembled) - reassembled_len,
+                            payload, payload_len);
+        reassembled_len += payload_len;
+    }
+
+    /* Every fragment's own payload reassembles back to the exact combined
+     * prefix-then-data payload the handler encoded -- proving this is
+     * real, correct response-aggregation, not just two frames of
+     * arbitrary content. */
+    TEST_ASSERT_EQUAL_size_t(4u + 6u + st.response_rx_len, reassembled_len);
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+                      rcp_ep_can_decode_reassembled_frame_response(
+                          reassembled, reassembled_len, &out_format, &out_id, &out_xl, &out_rx,
+                          &out_rx_len));
+    TEST_ASSERT_EQUAL(st.response_frame_format, out_format);
+    TEST_ASSERT_EQUAL_UINT32(st.response_arbitration_id, out_id);
+    TEST_ASSERT_EQUAL_UINT8(st.response_xl_header.sdt, out_xl.sdt);
+    TEST_ASSERT_EQUAL_UINT8(st.response_xl_header.vcid, out_xl.vcid);
+    TEST_ASSERT_EQUAL_UINT32(st.response_xl_header.af, out_xl.af);
+    TEST_ASSERT_EQUAL_size_t(st.response_rx_len, out_rx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(st.response_rx_data, out_rx, st.response_rx_len);
+
+    rcp_bytes_free(&req);
+    for (i = 0; i < response_count; i++) rcp_bytes_free(&responses[i]);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── ISELED (§13.7.12) ─────────────────────────────────────────────────────── */
 
 static void test_iseled_response_has_no_read_size_ceiling(void)
@@ -1756,6 +1930,7 @@ int main(void)
     RUN_TEST(test_can_ep_enable_clr_clear_bit_is_wire_bit_4);
     RUN_TEST(test_can_block_lacks_receive_filter_table);
     RUN_TEST(test_can_new_physical_layer_is_selected_per_frame);
+    RUN_TEST(test_can_dispatch_multi_fragment_response_round_trips);
 
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
