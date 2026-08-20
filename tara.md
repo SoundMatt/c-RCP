@@ -49,7 +49,7 @@ Satellite Package Disposition table).
 | Threat | Safety Impact | Financial Impact | Operational Impact | Privacy Impact |
 |---|---|---|---|---|
 | TS-001 | high — unauthorized actuation via a forged request (ASIL-A scoped per HARA.md H-002/H-006) | not quantified (library-level SEOOC; deployment-specific) | endpoint-dependent, potentially immediate | none (no PII in the RCP data path) |
-| TS-002 | high — repeated unintended actuation from a replayed request, with no library-level mitigation (HARA.md H-004) | not quantified | endpoint-dependent | none |
+| TS-002 | high — repeated unintended actuation from a replayed request; a library-level mitigation now exists but is opt-in (HARA.md H-004, see §6 note) | not quantified | endpoint-dependent | none |
 | TS-003 | severe — full configuration hijack for the affected server during bootstrap (HARA.md H-011) | not quantified | sustained until the next full reset | none |
 | TS-004 | severe — undermines confidentiality and integrity of every request on the affected link (HARA.md H-007) | not quantified | sustained until MACsec is deployed | none |
 | TS-005 | moderate — safety-tagged requests are exempted by design, bounding safety impact | not quantified | temporary, non-safety requests only | none |
@@ -67,9 +67,18 @@ Satellite Package Disposition table).
 _TS-002 note: elapsed time/knowledge are rated easier here than the
 pre-TC18 TARA's own TS-002 entry, which had a real, tested, TLC-verified
 anti-replay guard (the retired `AntiReplayGuard.tla`/`rcp_e2e_replay_guard_t`)
-standing in the way. That guard's TC18 replacement does not reimplement
-replay detection (see §6's notes), so this rating reflects capture-and-
-resend against no defense at all, not against a weakened one._
+standing in the way. This rating reflects the default/naive posture — a
+deployment that has not enabled the opt-in TC18 Table 24
+`rx_enforce_seq`/`rx_seq_safestate_enable` mitigation now available (see
+§6's notes, updated 2026-08-20) — i.e. capture-and-resend against no
+active defense, the same posture this rating described before that
+mitigation existed. A deployment that has enabled it and replicated
+`mock.c`'s reference wiring in its own dispatch loop faces a materially
+higher-effort attack (bounded by the mechanism's own documented residual
+risk: per-restart tracker reset, the RFC 1982 `[1,127]` forward-window
+limit, and per-AVTPDU-frame granularity), but this table's own numeric
+ratings are not re-derived per-deployment-configuration — they describe
+this library's shipped default._
 
 _TS-005 note: naively sending a lot of traffic is trivial (layman/public/
 easy), but the token-bucket limiter's default safety-tagged exemption
@@ -93,7 +102,7 @@ that outcome, not to merely transmit packets._
 | Threat | Treatment | Cybersecurity Goal | Requirement Ref |
 |---|---|---|---|
 | TS-001 | reduce | No request shall be forwarded to an endpoint unless the caller's asserted identity is permitted for that endpoint/request-type by the loaded policy. | REQ-AUTH-001, REQ-AUTH-002 |
-| TS-002 | reduce | No request carrying a previously-seen sequence number shall be accepted. **Currently unmet — no implemented mitigation; see HARA.md H-004/SG-004.** | none |
+| TS-002 | reduce | No request carrying a previously-seen sequence number shall be accepted. **Mitigated (opt-in) as of 2026-08-20 (issue #606/#601) — see HARA.md H-004/SG-004 and the note below for scope.** | REQ-E2E-028, REQ-E2E-029 |
 | TS-003 | reduce | Only a caller holding a valid, unexpired discovery claim (or, post-bootstrap, an authorized EP0 root-client/owning-stream writer context) shall be permitted to write HW/RCP configuration. | REQ-DISC-017, REQ-DISC-018, REQ-DISC-019, REQ-DISC-021, REQ-RMAP-009..012 |
 | TS-004 | reduce | Link-layer authentication (MACsec, 802.1AE) shall be enforced by the deployment on any transport carrying safety-relevant requests. **Deployment-level control; not implemented within this library — see HARA.md H-007/SG-007.** | none (deployment-level) |
 | TS-005 | reduce | A flood of non-safety-tagged requests shall not exhaust an endpoint's processing capacity; safety-tagged requests shall remain exempt by default. | REQ-RL-003, REQ-RL-004 |
@@ -101,7 +110,7 @@ that outcome, not to merely transmit packets._
 ### Notes on residual risk (read before citing this document as evidence of full mitigation)
 
 - **TS-001**: `rcp_authz_policy_permit()` (Layer 2, REAL and working, exercised by `test_authz.c`) rejects any identity/address/request-type combination not in the policy table. Its identity input is still a caller-supplied short string label (certificate CN or pre-shared key label, per `authz.h`'s own file header); full certificate-chain validation remains the responsibility of whichever link-layer security control (MACsec) is in effect — this library's own default posture (mock/sim/udp/shmem transports) supplies no cryptographic identity source of its own. This is the same residual structure the pre-TC18 TARA's TS-001 entry described for `tls.c`, now re-anchored on MACsec instead of TLS since `tls.c` itself is deprecated (see TS-004).
-- **TS-002**: **Open, unmitigated.** `include/rcp/e2e.h`'s own file header records explicitly that this module does not reimplement the retired CRC-16 sequence-counter/replay-window mechanism — this is a known, deliberate scope boundary of milestone 70 (Phase 18), not a defect newly discovered by this TARA re-derivation, but it is a genuine, currently-open gap in this library's shipped defenses that the pre-TC18 TARA's own TS-002 entry did not have (that entry cited a real, TLC-verified guard). No requirement in `.fusa-reqs.json` currently claims replay mitigation; none should be added until a real mechanism exists to trace to.
+- **TS-002**: **Mitigated (opt-in), updated 2026-08-20 (issue #606/#601).** The prior "open, unmitigated" note above described a real gap through issue #338 (v0.322.0): the retired CRC-16 sequence-counter/replay-window guard had no TC18 counterpart, and the TC18 CRC32 safe-point mechanism that replaced it is an integrity check, not a freshness check. That gap is now closed at the mechanism level — TC18 §12.7.7 Table 24 itself defines `rx_enforce_seq`/`rx_seq_safestate_enable` (0x000D bits 1/2), and `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` implement it (`.fusa-reqs.json` REQ-E2E-028/REQ-E2E-029, both `status: "implemented"`, `scope: "tc18"` — a real spec mechanism, not a c-RCP-specific extension), wired into `mock.c`'s reference dispatch composition (`frame_seq_gate_admits()`, once per AVTPDU frame). This is **opt-in**, not automatic: an integrator must enable the config bits via `regmap.h` and replicate `mock.c`'s admission wiring in their own real, I/O-attached dispatch loop (this library ships no networked dispatcher of its own). Residual risk even when enabled: `rcp_e2e_seq_tracker_t` state is per-process/per-restart (no persistence — a replay immediately after a restart is not detected), RFC 1982 forward-window comparison only distinguishes a gap in `[1,127]` from ordinary 8-bit wraparound, and detection is per-AVTPDU-frame, not per-ACF-message. See `include/rcp/e2e.h`'s own file header for the full scope statement. Feasibility/impact above are left unchanged from the pre-mitigation rating since Section 5's Risk Determination reflects the threat absent treatment, matching this document's own convention for every other `reduce`-treated threat in this table; the mitigation's actual effect is captured in the Risk Treatment table and this note, not by re-rating feasibility.
 - **TS-003**: `rcp_discovery_claim_note_request()`'s first-claimant-wins model (REAL, working, exercised by `test_discovery.c`) prevents a *second* attacker from displacing an already-bonded legitimate claimant, and `rcp_regmap_writer_ctx()` continues to gate configuration writes by grant afterward — but neither cryptographically authenticates the *first* claimant to arrive during a server's `HW_UNCONFIGURED` bootstrap window. Closing that gap requires the same link-layer authentication TS-004 already tracks as absent.
 - **TS-004**: **Open by design, out of this library's own scope.** The TC18 spec's own security control is MACsec — an explicitly product-specific/opaque link-layer configuration block (`ROADMAP.md`'s `tls.h`/`tls.c` DEPRECATE disposition) — not something a portable C99 protocol library implements itself. This library's own transports (`udp.c`, `avtp.c`, `shmem.c`) carry AVTPDUs with no authentication or encryption layer of their own. Every prior TLS-based mitigation this project's pre-TC18 TARA cited is gone (`tls.c` deprecated at v0.78.0) and no replacement is implemented here; integrators are expected to supply MACsec at the link layer, matching the same secure-by-refusal (never a silent insecure fallback) posture the retired `tls.c` stub already established.
 - **TS-005**: the only threat in this TARA with a genuinely complete, working mitigation at the library level with no external backend dependency.

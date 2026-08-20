@@ -10,11 +10,18 @@ modeled the retired Zone/Command-era watchdog and CRC-16 anti-replay
 guard (`WatchdogProtocol.tla`, `HealthStateMachine.tla`,
 `AntiReplayGuard.tla` — all three deleted by this milestone, not
 adapted, since their subject — a per-zone Healthy/Degraded/Faulted
-health state machine and a sequence-number replay window — has no TC18
-counterpart; `rcp_zone_t`/`rcp_controller_t` were retired at Phase 13-14
-and `include/rcp/e2e.h`'s own file header records that this codebase's
-CRC32 mechanism does not reimplement a sequence-counter/replay-window
-concept at all):
+health state machine and the retired CRC-16 pre-TC18 sequence-number
+replay window — has no TC18 counterpart; `rcp_zone_t`/`rcp_controller_t`
+were retired at Phase 13-14. Note (updated 2026-08-20, issue #606/#601):
+this codebase's E2E module has *since* gained a real, TC18-native
+sequence-number replay/staleness mechanism of its own —
+`rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 §12.7.7 Table 24
+`rx_enforce_seq`/`rx_seq_safestate_enable`, issue #338) — but it is not
+the same mechanism `AntiReplayGuard.tla` modeled (a different, retired,
+pre-TC18 design) and has no TLA+ spec of its own; it is not currently
+covered by TLC model checking, only by the direct unit/mutation tests
+`tests/test_tc18_gaps_ep.c`/`tests/test_tc18_gaps_e2e.c` provide. Adding
+formal coverage for it is a legitimate future item, not attempted here):
 
 | Spec | Module | Safety Property | Liveness Property | Fairness Required |
 |------|--------|-----------------|--------------------|--------------------|

@@ -121,7 +121,7 @@
         "asil": "ASIL-A",
         "rationale": "S2: a stale/duplicated request re-executed against an actuator is severe but repeats a previously-valid command rather than an arbitrary/unauthorized one -- survival probable. E3: requires either OS-006 (an adversarial actor capturing and replaying traffic) or, for accidental duplication, an unusual link-layer retransmit/duplication fault during OS-001 -- a specific triggering condition layered on top of ordinary operation, medium rather than high probability. C2: normally controllable -- a repeated command an endpoint already accepted once is often observable/idempotent-checkable downstream."
       },
-      "safe_state": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard.",
+      "safe_state": "UPDATED 2026-08-20 (issue #606/#601): a real, opt-in mitigation is now implemented -- rcp_e2e_seq_evaluate()/rcp_e2e_seq_tracker_t implement TC18 Table 24's own rx_enforce_seq/rx_seq_safestate_enable bits (REQ-E2E-028/029, both implemented, scope: tc18 -- a real spec mechanism, not a c-RCP extension) and are wired into this library's only reference dispatch composition (mock.c's frame_seq_gate_admits(), called once per AVTPDU frame). Opt-in: an integrator must set rx_enforce_seq/rx_seq_safestate_enable via regmap.h and must replicate mock.c's admit()+evaluate() wiring in their own real, I/O-attached dispatch loop -- this library ships no networked dispatcher of its own. Residual risk even when enabled: rcp_e2e_seq_tracker_t state is per-process/per-restart (no persistence across restarts); RFC 1982 forward-window comparison only distinguishes a gap in [1,127] from ordinary 8-bit wraparound; detection granularity is per-AVTPDU-frame, not per-ACF-message. See include/rcp/e2e.h's own file header for the full scope statement. Tracked as Mitigated (opt-in), not an unconditionally closed hazard.",
       "safetyGoals": [
         "SG-004"
       ],
@@ -325,12 +325,12 @@
     },
     {
       "id": "SG-004",
-      "description": "Replayed or duplicated requests should be detected and rejected. [Open -- no implemented mitigation; see H-004.]",
+      "description": "Replayed or duplicated requests should be detected and rejected. Mitigated (opt-in) as of 2026-08-20 (issue #606/#601); see H-004.",
       "hazards": [
         "H-004"
       ],
       "asil": "ASIL-A",
-      "safeState": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard."
+      "safeState": "rcp_e2e_seq_evaluate()/rcp_e2e_seq_tracker_t implement TC18 Table 24's rx_enforce_seq/rx_seq_safestate_enable bits (REQ-E2E-028/029, implemented, scope: tc18) and are wired into mock.c's reference dispatch composition (frame_seq_gate_admits(), once per AVTPDU frame). Opt-in (integrator must enable the config bits and replicate this wiring in their own real dispatch loop); residual risk (per-process/per-restart tracker reset, RFC 1982 [1,127] forward-window limit, per-AVTPDU-frame granularity) documented in include/rcp/e2e.h's own file header. Mitigated, not unconditionally closed."
     },
     {
       "id": "SG-005",
