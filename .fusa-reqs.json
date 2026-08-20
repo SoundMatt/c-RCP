@@ -14136,6 +14136,56 @@
       "status": "implemented"
     },
     {
+      "id": "REQ-ALLOC-007",
+      "title": "rcp_alloc_lock_hooks() locks the currently-installed hooks against further modification",
+      "text": "[c-RCP-23b], issue #600, closing SEOOC_BOUNDARY.md §2 AoU-8's access-control gap (FREEDOM_FROM_INTERFERENCE.md §2): rcp_alloc_lock_hooks() shall lock whatever hooks are currently installed (via rcp_alloc_set_hooks(), or the libc-passthrough default if none was ever installed) so that subsequent rcp_alloc_set_hooks()/rcp_alloc_reset_hooks() calls are rejected no-ops until rcp_alloc_unlock_hooks() is called. Returns true if the lock was newly acquired, false if the table was already locked (an idempotent no-op, not an error). This closes the access-control half of AoU-8 for e2e.c's rcp_e2e_wrap()/rcp_e2e_unwrap() and watchdog.c's rcp_watchdog_keeper_new()/_destroy() without any change to either module: both already route every allocation through rcp_malloc()/rcp_calloc()/rcp_free(), so this module's own shared indirection point is the correct place for the control.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-008",
+      "title": "rcp_alloc_unlock_hooks() releases a previously-acquired lock",
+      "text": "[c-RCP-23b], issue #600 (SEOOC_BOUNDARY.md §2 AoU-8, FREEDOM_FROM_INTERFERENCE.md §2): rcp_alloc_unlock_hooks() shall release a lock previously acquired by rcp_alloc_lock_hooks(), restoring rcp_alloc_set_hooks()/rcp_alloc_reset_hooks() to their normal (accepted) behavior. Safe to call when not locked -- a no-op in that case. Returns true if a lock was released, false if the table was not locked to begin with.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-009",
+      "title": "rcp_alloc_hooks_locked() reports whether the hook table is currently locked",
+      "text": "[c-RCP-23b], issue #600 (SEOOC_BOUNDARY.md §2 AoU-8, FREEDOM_FROM_INTERFERENCE.md §2): rcp_alloc_hooks_locked() shall return true if and only if the hook table is currently locked (rcp_alloc_lock_hooks() called with no matching rcp_alloc_unlock_hooks() since), with no side effects of its own.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-010",
+      "title": "rcp_alloc_set_hooks() is a rejected no-op while the hook table is locked",
+      "text": "[c-RCP-23b], issue #600, distinct from REQ-ALLOC-001's own pre-existing unconditional-apply behavior (SEOOC_BOUNDARY.md §2 AoU-8, FREEDOM_FROM_INTERFERENCE.md §2): while rcp_alloc_hooks_locked() would report true, rcp_alloc_set_hooks() shall leave the currently-installed hooks unchanged and return false, regardless of what *hooks the caller passed (including NULL) -- the caller attempting the override observes the false return; no QM-rated caller anywhere in the process can silently redirect the allocator e2e.c's/watchdog.c's ASIL-B call sites depend on once locked.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-011",
+      "title": "rcp_alloc_reset_hooks() is a rejected no-op while the hook table is locked",
+      "text": "[c-RCP-23b], issue #600, distinct from REQ-ALLOC-002's own pre-existing unconditional-reset behavior (SEOOC_BOUNDARY.md §2 AoU-8, FREEDOM_FROM_INTERFERENCE.md §2): while rcp_alloc_hooks_locked() would report true, rcp_alloc_reset_hooks() shall leave the currently-installed hooks unchanged and return false -- locking protects against a locked-out reset-to-default just as much as against a locked-out swap to different hooks; both are ways a QM-rated caller could otherwise redirect the allocator an ASIL-rated call site depends on.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
       "id": "REQ-UART-041",
       "title": "rcp_ep_uart_trigger_fires() never fires for RCP_EP_UART_TRIGGER_NONE",
       "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): TC18 §13.7.8.4 Table 52 (\"uart trigger signals\") defines a real UART HW trigger event with two output signals that this module previously modeled nowhere at all. rcp_ep_uart_trigger_fires() shall return false for trigger == RCP_EP_UART_TRIGGER_NONE regardless of event -- NONE is this module's own off/none state, the same shape as ep_spi.h's own RCP_EP_SPI_TRIGGER_NONE (see REQ-SPI-006) and ep_lin.h's RCP_EP_LIN_TRIGGER_NONE, neither of which Table 52 (nor Table 41, nor this endpoint type's own original LIN trigger concept) itself defines a wire value for.",

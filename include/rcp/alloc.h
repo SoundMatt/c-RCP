@@ -76,10 +76,71 @@
  * allocation this library performs -- never needs concurrent
  * installation, so this is a deliberate simplicity choice, not an
  * oversight.
+ *
+ * ── Locking the hook table: closing AoU-8's access-control gap ──────────────
+ *
+ * [c-RCP-23b], issue #600: `SEOOC_BOUNDARY.md` §2 AoU-8 and
+ * `FREEDOM_FROM_INTERFERENCE.md` §2 record a real freedom-from-
+ * interference finding -- `src/e2e.c`'s ASIL-B-rated
+ * rcp_e2e_wrap()/rcp_e2e_unwrap() (per-request safe-point path) and
+ * `src/watchdog.c`'s ASIL-B-rated rcp_watchdog_keeper_new()/_destroy()
+ * (once per keeper construction/destruction) both allocate exclusively
+ * through rcp_malloc()/rcp_calloc()/rcp_free(), which route through this
+ * module's single, process-wide g_hooks table. Before this mechanism
+ * existed, ANY caller in the same process -- including c-RCP's own
+ * QM-rated features, or integrator code entirely outside c-RCP -- could
+ * call rcp_alloc_set_hooks() at any time and silently redirect the
+ * allocator those two ASIL-rated call sites depend on, with no access
+ * control, no detection, and no attribution.
+ *
+ * rcp_alloc_lock_hooks() closes the access-control half of that gap
+ * *without changing e2e.c or watchdog.c at all* -- both already route
+ * every allocation through this module's own indirection, so this
+ * module's own indirection point is the correct, single place to add
+ * the control, not a duplicated fix at each call site. The intended
+ * integration pattern:
+ *
+ *   1. Install whatever hooks the integrator's own startup sequence
+ *      needs (a fixed pool, an audit-trail wrapper, or nothing --
+ *      rcp_alloc_reset_hooks()'s own libc-passthrough default is a
+ *      valid choice to lock in too).
+ *   2. Call rcp_alloc_lock_hooks().
+ *   3. Only after that point let any ASIL-rated code path -- e2e.c's
+ *      rcp_e2e_wrap()/rcp_e2e_unwrap(), watchdog.c's
+ *      rcp_watchdog_keeper_new()/_destroy() -- perform its first
+ *      allocation.
+ *
+ * Once locked, rcp_alloc_set_hooks() and rcp_alloc_reset_hooks() both
+ * become rejected no-ops (they return false, the previously-installed
+ * hooks are left untouched) until rcp_alloc_unlock_hooks() is called.
+ * No QM-rated code anywhere in the process can silently redirect the
+ * allocator after that point -- the caller attempting the override
+ * observes the false return and can react to it.
+ *
+ * ── What this does NOT close -- be honest about the remaining gap ───────────
+ *
+ * This is access control and detection-at-the-point-of-attempted-
+ * interference, not attribution: a rejected rcp_alloc_set_hooks() call
+ * sees `false`, but this module does not log or report *who* attempted
+ * it (no caller identity, no stack trace, no audit record) -- a full
+ * audit-log mechanism is a further, separate enhancement, not attempted
+ * here. Locking is also still a single global switch, not a true
+ * per-ASIL-tier partition (a QM-rated path and an ASIL-rated path that
+ * both allocate after the lock is engaged still share the exact same
+ * locked hook set -- there is no way to lock hooks for e2e.c/watchdog.c
+ * specifically while leaving some other, unrelated caller free to
+ * install its own). And the lock is opt-in: an integrator who never
+ * calls rcp_alloc_lock_hooks() gets none of this protection -- c-RCP
+ * cannot call it on the integrator's own behalf without presuming an
+ * integration pattern that may not fit every caller (e.g. one that
+ * legitimately needs to swap hooks at runtime for non-ASIL reasons).
+ * `SEOOC_BOUNDARY.md`/`FREEDOM_FROM_INTERFERENCE.md` accordingly
+ * describe AoU-8 as narrowed by this mechanism, not retired by it.
  */
 #ifndef RCP_ALLOC_H
 #define RCP_ALLOC_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -106,13 +167,45 @@ typedef struct {
 /* Installs hooks globally, replacing whatever was installed before (if
  * anything). hooks is copied by value; the caller does not need to keep
  * it alive past this call. Passing a hooks value with every member NULL
- * is equivalent to rcp_alloc_reset_hooks(). */
-void rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks);
+ * is equivalent to rcp_alloc_reset_hooks().
+ *
+ * Returns true if the hooks were applied, false if the table is
+ * currently locked (rcp_alloc_lock_hooks(), below) -- in that case this
+ * call is a rejected no-op and whatever hooks were previously installed
+ * remain active. */
+bool rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks);
 
 /* Restores the default passthrough-to-libc behavior, discarding whatever
  * hooks were previously installed. Safe to call even if no hooks were
- * ever installed (a no-op in that case). */
-void rcp_alloc_reset_hooks(void);
+ * ever installed (a no-op in that case).
+ *
+ * Returns true if the reset was applied, false if the table is
+ * currently locked -- in that case this call is a rejected no-op and
+ * whatever hooks were previously installed remain active. */
+bool rcp_alloc_reset_hooks(void);
+
+/* Locks the currently-installed hooks (whatever rcp_alloc_set_hooks()
+ * last applied, or the libc-passthrough default if none was ever
+ * installed) against further modification: rcp_alloc_set_hooks() and
+ * rcp_alloc_reset_hooks() both become rejected no-ops until
+ * rcp_alloc_unlock_hooks() is called. See this header's own "Locking
+ * the hook table" section above for the intended integration pattern
+ * and what this mechanism does and does not close.
+ *
+ * Returns true if the lock was newly acquired, false if the table was
+ * already locked (an idempotent no-op, not an error). */
+bool rcp_alloc_lock_hooks(void);
+
+/* Releases a lock previously acquired by rcp_alloc_lock_hooks(). Safe to
+ * call when not locked -- a no-op in that case.
+ *
+ * Returns true if a lock was released, false if the table was not
+ * locked to begin with. */
+bool rcp_alloc_unlock_hooks(void);
+
+/* Pure query, no side effects: true if the hook table is currently
+ * locked. */
+bool rcp_alloc_hooks_locked(void);
 
 /* rcp_malloc(size)/rcp_calloc(nmemb, size)/rcp_realloc(ptr, size)/
  * rcp_free(ptr): this module's own indirected counterparts of

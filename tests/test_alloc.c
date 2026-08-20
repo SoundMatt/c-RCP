@@ -2,11 +2,18 @@
 #include "unity.h"
 
 #include <rcp/alloc.h>
+#include <rcp/e2e.h>
 
 #include <stdlib.h>
 
-void setUp(void) { rcp_alloc_reset_hooks(); }
-void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a hook across tests */
+/* setUp()/tearDown() must themselves tolerate running while a previous
+ * test left the table locked (they must not silently no-op via the very
+ * mechanism under test) -- unlock unconditionally before resetting, or
+ * a locked table from one test would poison every test that runs after
+ * it in this binary. rcp_alloc_unlock_hooks() is itself a safe no-op
+ * when not locked. */
+void setUp(void) { rcp_alloc_unlock_hooks(); rcp_alloc_reset_hooks(); }
+void tearDown(void) { rcp_alloc_unlock_hooks(); rcp_alloc_reset_hooks(); } /* never leak a hook or a lock across tests */
 
 /* ── Default passthrough (no hooks installed) ────────────────────────────── */
 
@@ -219,6 +226,171 @@ static void test_reset_hooks_is_a_safe_no_op_when_nothing_was_installed(void)
     rcp_free(p);
 }
 
+/* ── Locking [c-RCP-23b], issue #600 (SEOOC_BOUNDARY.md §2 AoU-8,
+ * FREEDOM_FROM_INTERFERENCE.md §2) ────────────────────────────────────────── */
+
+static void *hooks_a_malloc(size_t size) { g_malloc_calls++; return malloc(size); }
+static void *hooks_b_malloc(size_t size) { (void)size; return NULL; /* sentinel: never actually called */ }
+
+//cfusa:test REQ-ALLOC-007
+//cfusa:test REQ-ALLOC-010
+static void test_lock_rejects_a_subsequent_set_hooks_call(void)
+{
+    rcp_alloc_hooks_t hooks_a = {0};
+    rcp_alloc_hooks_t hooks_b = {0};
+    bool               applied;
+    void              *p;
+
+    g_malloc_calls = 0;
+    hooks_a.malloc_fn = hooks_a_malloc;
+    TEST_ASSERT_TRUE(rcp_alloc_set_hooks(&hooks_a));
+
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());
+
+    hooks_b.malloc_fn = hooks_b_malloc;
+    applied = rcp_alloc_set_hooks(&hooks_b);
+    TEST_ASSERT_FALSE(applied);
+
+    /* Hooks A must still be the actually-active hooks -- verified by
+     * allocating and confirming A's own counting behavior fired, not
+     * just trusting the false return value. */
+    p = rcp_malloc(4);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_INT(1, g_malloc_calls);
+    rcp_alloc_unlock_hooks();
+    rcp_free(p);
+}
+
+//cfusa:test REQ-ALLOC-011
+static void test_lock_rejects_reset_hooks_too(void)
+{
+    rcp_alloc_hooks_t hooks_a = {0};
+    bool               applied;
+    void              *p;
+
+    g_malloc_calls = 0;
+    hooks_a.malloc_fn = hooks_a_malloc;
+    TEST_ASSERT_TRUE(rcp_alloc_set_hooks(&hooks_a));
+
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());
+
+    applied = rcp_alloc_reset_hooks();
+    TEST_ASSERT_FALSE(applied);
+
+    /* Hooks A must still be active -- reset() was rejected, not merely
+     * reported as rejected. */
+    p = rcp_malloc(4);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_INT(1, g_malloc_calls);
+    rcp_alloc_unlock_hooks();
+    rcp_free(p);
+}
+
+//cfusa:test REQ-ALLOC-007
+static void test_lock_hooks_is_idempotent(void)
+{
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());   /* first call: newly acquired */
+    TEST_ASSERT_FALSE(rcp_alloc_lock_hooks());  /* second call: already locked */
+    rcp_alloc_unlock_hooks();
+}
+
+//cfusa:test REQ-ALLOC-008
+static void test_unlock_hooks_releases_the_lock(void)
+{
+    rcp_alloc_hooks_t hooks_b = {0};
+    bool               applied;
+    void              *p;
+
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());
+    TEST_ASSERT_TRUE(rcp_alloc_unlock_hooks());
+
+    g_malloc_calls = 0;
+    hooks_b.malloc_fn = hooks_a_malloc;
+    applied = rcp_alloc_set_hooks(&hooks_b);
+    TEST_ASSERT_TRUE(applied);
+
+    p = rcp_malloc(4);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_INT(1, g_malloc_calls);
+    rcp_free(p);
+}
+
+//cfusa:test REQ-ALLOC-008
+static void test_unlock_hooks_on_already_unlocked_table_is_a_no_op(void)
+{
+    TEST_ASSERT_FALSE(rcp_alloc_hooks_locked());
+    TEST_ASSERT_FALSE(rcp_alloc_unlock_hooks()); /* nothing to release */
+    TEST_ASSERT_FALSE(rcp_alloc_hooks_locked());
+}
+
+//cfusa:test REQ-ALLOC-009
+static void test_hooks_locked_reflects_state_across_lock_unlock_sequence(void)
+{
+    TEST_ASSERT_FALSE(rcp_alloc_hooks_locked());
+
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());
+    TEST_ASSERT_TRUE(rcp_alloc_hooks_locked());
+
+    TEST_ASSERT_FALSE(rcp_alloc_lock_hooks()); /* already locked */
+    TEST_ASSERT_TRUE(rcp_alloc_hooks_locked()); /* still locked */
+
+    TEST_ASSERT_TRUE(rcp_alloc_unlock_hooks());
+    TEST_ASSERT_FALSE(rcp_alloc_hooks_locked());
+
+    TEST_ASSERT_FALSE(rcp_alloc_unlock_hooks()); /* already unlocked */
+    TEST_ASSERT_FALSE(rcp_alloc_hooks_locked());
+}
+
+/* ── End-to-end proof: e2e.c's own ASIL-B safe-point path (rcp_e2e_wrap())
+ * keeps using the LOCKED hooks even though nothing in e2e.c itself
+ * changed -- the actual thing AoU-8/issue #600 needed closed, not just
+ * a unit test of alloc.c in isolation. Frame-construction idiom copied
+ * from test_e2e.c's own make_test_acf_frame(). */
+
+static void make_test_acf_frame(uint8_t *out, size_t out_len)
+{
+    size_t i;
+    TEST_ASSERT_TRUE(out_len >= 3);
+    out[0] = 0x1Cu; /* acf_msg_type=ABB, length MSB=0 */
+    out[1] = 0x00u; /* placeholder acf_msg_length, low 8 bits */
+    out[2] = (uint8_t)(out_len - 8u);
+    for (i = 3; i < out_len; i++) out[i] = (uint8_t)(i & 0xFFu);
+}
+
+//cfusa:test REQ-ALLOC-007
+//cfusa:test REQ-ALLOC-010
+static void test_e2e_wrap_still_uses_locked_hooks_with_no_change_to_e2e_c(void)
+{
+    rcp_alloc_hooks_t hooks_locked_in = {0};
+    rcp_alloc_hooks_t attempted_override = {0};
+    uint8_t            acf_frame[8];
+    rcp_bytes_t        wrapped;
+    bool               applied;
+
+    make_test_acf_frame(acf_frame, sizeof(acf_frame));
+
+    g_malloc_calls = 0;
+    hooks_locked_in.malloc_fn = hooks_a_malloc;
+    TEST_ASSERT_TRUE(rcp_alloc_set_hooks(&hooks_locked_in));
+    TEST_ASSERT_TRUE(rcp_alloc_lock_hooks());
+
+    /* An arbitrary QM-rated caller attempts to redirect the allocator
+     * e2e.c's own safe-point path depends on -- rejected. */
+    attempted_override.malloc_fn = hooks_b_malloc;
+    applied = rcp_alloc_set_hooks(&attempted_override);
+    TEST_ASSERT_FALSE(applied);
+
+    /* rcp_e2e_wrap() itself is untouched by this issue -- it still just
+     * calls rcp_malloc(). Prove the LOCKED hooks (hooks_locked_in), not
+     * the attempted override, are what it actually observes. */
+    wrapped = rcp_e2e_wrap(0x05u, 0x00u, false, 1u, 1u, acf_frame, sizeof(acf_frame));
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+    TEST_ASSERT_TRUE(g_malloc_calls > 0); /* hooks_a_malloc, not hooks_b_malloc, actually ran */
+
+    rcp_alloc_unlock_hooks();
+    rcp_bytes_free(&wrapped);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -238,6 +410,14 @@ int main(void)
 
     RUN_TEST(test_reset_hooks_restores_the_libc_passthrough);
     RUN_TEST(test_reset_hooks_is_a_safe_no_op_when_nothing_was_installed);
+
+    RUN_TEST(test_lock_rejects_a_subsequent_set_hooks_call);
+    RUN_TEST(test_lock_rejects_reset_hooks_too);
+    RUN_TEST(test_lock_hooks_is_idempotent);
+    RUN_TEST(test_unlock_hooks_releases_the_lock);
+    RUN_TEST(test_unlock_hooks_on_already_unlocked_table_is_a_no_op);
+    RUN_TEST(test_hooks_locked_reflects_state_across_lock_unlock_sequence);
+    RUN_TEST(test_e2e_wrap_still_uses_locked_hooks_with_no_change_to_e2e_c);
 
     return UNITY_END();
 }

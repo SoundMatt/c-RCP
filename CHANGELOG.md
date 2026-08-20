@@ -34,6 +34,95 @@ the rationale.
 
 ## Releases
 
+### v0.478.0 -- 2026-08-20 (feat+docs: [c-RCP-23b] issue #600 -- lockable allocator-hook table closes AoU-8's access-control gap for e2e.c/watchdog.c)
+
+Implements issue #600 (c-RCP-23b, child of the [c-RCP-23-tracker] #603):
+the deferred design-and-implementation follow-up #518 (c-RCP-16) item 4
+explicitly left open when it recorded AoU-8 (`SEOOC_BOUNDARY.md` §2) --
+`e2e.c`'s ASIL-B-rated `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` (per-request
+safe-point path) and `watchdog.c`'s ASIL-B-rated
+`rcp_watchdog_keeper_new()`/`_destroy()` (once per keeper
+construction/destruction) both allocate exclusively through
+`rcp_malloc()`/`rcp_calloc()`/`rcp_free()`, which route through
+`alloc.c`'s single, process-wide, unsynchronized hook table
+(`rcp_alloc_set_hooks()`) that any QM-rated caller in the same process
+could redirect with no access control.
+
+Two of the issue's own three suggested approaches were investigated and
+set aside as more invasive than the finding warrants: converting
+`rcp_e2e_wrap()`/`_unwrap()` to a caller-supplied-buffer API (bounded by
+`RCP_ACF_MAX_QUADLETS*4 + RCP_E2E_CRC_LEN` = 2048 octets) is a
+compatibility-breaking change to widely-used core public APIs -- every
+caller including `src/mock.c` and effectively every test file -- for a
+larger blast radius than needed; exposing `rcp_watchdog_keeper_t`'s
+struct layout (or building a portable fixed-size opaque-storage idiom)
+for caller-owned stack storage is real, ABI-risky, cross-platform work,
+since the type is deliberately opaque and contains platform-opaque
+members (`rcp_mutex_t`, `rcp_thread_t`) whose sizes differ across this
+project's three target OSes.
+
+The third approach -- a locked state on the shared hook table itself --
+is implemented instead. New `rcp_alloc_lock_hooks()`/
+`rcp_alloc_unlock_hooks()`/`rcp_alloc_hooks_locked()`
+(`REQ-ALLOC-007`/`008`/`009`) add an optional lock flag alongside
+`alloc.c`'s existing `g_hooks` global; once locked,
+`rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()` both become rejected
+no-ops -- return `false`, previously-installed hooks left untouched --
+until unlocked again (`REQ-ALLOC-010`/`011`, new behavior distinct from
+`REQ-ALLOC-001`/`002`'s pre-existing unconditional-apply text). This
+requires **zero changes to `e2e.c` or `watchdog.c`**: both already
+route every allocation through this module's own indirection, so
+`alloc.c`'s shared indirection point is the correct, single place to
+add access control rather than a duplicated fix at each call site. The
+intended integration pattern: install whatever hooks an integrator's
+own startup sequence needs (or deliberately leave the libc-passthrough
+default), call `rcp_alloc_lock_hooks()`, then let ASIL-rated code paths
+begin allocating.
+
+`rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()` change return type
+from `void` to `bool` (`true` = applied, `false` = rejected because
+locked) -- source- and call-site-compatible for every existing caller
+in this codebase (grepped before and after across `src/`/`tests/`: zero
+callers capture the return value), but a real, backward-compatible
+public API addition, hence this **MINOR** version bump rather than a
+patch.
+
+`FREEDOM_FROM_INTERFERENCE.md` §2 gets a new §2.1 recording the design
+investigation and disposition; `SEOOC_BOUNDARY.md` §2's AoU-8 row is
+updated to match. Both are explicit that this **narrows AoU-8, it does
+not retire it**: an integrator who never calls
+`rcp_alloc_lock_hooks()` carries the exact same finding as before; one
+who does gains genuine access control for both named call sites, but
+the mechanism provides no attribution of an attempted override (a
+rejected caller sees `false`, nothing logs *who* attempted it -- a
+possible future enhancement, not attempted here) and is still a single
+global switch, not a true per-ASIL-tier partition.
+
+New tests in `tests/test_alloc.c`: lock rejects a subsequent
+`rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()` call (verified by
+allocating and confirming the still-active hooks' own behavior, not
+just the boolean return); `rcp_alloc_lock_hooks()` is idempotent (`true`
+then `false`); `rcp_alloc_unlock_hooks()` releases the lock and is
+itself a safe no-op when not locked; `rcp_alloc_hooks_locked()` tracks
+state correctly across a full lock/unlock sequence; and an end-to-end
+test that installs hooks, locks, and confirms `rcp_e2e_wrap()` --
+untouched by this change -- still observes the locked hooks rather than
+an attempted override, the actual proof this closes the gap for the
+call site AoU-8 names rather than only unit-testing `alloc.c` in
+isolation.
+
+Verified: full 67-test suite (Debug, 100% passing); `test_alloc`'s 19
+tests individually confirmed `:PASS` (7 new); mutation-tested the lock
+check in both `rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()`
+(temporarily neutered to always apply) and confirmed the three tests
+that depend on rejection (`test_lock_rejects_a_subsequent_set_hooks_call`,
+`test_lock_rejects_reset_hooks_too`,
+`test_e2e_wrap_still_uses_locked_hooks_with_no_change_to_e2e_c`) fail as
+expected, then reverted; ASan/UBSan clean (67/67); `cfusa check`: 0
+errors, PASS; `cfusa trace --req-coverage 100`: Metric 1 (requirement
+traceability) 100% (1281/1281), Metric 2 (function annotation density)
+100% (512/512).
+
 ### v0.477.0 -- 2026-08-20 (docs+test: [c-RCP-23b] issue #604 -- re-confirm watchdog.c's 33% MC/DC gap as structurally unreachable, not closable)
 
 Follow-up to issue #599 (c-RCP-23a)'s ratchet gate: issue #604 tasked
