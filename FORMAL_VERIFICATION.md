@@ -16,10 +16,17 @@ and `include/rcp/e2e.h`'s own file header records that this codebase's
 CRC32 mechanism does not reimplement a sequence-counter/replay-window
 concept at all):
 
-| Spec | Module | Safety Property |
-|------|--------|-----------------|
-| `LifecycleStateMachine.tla` | RC Server lifecycle FSM (`include/rcp/lifecycle.h`, Phase 14) | SP1: `RcpConfigured` is only ever reached via `HwConfigured`; SP2: a field lock set while `RcpConfigured` never reverts except via full reset |
-| `E2ESafePoint.tla` | Per-stream watchdog + safety-tagged execution gate (`include/rcp/e2e.h`, Phase 18) | SP1: a watchdog-overflow purge never discards a pending safety-tagged request; SP2: a safety-tagged request only executes once its endpoint reports safe state |
+| Spec | Module | Safety Property | Liveness Property | Fairness Required |
+|------|--------|-----------------|--------------------|--------------------|
+| `LifecycleStateMachine.tla` | RC Server lifecycle FSM (`include/rcp/lifecycle.h`, Phase 14) | SP1: `RcpConfigured` is only ever reached via `HwConfigured`; SP2: a field lock set while `RcpConfigured` never reverts except via full reset | LP1: given eventually-consistent HW/RCP config inputs, the server eventually reaches `RcpConfigured` | **WF** on `PromoteToHwConfigured`; **SF** on `PromoteToRcpConfigured` (WF alone is insufficient — see below) |
+| `E2ESafePoint.tla` | Per-stream watchdog + safety-tagged execution gate (`include/rcp/e2e.h`, Phase 18) | SP1: a watchdog-overflow purge never discards a pending safety-tagged request; SP2: a safety-tagged request only executes once its endpoint reports safe state | LP1: a safety-tagged request that becomes pending eventually executes, given an eventually-stable per-stream safe-state signal | **WF**, per stream, on `ExecuteSafety(s)` (sufficient — SF is not required) |
+
+The liveness properties (LP1 in both specs) were added by c-RCP-23d (issue
+#602), extending verification from bounded safety-invariant checking to
+fairness-conditioned liveness. See "Liveness Properties" below for what
+each one actually claims, the fairness level each genuinely needs (independently
+re-derived against real TLC runs, not assumed), and an important honesty
+note distinguishing this from the pre-existing deadlock-freedom guarantee.
 
 Unlike the specs they replace (ported verbatim from cpp-RCP's own `tla/`
 directory, per the pre-Phase-13 "feature and API mirror" convention this
@@ -49,7 +56,13 @@ This is wired into CI (`.github/workflows/ci.yml`'s `formal-verification`
 job) — every push/PR against `main` re-runs both model checks and fails
 the job on any violation. Both specs were run locally through TLC before
 this milestone's PR was opened (not merely written and assumed correct);
-see each spec's own state-count summary below.
+see each spec's own state-count summary below. As of c-RCP-23d (issue
+#602), each `.cfg`'s `SPECIFICATION` line points at a `FairSpec` formula
+(the original `Spec` plus the minimum fairness each spec's liveness
+property needs — see "Liveness Properties" below), so this exact same
+invocation — no `-config` flag, no CI change — now also checks each
+spec's LP1 liveness property alongside its pre-existing safety
+invariants and properties in the same run.
 
 ## Safety Properties Verified
 
@@ -89,6 +102,143 @@ executed while its endpoint's polled safe-state measurement reports
 by `ExecuteNormal`'s guard omitting `endpoint_in_safe_state` entirely).
 
 **Traceability**: REQ-E2E-011, REQ-E2E-012, REQ-E2E-013.
+
+## Liveness Properties (c-RCP-23d, issue #602)
+
+The safety properties above (and the invariants) are exhaustively
+checked over a **bounded, finite** state space — they say "nothing bad
+ever happens," not "something good eventually does." TLC's default
+model-checking run also always includes a no-successor-state deadlock
+check (every reachable state must have at least one enabled successor
+under `Next`), and **that check has already passed on every CI run
+since these two specs were added — it predates issue #602 and is not
+this issue's contribution.** What issue #602 actually adds is a
+strictly *stronger*, related claim: not just "the model never gets
+stuck with zero enabled actions," but "under fair scheduling, the
+system actually *makes progress* toward a specific good state" —
+livelock-freedom, not merely deadlock-freedom. A spec can be
+deadlock-free by TLC's default check and still livelock forever (e.g.
+an adversarial scheduler could, in principle, alternate two enabled
+actions forever without the system ever reaching the state that
+matters) — LP1 in each spec below is what rules that out.
+
+### LifecycleStateMachine — LP1: Eventually Reaches RcpConfigured
+
+**Claim**: given HW/RCP configuration inputs that eventually settle and
+stay consistent (`InputsEventuallyConsistent ==
+<>[](hw_cfg_consistent /\ rcp_cfg_consistent)`), the server eventually
+reaches `RcpConfigured` under fair scheduling of its two promote
+actions.
+
+**Fairness-minimality experiment.** The natural first guess — weak
+fairness (WF) on both `PromoteToHwConfigured` and
+`PromoteToRcpConfigured` — was independently built and run against real
+TLC as a separate variant and **fails**: TLC finds a concrete
+Promote/Demote lasso counterexample that never leaves
+`{HwUnconfigured, HwConfigured}` —
+
+```
+State 1: HwUnconfigured, hw_cfg_consistent=TRUE, rcp_cfg_consistent=TRUE
+State 2: PromoteToHwConfigured -> HwConfigured
+Back to State 1: DemoteToHwUnconfigured
+```
+
+`DemoteToHwUnconfigured` is unconditionally enabled at `HwConfigured`
+and races `PromoteToRcpConfigured` back to `HwUnconfigured` every time,
+so `PromoteToRcpConfigured` is only ever *intermittently* enabled, never
+*continuously* enabled — the condition WF acts on. **Strong fairness
+(SF) on `PromoteToRcpConfigured` specifically** is what fixes this (SF
+acts on infinitely-often-enabled, not just continuously-enabled), and a
+corrected mixed-fairness variant — WF on `PromoteToHwConfigured`, SF on
+`PromoteToRcpConfigured` — was independently built and confirmed to pass
+against real TLC.
+
+A separate isolated check (WF only on `PromoteToHwConfigured`, checking
+only that the server leaves `HwUnconfigured`, with no fairness anywhere
+else) also passed — confirming WF genuinely is the *sufficient* (not
+just convenient) minimum for that specific action: nothing else in the
+spec can change `state` away from `HwUnconfigured` except
+`PromoteToHwConfigured` itself, so once `hw_cfg_consistent` and
+`state = HwUnconfigured` hold continuously, nothing can disable it
+before it fires. Blanket-applying SF to both actions would have been a
+strictly weaker verification result presented as a stronger one (masking
+that `PromoteToHwConfigured` never needed it), so the spec uses WF there
+and SF only where TLC shows it is actually required.
+
+**State space**: 12 distinct reachable states (same bounded space as the
+safety properties — LP1 adds no new reachable states, only a temporal
+claim over the existing ones). TLC confirms `Model checking completed.
+No error has been found.` for the full `FairSpec` (`TypeOK`,
+`NoSkipConfiguration`, `FieldLockMonotonicWhileConfigured`,
+`EventuallyRcpConfigured`) in under 1 second.
+
+### E2ESafePoint — LP1: A Pending Safety Request Eventually Executes
+
+Issue #602's own suggested wording for this spec — "a pending
+safety-tagged request is eventually either executed or purged, never
+stuck pending forever" — is **false by construction** against this
+spec's own SP1: `Miss(s)` (the only purge event) never touches
+`safety_pending` by design (that is exactly what SP1 verifies), so
+"purged" is never a live alternative for a safety-tagged request.
+Independently re-running TLC against that literal wording confirms it:
+the counterexample is a trivial submit-and-never-purge-or-execute
+stutter, not a meaningful liveness gap. The corrected, narrower claim
+this spec can actually make — and what is verified here — is:
+
+**Claim**: for each stream `s`, given `s`'s endpoint safe-state signal
+eventually settling and staying `TRUE`
+(`EndpointEventuallyStable(s) == <>[](endpoint_in_safe_state[s])`), a
+safety-tagged request that becomes pending on `s` eventually executes,
+under weak-fair scheduling of `ExecuteSafety(s)`.
+
+**Fairness-minimality experiment.** A per-stream **weak fairness (WF)**
+variant (`WF_vars(ExecuteSafety(s))` for each stream, no SF anywhere)
+was independently built and confirmed to pass against real TLC — SF is
+**not** required here, unlike the Lifecycle spec's
+`PromoteToRcpConfigured`. The reason WF suffices: nothing in this spec
+can clear `safety_pending[s]` except `ExecuteSafety(s)` itself (`Miss`
+leaves it untouched, per SP1), so once `safety_pending[s]` holds and
+`endpoint_in_safe_state[s]` holds continuously, `ExecuteSafety(s)` stays
+*continuously* enabled until taken — exactly the condition WF (not just
+SF) acts on. There is no equivalent of the Lifecycle spec's
+Demote-race here disabling the action out from under a continuously-true
+guard.
+
+Two further variants confirm both halves of the claim are load-bearing,
+not decorative:
+- Dropping the `EndpointEventuallyStable(s)` antecedent (same WF
+  fairness, no endpoint-stability assumption) **fails**: TLC finds a
+  counterexample where `ObserveSafeState` perpetually flips
+  `endpoint_in_safe_state[s]` true/false in lockstep with `ExecuteSafety`
+  becoming enabled, so it is never *continuously* enabled and WF never
+  triggers.
+- Dropping fairness entirely (same antecedent, `Spec` with no `WF`)
+  **fails**: TLC finds a stuttering counterexample where a pending
+  safety request with a permanently-safe endpoint simply never executes
+  because nothing forces the model to ever take an enabled step.
+
+**State space (default 2-stream config)**: 256 distinct states,
+sub-second. **Widened 4-stream configuration** (`Streams = {s1,s2,s3,s4}`,
+`SafestateEnabled = {s1,s3}`, `WatchdogEnabled = {s1,s2,s3,s4}`, run
+against the actual `FairSpec` including `EventuallySafetyExecutes`, not
+just the two safety properties): **65,536 distinct states**
+(5,308,432 states generated), all properties — `TypeOK`,
+`SafetyRequestsSurvivePurge`, `NoUnsafeSafetyExecution`,
+`EventuallySafetyExecutes` — still hold, in roughly 6–7 seconds of
+TLC model-checking time (about 7.5s wall-clock including JVM startup,
+`-workers 4`, run locally; timing is hardware-dependent and given for
+scale, not as a regression gate). 65,536 is the mathematically expected
+figure for this configuration — 4 boolean-valued functions
+(`overflowed`, `endpoint_in_safe_state`, `safety_pending`,
+`normal_pending`) over 4 streams is `2^(4*4) = 2^16 = 65536`
+possible variable assignments, and this widened config's `Init` and
+`Next` make every one of them reachable. This widened-configuration
+check is not itself wired into CI (the checked-in `.cfg` stays at the
+2-stream default for CI runtime); it is a one-off scaling sanity check,
+independently re-run for this issue, recorded here for anyone verifying
+this spec's state-space growth by hand.
+
+**Traceability**: REQ-E2E-011 through REQ-E2E-015, REQ-E2E-026.
 
 ## Assumptions and Abstractions
 
@@ -141,3 +291,11 @@ by `ExecuteNormal`'s guard omitting `endpoint_in_safe_state` entirely).
 | `safety_pending` / `normal_pending` | a request stream's queued-but-not-yet-executed requests, classified via `rcp_e2e_watchdog_purge_should_keep()`/`_classify()` (`src/e2e.c`) |
 | `endpoint_in_safe_state` | `rcp_e2e_endpoint_in_safe_state()`'s return value (`src/e2e.c`) |
 | `ExecuteSafety` / `ExecuteNormal` | `rcp_e2e_request_may_execute()`'s admission decision (`src/e2e.c`) |
+
+## Liveness Traceability
+
+| TLA+ Concept | Meaning |
+|--------------|---------|
+| `FairSpec` (both specs) | `Spec` plus the minimum fairness each spec's LP1 needs — see "Liveness Properties" above for how each fairness level was derived, not assumed |
+| `LifecycleStateMachine.InputsEventuallyConsistent` | Environment assumption: the HW/RCP plausibility checks' verdicts eventually settle and stay `TRUE` |
+| `E2ESafePoint.EndpointEventuallyStable(s)` | Environment assumption: stream `s`'s polled safe-state measurement eventually settles and stays `TRUE` |
