@@ -38,7 +38,7 @@ REQ-ADC-*, REQ-GPIO-*, REQ-LINEP-*, REQ-ISELED-*, REQ-CANEP-*, REQ-UART-*, REQ-P
 | `tc18` | 1232 | 1117 ASIL-B, 36 ASIL-A, 79 QM | The shipped TC18 behavior. The 79 QM-rated entries inside this scope are optional/non-safety-relevant TC18 features (e.g. discovery cosmetics) implemented alongside the ASIL-rated core, not a separate module. |
 | `tc18-gap` | 23 | 23 QM, 0 ASIL-B | Catalog markers for TC18 normative clauses this implementation does not fully meet. `tc18-gap`'s own catalog note says this scope should always be QM, and, as of the [c-RCP-16 follow-up] issue #548 pass (§4), that invariant now actually holds: every remaining entry is QM-rated. The `REQ-CANEP-*`/`REQ-PWM-*` batches' own splits each added entries here (`REQ-CANEP-038`; `REQ-PWM-068`/`-069`), moving this scope from 20 to 23; the `REQ-MDIO-*`/`REQ-WAKEUP-*` batches' own splits added no new entries, leaving that scope unchanged at 23. |
 | `retired` | 10 | 7 ASIL-B, 1 ASIL-A, 2 QM | Dead requirement-catalog text kept only because a surviving `//cfusa:req` tag still cites the ID (deleting the entry would create a dangling reference `cfusa trace` would flag) — not live code. See §3. Includes `REQ-ISELED-028` (moved here from `tc18-gap` by issue #552 -- its own text already said RETIRED, only the scope field hadn't caught up) and `REQ-I2C-019` (retired by the `REQ-I2C-*` atomicity-split batch as a near-duplicate). |
-| `internal` | 6 | 6 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. See §2's main finding. |
+| `internal` | 11 | 11 QM | The allocator-hook indirection layer (`alloc.h`/`alloc.c`) — infrastructure every module calls through, not a feature module of its own. Grew from 6 to 11 at [c-RCP-23b] (issue #600), which added the hook-table lock mechanism (`REQ-ALLOC-007`..`011`) described in §2 below. See §2's main finding. |
 
 The `tests/legacy_mock.*` file the issue cites no longer exists, and
 `src/rcp.c` (67 lines at HEAD) is limited to `relay_strerror()`/
@@ -52,7 +52,7 @@ because the code it was about no longer exists.
 ## 2. The real interference vector: the shared allocator-hook table
 
 `include/rcp/alloc.h`/`src/alloc.c` (scope `internal`, QM-rated end to
-end — `REQ-ALLOC-001`..`REQ-ALLOC-006`) implement `rcp_malloc()`/
+end — `REQ-ALLOC-001`..`REQ-ALLOC-011`) implement `rcp_malloc()`/
 `rcp_calloc()`/`rcp_realloc()`/`rcp_free()` as thin wrappers around a
 **single process-wide, mutable global**:
 
@@ -133,20 +133,89 @@ honestly rather than treated as closing the gap:
    would require the hook implementation itself to be trusted to the
    same ASIL, which is exactly this section's finding.
 
-**Disposition:** this is added as a new binding Assumption of Use
-(AoU-8, `SEOOC_BOUNDARY.md` §2) rather than asserted as resolved.
-c-RCP cannot itself partition a single-process C allocator by ASIL —
-that would require either a real memory-protection boundary (an
-OS/hardware concern already covered by AoU-1) or a second, ASIL-rated-
-only allocation path this library does not currently have. Introducing
-one is a real, substantial design change (a new allocator indirection
-layer, a compatibility-breaking API for any caller who already uses
-`rcp_alloc_set_hooks()`) that this issue's own scoping — "each of these
-is independently substantial; none should be attempted as a single-PR
-change" — puts outside a documentation-focused pass. It is recorded
-here, honestly, as the actual freedom-from-interference finding this
-analysis produced, not papered over with the "QM/ASIL partition is
+**Disposition (as of [c-RCP-16], issue #518):** this was added as a new
+binding Assumption of Use (AoU-8, `SEOOC_BOUNDARY.md` §2) rather than
+asserted as resolved. c-RCP cannot itself partition a single-process C
+allocator by ASIL — that would require either a real memory-protection
+boundary (an OS/hardware concern already covered by AoU-1) or a second,
+ASIL-rated-only allocation path this library does not currently have.
+Introducing one is a real, substantial design change (a new allocator
+indirection layer, a compatibility-breaking API for any caller who
+already uses `rcp_alloc_set_hooks()`) that this issue's own scoping —
+"each of these is independently substantial; none should be attempted
+as a single-PR change" — put outside a documentation-focused pass. It
+was recorded, honestly, as the actual freedom-from-interference finding
+that analysis produced, not papered over with the "QM/ASIL partition is
 fine" conclusion a less careful pass might have reached.
+
+### 2.1 [c-RCP-23b] (issue #600): a locked hook table narrows, but does not retire, AoU-8
+
+Three shapes for actually closing this gap were investigated, not
+assumed up front:
+
+1. **Convert `e2e.c`'s wrap/unwrap functions to a caller-supplied-buffer
+   API**, removing their `rcp_malloc()` dependency entirely (the
+   `RCP_ACF_MAX_QUADLETS*4 + RCP_E2E_CRC_LEN` = 2048-octet upper bound
+   is a valid fixed size to bound such a buffer). Set aside: this is a
+   compatibility-breaking change to widely-used core public APIs —
+   every caller of `rcp_e2e_wrap()`/`rcp_e2e_unwrap()`, including
+   `src/mock.c` and effectively every test file — for a larger blast
+   radius than the finding requires.
+2. **Expose `rcp_watchdog_keeper_t`'s struct layout (or a portable
+   fixed-size opaque-storage byte buffer) for caller-owned stack
+   storage**, removing `rcp_watchdog_keeper_new()`'s one `rcp_calloc()`.
+   Set aside: the type is deliberately opaque today
+   (`typedef struct rcp_watchdog_keeper rcp_watchdog_keeper_t;`, full
+   definition only in `src/watchdog.c`) and contains platform-opaque
+   members (`rcp_mutex_t`, `rcp_thread_t`) whose sizes differ across
+   this project's three target OSes — building a portable fixed-size
+   idiom for this is real, ABI-risky, cross-platform work
+   disproportionate to what the finding actually needs.
+3. **A locked state on the shared hook table itself** — the approach
+   taken. `rcp_alloc_lock_hooks()`/`rcp_alloc_unlock_hooks()`/
+   `rcp_alloc_hooks_locked()` (`REQ-ALLOC-007`/`008`/`009`) add an
+   optional lock flag alongside `g_hooks`; once locked,
+   `rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()` both become
+   rejected no-ops (`REQ-ALLOC-010`/`011`) until unlocked again. This is
+   deliberately minimal: **zero changes to `e2e.c` or `watchdog.c`
+   themselves** — both already route every allocation through
+   `rcp_malloc()`/`rcp_calloc()`/`rcp_free()`, so `alloc.c`'s own shared
+   indirection point is the correct, single place to add access
+   control, not a duplicated fix at each of the two call sites §2
+   names. An integrator's own startup sequence becomes: install
+   whatever hooks are needed (or deliberately leave the libc-passthrough
+   default), then call `rcp_alloc_lock_hooks()`, before any ASIL-rated
+   code path performs its first allocation.
+
+**This narrows AoU-8; it does not retire it.** Precisely what changes
+and what doesn't:
+
+- An integrator who does **not** call `rcp_alloc_lock_hooks()` carries
+  the *exact same* AoU-8 finding this section originally recorded —
+  the mechanism is opt-in, and c-RCP cannot call it on the integrator's
+  own behalf without presuming an integration pattern that may not fit
+  every caller (e.g. one that legitimately needs to swap hooks at
+  runtime for a non-ASIL reason).
+- An integrator who **does** call it gains genuine access control for
+  both named ASIL-rated call sites: after the lock is engaged, no
+  QM-rated caller anywhere in the process — including c-RCP's own
+  `tc18`-scope QM features — can silently redirect the allocator either
+  mechanism depends on. The caller attempting the override observes a
+  `false` return (detection at the point of attempted interference).
+- This is **not attribution**: a rejected call sees `false`, but
+  nothing logs or reports *who* attempted it (no caller identity, no
+  stack trace, no audit record). A full audit-log mechanism remains a
+  possible future enhancement, not attempted here.
+- This is **still a single global switch, not a true per-ASIL-tier
+  partition**: locking protects the one shared hook table as a whole,
+  not `e2e.c`/`watchdog.c` specifically while leaving some other caller
+  free to install its own hooks. A QM-rated path and the two ASIL-rated
+  paths that allocate after the lock is engaged all still share
+  exactly the same locked hook set.
+
+`SEOOC_BOUNDARY.md` §2's AoU-8 row is updated to describe this
+mechanism with the same honesty — narrowed, not retired — rather than
+claiming a stronger posture than the code supports.
 
 ## 3. `retired` catalog entries: no interference, by construction
 
@@ -257,15 +326,22 @@ remaining scope, not asserted as already covered.
 Freedom-from-interference between c-RCP's QM-rated and ASIL-A/B-rated
 requirement surface holds **by construction** for the `retired` (§3,
 6 entries) and the 3 genuinely-not-implemented `tc18-gap` entries (§4)
-— all have zero runtime footprint. It holds for the `tc18`-scope
-QM-rated features and the 17 live-code `tc18-gap` entries **only
-insofar as they do not call `rcp_alloc_set_hooks()`** — a real,
-load-bearing dependency the two allocating ASIL-B safety mechanisms
-(§2) share with every other caller in the process, with no partition
-c-RCP can unilaterally enforce. That dependency is now recorded as
-AoU-8 (`SEOOC_BOUNDARY.md`), not asserted as closed — consistent with
-this issue's own instruction to document evidence rigor honestly
-rather than claim a stronger posture than the code supports. §4's
+— all have zero runtime footprint. For the `tc18`-scope QM-rated
+features and the 17 live-code `tc18-gap` entries, it now holds in one
+of two ways, depending on whether the integrator opted in to §2.1's
+lock mechanism: **fully**, if the integrator called
+`rcp_alloc_lock_hooks()` before any ASIL-rated code path's first
+allocation — after which no QM-rated caller in the process can
+redirect the allocator `e2e.c`/`watchdog.c` depend on — or **only
+insofar as they do not call `rcp_alloc_set_hooks()`**, exactly as
+before, if the integrator did not opt in. That dependency, and its
+[c-RCP-23b] narrowing, is recorded as AoU-8 (`SEOOC_BOUNDARY.md`) — not
+asserted as fully closed even for an integrator who does lock the
+table, since locking is still a single global switch (not a true
+per-ASIL-tier partition) with no attribution of an attempted override
+— consistent with this issue's own instruction to document evidence
+rigor honestly rather than claim a stronger posture than the code
+supports. §4's
 `tc18-gap` text/scope-field drift this document originally surfaced
 (49+ entries reporting "IMPLEMENTED" while still scoped as a gap,
 including all 10 of the scope's own ASIL-B-rated entries despite the

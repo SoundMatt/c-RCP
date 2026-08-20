@@ -8,23 +8,55 @@
  * constructor. */
 static rcp_alloc_hooks_t g_hooks;
 
+/* [c-RCP-23b], issue #600: zero-initialized (unlocked) by default, same
+ * "no explicit constructor needed" reasoning as g_hooks above. See
+ * alloc.h's own "Locking the hook table" doc section for the design. */
+static bool g_locked;
+
 //cfusa:req REQ-ALLOC-001
-void rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks)
+//cfusa:req REQ-ALLOC-010
+bool rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks)
 {
+    if (g_locked) return false;
     if (!hooks) {
-        rcp_alloc_reset_hooks();
-        return;
+        return rcp_alloc_reset_hooks();
     }
     g_hooks = *hooks;
+    return true;
 }
 
 //cfusa:req REQ-ALLOC-002
-void rcp_alloc_reset_hooks(void)
+//cfusa:req REQ-ALLOC-011
+bool rcp_alloc_reset_hooks(void)
 {
+    if (g_locked) return false;
     g_hooks.malloc_fn  = NULL;
     g_hooks.calloc_fn  = NULL;
     g_hooks.realloc_fn = NULL;
     g_hooks.free_fn    = NULL;
+    return true;
+}
+
+//cfusa:req REQ-ALLOC-007
+bool rcp_alloc_lock_hooks(void)
+{
+    if (g_locked) return false;
+    g_locked = true;
+    return true;
+}
+
+//cfusa:req REQ-ALLOC-008
+bool rcp_alloc_unlock_hooks(void)
+{
+    if (!g_locked) return false;
+    g_locked = false;
+    return true;
+}
+
+//cfusa:req REQ-ALLOC-009
+bool rcp_alloc_hooks_locked(void)
+{
+    return g_locked;
 }
 
 //cfusa:req REQ-ALLOC-003
