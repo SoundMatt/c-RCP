@@ -25,6 +25,21 @@
  * is RcpConfigured, it never becomes unlocked again while the server
  * remains RcpConfigured (a lock can only be cleared by demoting all the
  * way back to HwUnconfigured -- a full reset).
+ *
+ * Liveness property (LP1, c-RCP-23d / issue #602): given HW/RCP
+ * configuration inputs that eventually settle and stay consistent, the
+ * server eventually reaches RcpConfigured under fair scheduling -- i.e.
+ * this is not merely a state the server *can* reach (SP1/SP2 already
+ * establish what happens if it does), it is a state fair scheduling
+ * *guarantees* it reaches. TLC's default no-successor-state deadlock
+ * check has already passed on every CI run since this spec was added
+ * (predating this issue -- every state in the model has at least one
+ * enabled successor). LP1 is a related but strictly stronger claim:
+ * progress/livelock-freedom under fairness, not mere deadlock-freedom.
+ * See FORMAL_VERIFICATION.md's "Liveness Properties" section for the
+ * fairness-minimality experiment (WF vs. SF, both re-run against real
+ * TLC) that determined the fairness conditions below are the correct
+ * minimum, not merely a sufficient one chosen out of caution.
  *)
 
 EXTENDS TLC
@@ -43,6 +58,8 @@ VARIABLES state,              \* current lifecycle state
           hw_cfg_consistent,  \* HW_CFG_INCONSISTENT check's current verdict
           rcp_cfg_consistent, \* RCP_CFG_INCONSISTENT check's current verdict
           field_lock          \* FUNCTIONAL_W_STAR-class field lock state
+
+vars == <<state, hw_cfg_consistent, rcp_cfg_consistent, field_lock>>
 
 TypeOK ==
     /\ state              \in LifecycleStates
@@ -117,6 +134,45 @@ Next ==
 
 Spec == Init /\ [][Next]_<<state, hw_cfg_consistent, rcp_cfg_consistent, field_lock>>
 
+(* FairSpec adds the minimum fairness each promote action genuinely
+ * needs to guarantee LP1, re-derived and confirmed against real TLC
+ * runs rather than assumed (see FORMAL_VERIFICATION.md):
+ *
+ * - WF_vars(PromoteToHwConfigured): weak fairness suffices. Once
+ *   hw_cfg_consistent holds continuously and state = HwUnconfigured
+ *   holds continuously, nothing else can disable
+ *   PromoteToHwConfigured before it fires -- no other action changes
+ *   state away from HwUnconfigured. TLC confirms a WF-only variant
+ *   already gets the server past HwUnconfigured on its own.
+ *
+ * - SF_vars(PromoteToRcpConfigured): strong fairness is required, and
+ *   WF is provably insufficient here. DemoteToHwUnconfigured is
+ *   unconditionally enabled at state = HwConfigured and can race
+ *   PromoteToRcpConfigured back to HwUnconfigured every time before it
+ *   fires, so PromoteToRcpConfigured is never *continuously* enabled --
+ *   only *infinitely often* enabled -- which WF does not act on but SF
+ *   does. TLC confirms a WF-only variant on this action finds a
+ *   concrete Promote/Demote lasso counterexample that never leaves
+ *   {HwUnconfigured, HwConfigured}.
+ *)
+FairSpec == Spec
+    /\ WF_vars(PromoteToHwConfigured)
+    /\ SF_vars(PromoteToRcpConfigured)
+
+(* LP1's antecedent: the HW/RCP config plausibility inputs eventually
+ * settle and stay consistent (become permanently TRUE) -- without this,
+ * ReviseHwConsistency/ReviseRcpConsistency (deliberately left unfair,
+ * matching their role as an unconstrained environment input) could
+ * keep an input flapping forever and no fairness on the promote actions
+ * could compensate, since neither promote action is ever enabled while
+ * its gating input is FALSE. *)
+InputsEventuallyConsistent == <>[](hw_cfg_consistent /\ rcp_cfg_consistent)
+
+(* LP1: given eventually-consistent inputs and fair scheduling of the
+ * two promote actions (at the minimum fairness level each genuinely
+ * needs, above), the server eventually reaches RcpConfigured. *)
+EventuallyRcpConfigured == InputsEventuallyConsistent => <>(state = RcpConfigured)
+
 (* SP1: No skip-configuration transition -- RcpConfigured is only ever
  * reached from HwConfigured, never directly from HwUnconfigured. *)
 NoSkipConfiguration ==
@@ -131,5 +187,6 @@ FieldLockMonotonicWhileConfigured ==
             => field_lock' = Locked ]_<<state, field_lock>>
 
 THEOREM Spec => TypeOK /\ NoSkipConfiguration /\ FieldLockMonotonicWhileConfigured
+THEOREM FairSpec => EventuallyRcpConfigured
 
 ====

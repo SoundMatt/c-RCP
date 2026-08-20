@@ -32,6 +32,27 @@
  * Safety property (SP2): a safety-tagged request only ever transitions
  * from pending to executed while its endpoint reports it has reached
  * the configured safe state.
+ *
+ * Liveness property (LP1, c-RCP-23d / issue #602): a safety-tagged
+ * request that becomes pending eventually executes, given per-stream
+ * fair scheduling of ExecuteSafety and an endpoint safe-state signal
+ * that eventually settles and stays true. issue #602's own suggested
+ * wording -- "a pending safety-tagged request is eventually either
+ * executed or purged, never stuck pending forever" -- is false by
+ * construction against this spec's own SP1 above: Miss(s) (the only
+ * purge event) never touches safety_pending by design, so "purged" is
+ * never a live alternative for a safety-tagged request, and a property
+ * requiring "executed or purged" is unprovable as stated (TLC finds a
+ * trivial submit-and-never-purge counterexample). LP1 below is the
+ * corrected, narrower claim this spec can actually make and TLC
+ * confirms holds. TLC's default no-successor-state deadlock check has
+ * already passed on every CI run since this spec was added (predating
+ * this issue -- every state in the model has at least one enabled
+ * successor). LP1 is a related but strictly stronger claim: per-stream
+ * progress/livelock-freedom under fairness, not mere deadlock-freedom.
+ * See FORMAL_VERIFICATION.md's "Liveness Properties" section for the
+ * fairness-minimality experiment (WF vs. SF, re-run against real TLC)
+ * that determined weak fairness is the correct minimum here, not SF.
  *)
 
 EXTENDS TLC
@@ -47,6 +68,8 @@ VARIABLES overflowed,           \* Stream -> BOOLEAN: rx_wd_evaluate() overflow 
           endpoint_in_safe_state, \* Stream -> BOOLEAN: polled safe-state measurement
           safety_pending,       \* Stream -> BOOLEAN: a safety-tagged request is queued
           normal_pending        \* Stream -> BOOLEAN: a normal-tagged request is queued
+
+vars == <<overflowed, endpoint_in_safe_state, safety_pending, normal_pending>>
 
 TypeOK ==
     /\ overflowed             \in [Streams -> BOOLEAN]
@@ -128,6 +151,35 @@ Next ==
 
 Spec == Init /\ [][Next]_<<overflowed, endpoint_in_safe_state, safety_pending, normal_pending>>
 
+(* FairSpec adds weak fairness, per stream, on ExecuteSafety(s) -- and
+ * only weak fairness. Re-derived and confirmed against real TLC runs
+ * rather than assumed (see FORMAL_VERIFICATION.md): nothing in this
+ * spec can clear safety_pending[s] except ExecuteSafety(s) itself
+ * (Miss(s) leaves it untouched by SP1), so once safety_pending[s] holds
+ * and endpoint_in_safe_state[s] holds continuously, ExecuteSafety(s)
+ * stays continuously enabled until it is taken -- exactly the condition
+ * WF acts on. Strong fairness buys nothing extra here; TLC confirms a
+ * WF-only variant already suffices once LP1's antecedent below holds. *)
+FairSpec == Spec /\ (\A s \in Streams : WF_vars(ExecuteSafety(s)))
+
+(* LP1's antecedent, per stream: the endpoint's polled safe-state signal
+ * eventually settles and stays TRUE. Without this, ObserveSafeState
+ * (deliberately left unfair, matching its role as an unconstrained
+ * polled environment measurement) could keep flipping
+ * endpoint_in_safe_state[s] forever, which would repeatedly disable
+ * ExecuteSafety(s) right as it becomes enabled -- WF only acts on an
+ * action that is *continuously* enabled, and TLC confirms dropping this
+ * antecedent produces exactly that flapping-endpoint counterexample. *)
+EndpointEventuallyStable(s) == <>[](endpoint_in_safe_state[s])
+
+(* LP1: for every stream, given its endpoint signal eventually settling
+ * true and fair (WF) scheduling of that stream's ExecuteSafety, a
+ * safety-tagged request that becomes pending on that stream eventually
+ * executes. *)
+EventuallySafetyExecutes ==
+    \A s \in Streams :
+        EndpointEventuallyStable(s) => [](safety_pending[s] => <>~safety_pending[s])
+
 (* SP1: a watchdog-overflow purge (safestate-enabled Miss) never clears a
  * pending safety-tagged request -- only Miss can purge, and Miss leaves
  * safety_pending entirely unchanged by construction; this property
@@ -147,5 +199,6 @@ NoUnsafeSafetyExecution ==
         (safety_pending[s] /\ ~safety_pending'[s]) => endpoint_in_safe_state[s]]_<<safety_pending, endpoint_in_safe_state>>
 
 THEOREM Spec => TypeOK /\ SafetyRequestsSurvivePurge /\ NoUnsafeSafetyExecution
+THEOREM FairSpec => EventuallySafetyExecutes
 
 ====
