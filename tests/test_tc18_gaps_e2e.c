@@ -35,6 +35,7 @@
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/e2e.h>
+#include <rcp/ep_can.h>
 #include <rcp/mock.h>
 #include <rcp/regmap.h>
 #include <rcp/request.h>
@@ -2187,6 +2188,328 @@ static void test_dispatch_e2e_fragment_too_large_reassembly_is_rejected(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── CAN endpoint: a client-constructed, genuinely multi-fragment CAN XL
+ * write request fragmented via rcp_ep_can_encode_frame_request_fragmented()
+ * (issue #611) round-trips through this SAME generic reassembly mechanism ──
+ *
+ * Issue #611's own correction comment: the receive/reassembly side above
+ * (rcp_mock_server_dispatch_e2e_fragment()/srv's own frag_reasm[]) is
+ * already generic and endpoint-type-agnostic -- nothing CAN-specific was
+ * missing there. What WAS missing was the encode-side convenience
+ * function a client uses to slice a large CAN XL write request into
+ * correctly ms/segment_num-tagged ACF_ABB fragments in the first place --
+ * rcp_ep_can_frame_request_fragment_count()/rcp_ep_can_encode_frame_
+ * request_fragmented() (ep_can.h, REQ-CANEP-041/042). This test proves
+ * those two new functions genuinely compose with the pre-existing generic
+ * reassembly path above.
+ *
+ * IMPORTANT SIZE NOTE (found while building this test -- see this PR's own
+ * description for the full write-up): the LITERAL worst case (2058-octet
+ * combined payload, RCP_EP_CAN_XL_MAX_ENCODED_LEN, from a full
+ * RCP_EP_CAN_XL_MAX_DATA_LEN 2048-octet CAN XL data field) cannot reach a
+ * registered per-endpoint handler through THIS SPECIFIC entry point
+ * (rcp_mock_server_dispatch_e2e_fragment()), independent of anything this
+ * PR adds: once reassembly completes, mock.c's own dispatch_e2e_fragment()
+ * re-encodes the FULL reassembled payload into a single ACF_ABB frame
+ * (rcp_acf_encode_abb()) before handing it to dispatch_plain()'s
+ * one-ACF-message-in handler contract -- the same contract counting_
+ * handler()/capturing_handler() above already rely on decoding via
+ * rcp_acf_decode_abb(). RCP_ACF_ABB_MAX_PAYLOAD (2036 octets) is therefore
+ * a hard ceiling on any REASSEMBLED request this specific dispatch entry
+ * point can actually deliver -- 22 octets short of the CAN XL worst case's
+ * own 2058. This is a pre-existing characteristic of mock.c's own
+ * dispatch-plumbing (not a defect in rcp_ep_can_encode_frame_request_
+ * fragmented(), which correctly PRODUCES the worst-case fragments -- see
+ * test_ep_can.c's own test_fragment_worst_case_can_xl_request_round_trip(),
+ * which proves the full 2048/2058-octet case at the pure encode/reassemble
+ * level, independent of mock.c), and is out of THIS issue's own scope (the
+ * issue is scoped to the missing encode-side function, not to mock.c's
+ * dispatch_plain() handler contract). This test therefore uses the
+ * largest combined payload that still fits under that ceiling (2036
+ * octets, i.e. RCP_ACF_ABB_MAX_PAYLOAD itself) split into 2 real fragments
+ * -- genuinely exercising multi-fragment composition through the existing
+ * mechanism, which is this test's actual purpose; the RC5 reject-when-
+ * oversized test below deliberately DOES use the literal 2058-octet worst
+ * case, since rejection happens at the reassembler stage, before mock.c's
+ * re-encode step, so it is unaffected by this ceiling.
+ *
+ * can_capturing_handler() mirrors capturing_handler() above exactly, sized
+ * generously for a CAN XL-scale payload instead of capturing_handler()'s
+ * own 64-octet ceiling. */
+static uint8_t g_can_captured_payload[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+static size_t  g_can_captured_payload_len;
+
+static void can_capturing_handler(const uint8_t *request, size_t request_len,
+                                   rcp_bytes_t *out_response, void *user_data)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                        payload_len;
+
+    (void)out_response;
+    (void)user_data;
+    g_handler_called = true;
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_TRUE(payload_len <= sizeof(g_can_captured_payload));
+    rcp_memcpy_bounded(g_can_captured_payload, sizeof(g_can_captured_payload), payload, payload_len);
+    g_can_captured_payload_len = payload_len;
+}
+
+//cfusa:test REQ-CANEP-041
+//cfusa:test REQ-CANEP-042
+/* The largest combined CAN XL write-request payload
+ * (4-octet leading quadlet + 6-octet SDT/VCID/AF prefix + data) that still
+ * fits within RCP_ACF_ABB_MAX_PAYLOAD (2036) once reassembled -- see the
+ * comment above for why this dispatch entry point (not ep_can.c's new
+ * encode function) is what draws that line. */
+#define CAN_REQUEST_DISPATCHABLE_DATA_LEN ((size_t)(RCP_ACF_ABB_MAX_PAYLOAD - 4u - 6u))
+
+static void test_dispatch_e2e_fragment_can_xl_write_request_round_trips(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    rcp_ep_can_xl_header_t  xl  = {0};
+    uint8_t                 tx_data[CAN_REQUEST_DISPATCHABLE_DATA_LEN];
+    rcp_bytes_t              frames[2] = {{0}, {0}};
+    /* Smaller than the fragment size itself, forcing 2 genuine fragments
+     * (ceil(2036/1024) = 2), not a toy split. */
+    const size_t              max_fragment_payload = 1024u;
+    size_t                   count;
+    size_t                   i;
+    uint8_t                  combined[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t                   combined_len = 0;
+    uint8_t                  first_hdr[RCP_ACF_ABB_HEADER_LEN];
+    size_t                    final_payload_len = 0;
+    rcp_bytes_t               final_wire;
+    uint32_t                  want;
+    size_t                    pad_octets;
+    size_t                    crc_offset;
+    rcp_bytes_t                resp = {0};
+
+    xl.sdt = 0x5u;
+    xl.vcid = 0x9u;
+    xl.af   = 0xCAFEBABEu;
+    for (i = 0; i < sizeof(tx_data); i++) tx_data[i] = (uint8_t)(i * 7u + 3u);
+
+    set_up_frag_stream(srv, can_capturing_handler);
+
+    count = rcp_ep_can_frame_request_fragment_count(RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u, &xl,
+                                                      sizeof(tx_data), max_fragment_payload);
+    TEST_ASSERT_EQUAL_size_t(2u, count);
+
+    TEST_ASSERT_EQUAL_size_t(
+        count, rcp_ep_can_encode_frame_request_fragmented(0x11u, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u,
+                                                           &xl, tx_data, sizeof(tx_data), 0x77u,
+                                                           max_fragment_payload, frames));
+    TEST_ASSERT_NOT_NULL(frames[0].data);
+    TEST_ASSERT_NOT_NULL(frames[1].data);
+
+    /* Decode each fragment via acf.c itself (not by trusting ep_can.c's
+     * own internal layout) to recover its own header fields and raw
+     * payload slice, reassembling the combined payload independently for
+     * the fragmented-CRC computation and the later byte-for-byte check. */
+    {
+        rcp_acf_byte_message_info_t h0;
+        rcp_acf_byte_message_info_t h1;
+        const uint8_t               *p0;
+        const uint8_t               *p1;
+        size_t                        p0len;
+        size_t                        p1len;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frames[0].data, frames[0].len, &h0, &p0, &p0len));
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frames[1].data, frames[1].len, &h1, &p1, &p1len));
+
+        TEST_ASSERT_EQUAL_UINT8(0x11u, h0.byte_bus_id);
+        TEST_ASSERT_EQUAL(RCP_ACF_OP_WRITE, (rcp_acf_op_t)h0.op);
+        TEST_ASSERT_EQUAL_UINT8(0x77u, h0.transaction_num);
+        TEST_ASSERT_EQUAL_UINT8(0x77u, h1.transaction_num);
+        TEST_ASSERT_TRUE(h0.ms != 0u);
+        TEST_ASSERT_EQUAL_UINT16(0u, h0.read_size_or_segment_num);
+        TEST_ASSERT_TRUE(h1.ms == 0u);
+
+        rcp_memcpy_bounded(combined, sizeof(combined), p0, p0len);
+        rcp_memcpy_bounded(combined + p0len, sizeof(combined) - p0len, p1, p1len);
+        combined_len = p0len + p1len;
+        final_payload_len = p1len;
+
+        rcp_memcpy_bounded(first_hdr, sizeof(first_hdr), frames[0].data, RCP_ACF_ABB_HEADER_LEN);
+    }
+    TEST_ASSERT_EQUAL_size_t(4u + 6u + sizeof(tx_data), combined_len);
+
+    /* Same technique test_dispatch_e2e_fragment_three_fragment_round_trip_
+     * succeeds() above already uses: rcp_e2e_wrap() supplies a correctly
+     * length-adapted/pad-aware trailer SLOT for the final fragment; its
+     * own single-frame CRC VALUE is wrong for a fragmented message and is
+     * overwritten with the real rcp_e2e_compute_fragmented_crc() answer.
+     * issue #445's own pad-aware CRC placement applies here exactly as it
+     * does for test_dispatch_e2e_fragment_final_fragment_non_aligned_
+     * payload_ok() above: this fragment's own real (unpadded) payload is
+     * 22 octets, not a multiple of 4, so the trailer sits BEFORE the
+     * pad octets acf.c's own encoder appended, not at final_wire's
+     * literal last 4 bytes. */
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frames[1].data,
+                               frames[1].len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+    want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS,
+                                           first_hdr, RCP_ACF_ABB_HEADER_LEN, combined, combined_len);
+    pad_octets = rcp_acf_pad_len(final_payload_len);
+    crc_offset = frames[1].len - pad_octets;
+    final_wire.data[crc_offset + 0u] = (uint8_t)(want >> 24);
+    final_wire.data[crc_offset + 1u] = (uint8_t)(want >> 16);
+    final_wire.data[crc_offset + 2u] = (uint8_t)(want >> 8);
+    final_wire.data[crc_offset + 3u] = (uint8_t)want;
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, frames[0].data, frames[0].len,
+                                                             &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data, final_wire.len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    /* The handler received the exact reassembled combined payload the
+     * encoder produced -- real reassembly, not two frames of arbitrary
+     * content. */
+    TEST_ASSERT_EQUAL_UINT(combined_len, g_can_captured_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(combined, g_can_captured_payload, combined_len);
+
+    /* And that reassembled payload decodes back to the exact original
+     * frame_format/arbitration_id/xl_header/tx_data, byte-for-byte --
+     * reusing rcp_ep_can_decode_reassembled_frame_response() verbatim for
+     * the request direction, exactly as ep_can.h's own new doc comment
+     * says a caller should (it inspects only the reassembled bytes
+     * themselves, never op/rsp). */
+    {
+        rcp_ep_can_frame_format_t out_format;
+        uint32_t                   out_id  = 0u;
+        rcp_ep_can_xl_header_t     out_xl;
+        const uint8_t              *out_data = NULL;
+        size_t                       out_len  = 0u;
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+                          rcp_ep_can_decode_reassembled_frame_response(
+                              g_can_captured_payload, g_can_captured_payload_len, &out_format,
+                              &out_id, &out_xl, &out_data, &out_len));
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, out_format);
+        TEST_ASSERT_EQUAL_UINT32(0x321u, out_id);
+        TEST_ASSERT_EQUAL_UINT8(xl.sdt, out_xl.sdt);
+        TEST_ASSERT_EQUAL_UINT8(xl.vcid, out_xl.vcid);
+        TEST_ASSERT_EQUAL_UINT32(xl.af, out_xl.af);
+        TEST_ASSERT_EQUAL_size_t(sizeof(tx_data), out_len);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(tx_data, out_data, sizeof(tx_data));
+    }
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&frames[0]);
+    rcp_bytes_free(&frames[1]);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── RC5 Table 24 rx_stream_max_request_size: "longer requests will be
+ * rejected" -- the reject-when-oversized half issue #611 explicitly names
+ * (TC18.txt L3231-3232) ────────────────────────────────────────────────
+ *
+ * Same worst-case CAN XL write request and the same generic reassembly
+ * mechanism as the round-trip test above, but with the stream's own
+ * reassembler ceiling (rcp_mock_server_fragment_reassembler()'s escape
+ * hatch, matching test_dispatch_e2e_fragment_too_large_reassembly_is_
+ * rejected() above) deliberately set to admit the first fragment alone
+ * (frag0_len octets) but be exceeded once the second fragment's own
+ * octets are added -- proving this is a real REASSEMBLED-TOTAL check
+ * (rx_stream_max_request_size bounds the whole request, not any one
+ * fragment), not merely "one fragment already too big to append". */
+//cfusa:test REQ-CANEP-041
+//cfusa:test REQ-CANEP-042
+static void test_dispatch_e2e_fragment_can_xl_write_request_rejected_when_reassembled_total_exceeds_ceiling(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_ep_can_xl_header_t       xl  = {0};
+    uint8_t                       tx_data[RCP_EP_CAN_XL_MAX_DATA_LEN];
+    rcp_bytes_t                   frames[2] = {{0}, {0}};
+    size_t                         count;
+    size_t                         i;
+    size_t                         frag0_len = 0u;
+    rcp_fragment_reassembler_t   *reasm;
+    rcp_bytes_t                    final_wire;
+    rcp_bytes_t                     resp = {0};
+
+    xl.sdt = 0x5u;
+    xl.vcid = 0x9u;
+    xl.af   = 0xCAFEBABEu;
+    for (i = 0; i < sizeof(tx_data); i++) tx_data[i] = (uint8_t)(i * 7u + 3u);
+
+    set_up_frag_stream(srv, counting_handler);
+
+    count = rcp_ep_can_frame_request_fragment_count(RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u, &xl,
+                                                      sizeof(tx_data), RCP_ACF_ABB_MAX_PAYLOAD);
+    TEST_ASSERT_EQUAL_size_t(2u, count);
+    TEST_ASSERT_EQUAL_size_t(
+        count, rcp_ep_can_encode_frame_request_fragmented(0x11u, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u,
+                                                           &xl, tx_data, sizeof(tx_data), 0x88u,
+                                                           RCP_ACF_ABB_MAX_PAYLOAD, frames));
+    TEST_ASSERT_NOT_NULL(frames[0].data);
+    TEST_ASSERT_NOT_NULL(frames[1].data);
+
+    {
+        rcp_acf_byte_message_info_t h0;
+        const uint8_t               *p0;
+        size_t                        p0len;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frames[0].data, frames[0].len, &h0, &p0, &p0len));
+        frag0_len = p0len;
+    }
+
+    reasm = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    TEST_ASSERT_NOT_NULL(reasm);
+    /* Admits fragment 0 (frag0_len octets) alone; the combined total
+     * (RCP_EP_CAN_XL_MAX_ENCODED_LEN, 2058) exceeds it once fragment 1's
+     * remaining octets are added. */
+    rcp_fragment_reassembler_init(reasm, frag0_len + 4u);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, frames[0].data, frames[0].len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(rcp_fragment_reassembler_is_collecting(reasm));
+    rcp_bytes_free(&resp);
+
+    /* The final fragment's own trailer VALUE does not matter here:
+     * rcp_mock_server_dispatch_e2e_fragment()'s own TOO_LARGE check runs
+     * (and rejects) strictly before its CRC comparison -- see mock.c's
+     * own dispatch_e2e_fragment() ordering -- so rcp_e2e_wrap()'s default
+     * (wrong-formula, single-frame) trailer is sufficient to reach that
+     * check structurally intact. */
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frames[1].data,
+                               frames[1].len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data, final_wire.len,
+                                                             &resp));
+    TEST_ASSERT_FALSE(rcp_fragment_reassembler_is_collecting(reasm));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&frames[0]);
+    rcp_bytes_free(&frames[1]);
+    rcp_mock_server_destroy(srv);
+}
+
 /* An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
  * call for it) has no reassembler slot to use -- the documented
  * fallback delegates to rcp_mock_server_dispatch_e2e() unchanged rather
@@ -4000,6 +4323,8 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc);
     RUN_TEST(test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets);
     RUN_TEST(test_dispatch_e2e_fragment_too_large_reassembly_is_rejected);
+    RUN_TEST(test_dispatch_e2e_fragment_can_xl_write_request_round_trips);
+    RUN_TEST(test_dispatch_e2e_fragment_can_xl_write_request_rejected_when_reassembled_total_exceeds_ceiling);
     RUN_TEST(test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e);
     RUN_TEST(test_dispatch_e2e_fragment_already_faulted_stream_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_plain_command_mode_falls_back_to_dispatch_plain);
