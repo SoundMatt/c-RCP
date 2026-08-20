@@ -368,18 +368,49 @@
  * rx_enforce_e2e has no separate dedicated safestate-enable bit of its
  * own gating this -- the one bit drives both consequences.
  *
- * Note for downstream security/safety documentation: this module does not
- * reimplement the pre-replacement content's sequence-counter/replay-window
- * mechanism (there was no rx_enforce_seq-equivalent in this milestone's
- * roadmap scope) -- the same gap cpp-RCP's and rust-RCP's own merges left
- * open. tara.md/CYBERSECURITY.md/SAFETY_PLAN.md/FORMAL_VERIFICATION.md
- * still reference the pre-replacement REQ-E2E-004..012 ids for replay/CRC
- * threat mitigations; those ids no longer exist in .fusa-reqs.json
- * (superseded by REQ-E2E-001..027 above, describing the CRC32 mechanism
- * only). Updating that threat-model documentation is a security-review
- * judgment call, not a naming fix, and is out of scope for issue #87 --
- * left for a dedicated follow-up, matching the same latent gap already
- * present in cpp-RCP's shipped tara.md/CYBERSECURITY.md/SAFETY_PLAN.md.
+ * Note for downstream security/safety documentation (STALE CLAIM CORRECTED
+ * 2026-08-20, issue #606/#601): this paragraph used to say this module does
+ * not reimplement the pre-replacement content's sequence-counter/
+ * replay-window mechanism at all. That is no longer true and, as of issue
+ * #338 (v0.322.0), has not been true for some time -- TC18 §12.7.7 Table 24
+ * itself defines a real, spec-native replay/staleness pair at 0x000D bits
+ * 1/2 (rx_enforce_seq/rx_seq_safestate_enable), and this module's own
+ * rcp_e2e_seq_evaluate()/rcp_e2e_seq_tracker_t (REQ-E2E-028/029, both
+ * `.fusa-reqs.json` status "implemented", `scope: "tc18"` -- this is a real
+ * TC18 mechanism, not a c-RCP-specific extension layered on top of the
+ * spec) is the RFC 1982 forward-window implementation of it. It is wired
+ * into this codebase's own reference dispatch composition -- mock.c's
+ * frame_seq_gate_admits(), called exactly once per AVTPDU frame from
+ * rcp_mock_server_dispatch_frame()/_dispatch_frame_e2e() -- the same, only
+ * dispatch composition every other Table 24 gate in this file (CRC latch,
+ * watchdog, overflow) is wired into; see mock.h's own file header for why
+ * that in-process, zero-I/O composition is simultaneously this library's
+ * only reference dispatcher AND correctly self-described as a test double,
+ * not a contradiction once "wired into real dispatch" is read as this
+ * repo's own established term of art (ROADMAP.md, dozens of citations) for
+ * "actually called by mock.c's own dispatch chain," not "ships inside a
+ * fielded vehicle's RC Server" -- this library ships no networked
+ * dispatcher of its own at all, by mock.c's own I/O-free design.
+ *
+ * Scope and residual risk an integrator must know before relying on this
+ * as H-004/SG-004 mitigation (HARA.md, SEOOC_BOUNDARY.md AoU-3): (1)
+ * opt-in -- rx_enforce_seq/rx_seq_safestate_enable are R/W* config bits an
+ * integrator must set via regmap.h; unset, this gate evaluates nothing;
+ * (2) rcp_e2e_seq_tracker_t's prev_seq state is caller-owned, in-process
+ * memory with no persistence -- it resets on every process/device restart,
+ * so a captured request replayed immediately after a restart is not
+ * detected; (3) RFC 1982 serial-number comparison accepts any forward
+ * distance in [1, 127] of the 8-bit sequence_num space -- a genuine
+ * mechanism limit, not a bug, since a literal always-greater-than reading
+ * would reject every request once the counter first wraps, but it bounds
+ * how large a gap this gate can distinguish from ordinary wraparound; (4)
+ * granularity is per-AVTPDU-frame, not per-ACF-message -- sequence_num is
+ * a property of the whole frame, evaluated once before any member is
+ * processed, deliberately not per individual ACF message packed inside
+ * one frame (TC18 defines no finer-grained counter). An integrator's own
+ * real, I/O-attached dispatch loop must replicate mock.c's admit()+
+ * evaluate() composition for this mitigation to take effect against real
+ * traffic; linking this library alone does not.
  *
  * ── TC18 0.5.1_RC5 terminology drift ────────────────────────────────────────
  *
@@ -1005,9 +1036,17 @@ void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint6
  * not a CRC-check result, for the identical reason).
  *
  * Wiring: UPDATED 2026-08-14 -- both halves of this note's own original
- * claim are now stale. mock.c's real, live production dispatch paths
+ * claim are now stale. mock.c's own dispatch functions
  * (dispatch_frame()/dispatch_plain()/rcp_mock_server_dispatch_e2e()/
- * rcp_mock_server_check_watchdog()) already call the note_*() functions
+ * rcp_mock_server_check_watchdog()) -- this codebase's only reference
+ * dispatch composition, not a synthetic test harness that stops at calling
+ * a primitive directly (WORDING CORRECTED 2026-08-20, issue #606: "real,
+ * live production dispatch paths" read outside this repo's own established
+ * ROADMAP.md jargon for "actually exercised by mock.c's own dispatch
+ * chain" is ambiguous with "ships inside a fielded vehicle's RC Server,"
+ * which no code in this library does, including this one -- mock.c is
+ * explicitly in-process/zero-I/O by design, see mock.h's own file header)
+ * -- already call the note_*() functions
  * from a real evaluate()-then-latch path for all four causes (see
  * REQ-E2E-046's own .fusa-reqs.json entry for the full history). And
  * rcp_e2e_stream_status_rx_blocked()'s own aggregate IS now exposed as a

@@ -17,15 +17,35 @@ register-map access-control model (`regmap.h`), the RC Server lifecycle
 state machine (`lifecycle.h`), the CRC32 safe-point / safety-tagged
 request execution gate and per-stream watchdog (`e2e.h`), and the
 Normal/StandBy/Sleep/Unpowered power-mode model with its WakeUp
-handshake (`power.h`) — not carried over from the retired catalog. Two
-of the original eleven hazards this pass produced (H-004, H-007) record
-genuinely open, currently-unmitigated gaps rather than implemented
-controls; they are recorded honestly as open items, matching this
-project's practice throughout the roadmap of not asserting an unverified
-mitigation (see also `tara.md`'s TS-002/TS-001/TS-003 notes on residual
-risk). A twelfth hazard, H-012, was added later (issue `c-RCP-22` Gap 4,
-below) covering the 9 protocol-bridge stub modules that Phase 13-21's
-core-implementation scope above did not include.
+handshake (`power.h`) — not carried over from the retired catalog. Of
+the original eleven hazards this pass produced, H-007 records a
+genuinely open, currently-unmitigated gap (link-layer authentication is
+out of this library's scope entirely); H-004 (replay/staleness) was open
+at the time of this pass but is **no longer** — see "H-004 update
+(2026-08-20, issue #606/#601)" below. Both are recorded honestly,
+matching this project's practice throughout the roadmap of not
+asserting an unverified mitigation (see also `tara.md`'s
+TS-002/TS-001/TS-003 notes on residual risk). A twelfth hazard, H-012,
+was added later (issue `c-RCP-22` Gap 4, below) covering the 9
+protocol-bridge stub modules that Phase 13-21's core-implementation
+scope above did not include.
+
+**H-004 update (2026-08-20, issue #606/#601):** TC18 §12.7.7 Table 24's
+own `rx_enforce_seq`/`rx_seq_safestate_enable` replay/staleness-detection
+mechanism is now implemented (`rcp_e2e_seq_evaluate()`/
+`rcp_e2e_seq_tracker_t`, `.fusa-reqs.json` REQ-E2E-028/029, both
+`status: "implemented"`) and wired into this library's own reference
+dispatch composition (`mock.c`'s `frame_seq_gate_admits()`, called once
+per AVTPDU frame). It is **opt-in** (an integrator must set
+`rx_enforce_seq`/`rx_seq_safestate_enable` via `regmap.h`) and carries
+explicit residual risk — see the Residual Risks table below and
+`include/rcp/e2e.h`'s own file header for the full scope statement
+(per-process/per-restart tracker reset, RFC 1982 forward-window limits,
+per-AVTPDU-frame granularity). This is a real, tested, opt-in mitigation
+now demonstrated wired into this library's only reference dispatcher —
+not an unqualified "closed" hazard, and not automatically in effect for
+an integrator who does not both enable the config bits and replicate the
+same admission wiring in their own production dispatch loop.
 
 ---
 
@@ -145,11 +165,23 @@ computes to ASIL-A, not ASIL-C — but remains a genuinely open,
 it has **no ASIL-relevant control implemented at all** in this
 repository, since MACsec is out of this library's scope entirely.
 
-**H-004 and H-007 are open, not process gaps on an implemented
-mechanism.** H-004 (replay) and H-007 (link-layer authentication) have
-**no implemented control in this library at all** to fall short of.
-Both are honestly recorded as open in `.fusa-hara.json`'s `safe_state`
-field and in `tara.md`'s residual-risk notes, not asserted as closed.
+**H-007 is open, not a process gap on an implemented mechanism.** H-007
+(link-layer authentication) has **no implemented control in this
+library at all** to fall short of — MACsec is out of this library's
+scope entirely. It is honestly recorded as open in `.fusa-hara.json`'s
+`safe_state` field and in `tara.md`'s residual-risk notes, not asserted
+as closed.
+
+**H-004 now has a real, opt-in, implemented mitigation** (updated
+2026-08-20, issue #606/#601 — see the note above): `rcp_e2e_seq_evaluate()`/
+`rcp_e2e_seq_tracker_t` implement TC18 Table 24's own `rx_enforce_seq`/
+`rx_seq_safestate_enable` bits and are wired into this library's
+reference dispatch composition. This does not raise H-004's ASIL letter
+or change its S/E/C classification (the hazard's worst case — an
+integrator who does not enable the opt-in bits, or does not replicate
+the wiring in their own production dispatch loop — is unchanged), but it
+is no longer accurate to describe H-004 as having no implemented control
+at all; it is Mitigated (opt-in), not Open.
 
 ---
 
@@ -160,7 +192,7 @@ field and in `tara.md`'s residual-risk notes, not asserted as closed.
 | SG-001 | Safety-tagged requests to a safety-critical endpoint shall execute, or the endpoint shall be driven to a defined safe state, within the configured per-stream watchdog timeout. | ASIL-C | `rcp_e2e_wd_evaluate()`, `rcp_watchdog_keeper_t` |
 | SG-002 | Requests shall only be executed against the endpoint identified by their `(stream_id, byte_bus_id)` address; a request naming an unregistered address shall be rejected. | ASIL-A | `avtp.h` addressing, `rcp_mock_server_dispatch()` unregistered-`byte_bus_id` handling |
 | SG-003 | A per-stream watchdog overflow with `rx_wd_safestate_enable` set shall drive the endpoint toward its configured safe state and shall never discard a pending safety-tagged request in doing so. | ASIL-B | `rcp_e2e_wd_evaluate()`, `rcp_e2e_watchdog_purge_should_keep()`/`_classify()`; formally verified (`tla/E2ESafePoint.tla` `SafetyRequestsSurvivePurge`) |
-| SG-004 | Replayed or duplicated requests should be detected and rejected. | ASIL-A | **Open — no implemented mitigation.** See ASIL Determination Note and `tara.md` TS-002. |
+| SG-004 | Replayed or duplicated requests should be detected and rejected. | ASIL-A | **Mitigated (opt-in).** `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`), wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`). Integrator must enable the config bits and replicate the wiring in their own dispatch loop; see ASIL Determination Note, Residual Risks below, and `include/rcp/e2e.h`'s file header for the full residual-risk scope. |
 | SG-005 | A safety-tagged request shall execute only once its endpoint reports it has reached the configured safe state. | ASIL-B | `rcp_e2e_request_may_execute()`, `rcp_e2e_endpoint_in_safe_state()`; formally verified (`tla/E2ESafePoint.tla` `NoUnsafeSafetyExecution`) |
 | SG-006 | Register-map field writes shall be permitted only for the authorized writer context, and a `FUNCTIONAL_W_STAR`-class field, once locked while `RCP_CONFIGURED`, shall never accept a write until a full reset. | ASIL-A | `rcp_regmap_writer_ctx()`; formally verified (`tla/LifecycleStateMachine.tla` `FieldLockMonotonicWhileConfigured`) |
 | SG-007 | Link-layer authentication (MACsec) shall be enforced by the deployment on any transport carrying safety-relevant requests. | ASIL-A | **Deployment-level control; not implemented within this library.** See ASIL Determination Note and `tara.md` TS-001/TS-003. |
@@ -176,7 +208,7 @@ field and in `tara.md`'s residual-risk notes, not asserted as closed.
 
 | Risk | Likelihood | Mitigation | Status |
 |------|-----------|------------|--------|
-| No replay/staleness detection for captured-and-resent requests (H-004) | Medium | None implemented in this library; the retired CRC-16 sequence-counter/replay-window mechanism was not carried forward, and the TC18 CRC32 safe-point mechanism that replaced it does not reimplement replay detection (`include/rcp/e2e.h`'s own file header records this gap explicitly) | **Open — tracked, not mitigated** |
+| Residual exposure to replay/staleness even with H-004's mitigation enabled (H-004) | Low-Medium | `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`) is implemented and wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`), but is opt-in (config bits must be set), its tracker state is per-process/per-restart (no persistence — a replay immediately after a restart is not detected), RFC 1982 forward-window comparison only distinguishes a gap within `[1,127]` from ordinary wraparound, and detection is per-AVTPDU-frame, not per-ACF-message. An integrator must also replicate `mock.c`'s admit()+evaluate() wiring in their own real dispatch loop — this library ships no networked dispatcher of its own. See `include/rcp/e2e.h`'s file header for the full scope statement. | **Mitigated (opt-in) — see residual-risk scope above; not unconditionally closed** |
 | No link-layer authentication for the native transport in this library's default posture (H-007) | Medium | MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; an integrator must supply it | **Open — deployment responsibility, not closed by this library** |
 | `rcp_e2e_endpoint_in_safe_state()` misconfiguration (invalid `safestate_sequencer` index, unrecognized `rx_safety_measure`) | Low | Fails closed (returns false) by explicit design choice, not a spec-mandated value | Accepted |
 | Discovery/bootstrap (`OS-008`) accepts any claimant at the reserved discovery `byte_bus_id` while `HW_UNCONFIGURED` | Low | No identity check exists at this stage in the spec's own bootstrap sequence; matches the same residual posture as H-007 above | Accepted, tracked alongside H-007 |

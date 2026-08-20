@@ -104,6 +104,32 @@
  * layering discipline changes, this is purely additive surface wiring
  * an already-existing pure primitive (e2e.h's rcp_e2e_unwrap_framed())
  * into this double's own dispatch path for the first time.
+ *
+ * ── Reconciliation note (2026-08-20, issue #606) ────────────────────────────
+ *
+ * A handful of comments elsewhere in this codebase (e2e.h's own file
+ * header among them) describe calls that flow through this file's
+ * dispatch functions as "real, live production dispatch paths." That is
+ * not a contradiction of this header's own repeated "test double" framing
+ * above, once read for what it actually distinguishes: this repo's own
+ * long-established ROADMAP.md usage of "real dispatch"/"production
+ * dispatch" means "actually wired into this file's own
+ * dispatch()/dispatch_frame()/etc. call chain," in contrast with "a pure
+ * primitive that exists and is directly unit-tested, but that nothing in
+ * this codebase's own dispatch composition ever calls" -- an internal
+ * distinction about this repo's own call graph, not a claim about a real
+ * fielded vehicle's RC Server. Both things are true at once: this file is
+ * in-process and zero-I/O by design (test-double framing, accurate, for a
+ * downstream integrator's own testing purposes), AND it is simultaneously
+ * this library's only concrete reference composition of the per-message
+ * admission primitives (server.h's rcp_server_endpoint_admit()) with the
+ * e2e.h evaluate()/latch primitives -- no other file in src/ (udp.c, l2.c,
+ * cli.c included) assembles them into a working dispatcher at all. An
+ * integrator's own real, I/O-attached production dispatch loop is
+ * expected to replicate this file's composition pattern (README.md's
+ * Quick Start says exactly this: "the same shape a real transport ...
+ * hands to a real RC Server"); this library does not ship that networked
+ * loop itself.
  */
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H

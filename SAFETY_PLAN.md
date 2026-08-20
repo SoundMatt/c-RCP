@@ -15,11 +15,15 @@ Control Protocol, baselined at ISO 26262 ASIL-B / IEC 61508 SIL-2.
 
 ## Safety goals
 
-See `HARA.md` for the full SG-001..SG-011 table with ASIL ratings
-computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). Two safety
-goals (SG-004, SG-007) are recorded as open — no implemented mitigation
-exists in this library for replay/staleness detection or link-layer
-authentication; see `HARA.md`'s Residual Risks and `tara.md`.
+See `HARA.md` for the full SG-001..SG-012 table with ASIL ratings
+computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). One safety
+goal, SG-007 (link-layer authentication), is recorded as open — no
+implemented mitigation exists in this library for it, by design (MACsec
+is out of this library's scope). SG-004 (replay/staleness detection) was
+open through issue #338 but is no longer: as of 2026-08-20 (issue
+#606/#601) a real, opt-in mitigation is implemented and wired into this
+library's reference dispatch composition — see the Safety mechanisms
+table below, `HARA.md`'s Residual Risks, and `tara.md`.
 
 ## SEOOC status
 
@@ -39,6 +43,7 @@ case as part of a larger item's own safety argument.
 | Watchdog-purge safety survival | REQ-E2E-014, REQ-E2E-015 | A watchdog-overflow purge with `rx_wd_safestate_enable` set never discards a pending safety-tagged request |
 | CRC32 frame integrity | REQ-E2E-002..009 | `rcp_e2e_wrap()`/`_unwrap()` append/validate a CRC32 trailer over the AVTPDU/ACF frame |
 | CRC-error handling | REQ-E2E-020, REQ-E2E-021 | `rcp_e2e_crc_error_action()` maps `rx_enforce_e2e` to drop-request or latch-stream-fault |
+| Sequence-number replay/staleness gate (opt-in) | REQ-E2E-028, REQ-E2E-029 | `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` implement TC18 Table 24's `rx_enforce_seq`/`rx_seq_safestate_enable`; wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`), once per AVTPDU frame. Opt-in — integrator must enable the config bits and replicate the dispatch wiring; residual risk (per-restart tracker reset, RFC 1982 `[1,127]` window, per-frame granularity) in `include/rcp/e2e.h`'s file header. |
 | Register-map write authorization | REQ-RMAP-009..012, REQ-LIFECYCLE-018..020 | `rcp_regmap_writer_ctx()` gates field writes; formally verified (`tla/LifecycleStateMachine.tla`) |
 | Lifecycle configuration gating | REQ-LIFECYCLE-008, -009, -012 | `RCP_CONFIGURED` is reachable only via `HW_CONFIGURED`; formally verified (`tla/LifecycleStateMachine.tla`) |
 | WakeUp handshake completion gate | REQ-PWRMODE-006..011 | Normal operation resumes only after `rcp_pwrmode_handshake_is_complete()` |

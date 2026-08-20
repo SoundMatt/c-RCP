@@ -74,18 +74,24 @@ obligates:
 |--------------------|----------------------|-------------------|
 | Redundant safety-tagged-request delivery paths | Not pursued at ECU boundary for ASIL-B | Single channel with the E2E CRC32 safe-point mechanism (`e2e.c`) and per-stream watchdog; no server-redundancy concept exists in TC18 (`redundancy.h`/`redundancy.c` were DEPRECATE-removed at milestone 83 — an RC Server is a single node with one lifecycle state) |
 | Link-layer authentication (MACsec) | Explicitly out of this library's own scope — a link-layer, product-specific/opaque control the spec delegates to the deployment | **Not implemented in this library** — see `HARA.md` H-007/`tara.md` TS-004. This is an open item, not a process-rigor derogation on top of an implemented control. |
-| Replay/staleness detection | The retired CRC-16 sequence-counter/replay-window mechanism has no TC18 counterpart in this codebase (`include/rcp/e2e.h`'s own file header records this explicitly) | **Not implemented in this library** — see `HARA.md` H-004/`tara.md` TS-002. Also an open item, not a derogation. |
+| Replay/staleness detection | TC18 §12.7.7 Table 24's own `rx_enforce_seq`/`rx_seq_safestate_enable` mechanism (`rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t`) is implemented and wired into `mock.c`'s reference dispatch composition (issue #606/#601, 2026-08-20) | **Mitigated (opt-in)** — see `HARA.md` H-004/`tara.md` TS-002. Integrator must enable the config bits and replicate the dispatch wiring; residual risk (per-restart tracker reset, RFC 1982 `[1,127]` window, per-frame granularity) documented in `include/rcp/e2e.h`'s file header. Not a derogation — a real, tested mechanism, opt-in scope disclosed rather than a rigor trade-off. |
 | Formal proofs of absence of deadlock | Fairness-conditioned liveness proofs for the two specs `tla/` covers landed under c-RCP-23d (issue #602); broader liveness coverage beyond those two specs' own scope remains an ASIL-C/D upgrade-path item | TLC exhaustive model check on bounded state spaces (`tla/`, `FORMAL_VERIFICATION.md`) covering the lifecycle FSM and the E2E safe-point/watchdog mechanism. Two distinct guarantees, not to be conflated: (1) **deadlock-freedom** — TLC's default no-successor-state check, which has passed on every CI run since these specs were added (predates issue #602, not this issue's contribution) — every reachable state has at least one enabled successor; (2) **progress/livelock-freedom under fairness** — issue #602's own contribution, a related but *stronger* claim added for one property per spec (`EventuallyRcpConfigured`/LP1 in `LifecycleStateMachine.tla`, `EventuallySafetyExecutes`/LP1 in `E2ESafePoint.tla`), each conditioned on the mechanically-minimum fairness level TLC confirms it actually needs (weak fairness where sufficient, strong fairness only where TLC shows weak fairness is not — see `FORMAL_VERIFICATION.md`'s "Liveness Properties" section for the fairness-minimality experiment and reproducible state counts). This closes the specific "absence of deadlock" gap for the two safety-critical subsystems these specs model; it is not a claim of exhaustive liveness coverage across the entire codebase. |
 | MISRA C:2012 mandatory + required compliance | Advisory rules selectively noted | `cfusa lint` clean on mandatory/required rules |
 | 100% MC/DC structural coverage | Branch coverage is captured (`lcov --rc branch_coverage=1`, both `ci.yml`'s `coverage` job and `release.yml`); real MC/DC is now measured and gated against regression (a ratchet floor, not 100%) by `ci.yml`'s `mcdc` job (c-RCP-16 item 3, issue #518; ratchet gate added issue #599, c-RCP-23a) | See §3 |
 
 Unlike the ASIL-D-requirement rows above (a deliberate, reasoned choice
 to not pursue a higher rigor level for an already-implemented
-mechanism), H-004 and H-007's "Not implemented in this library" rows
-are genuinely open gaps this re-certification pass surfaced rather than
+mechanism), H-007's "Not implemented in this library" row is a
+genuinely open gap this re-certification pass surfaced rather than
 closed — recorded honestly here rather than folded into the same
 "derogation" framing as the others, which would misrepresent an absent
-control as a considered rigor trade-off.
+control as a considered rigor trade-off. H-004's row previously read the
+same way but no longer does (updated 2026-08-20, issue #606/#601): a
+real, opt-in mechanism is now implemented and wired into this library's
+reference dispatch composition — recorded above as "Mitigated (opt-in)",
+distinct from both the derogation rows (a rigor trade-off on an
+already-implemented control) and H-007's row (no control implemented at
+all).
 
 ### Dynamic Allocation Posture (issue #521)
 

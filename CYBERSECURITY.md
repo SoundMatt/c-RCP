@@ -51,16 +51,27 @@ per-stream watchdog whose overflow purge always keeps safety-tagged
 requests queued rather than discarding them. Formally verified via TLC
 model checking in `tla/E2ESafePoint.tla` (see `FORMAL_VERIFICATION.md`).
 
-**This layer does not include replay/staleness detection.** The
-pre-TC18 architecture's "Layer 3 — E2E Anti-Replay" (a 32-entry
-sliding-window bitmap over CRC-16-protected sequence numbers) has no
-TC18 counterpart in this codebase — confirmed by direct read of
-`include/rcp/e2e.h`'s own file header, which records this as a
-deliberate scope boundary of milestone 70, not an oversight. See
-`tara.md` TS-002 for the residual-risk analysis; no requirement in
-`.fusa-reqs.json` claims replay mitigation.
+**This layer now includes an opt-in replay/staleness detection gate**
+(updated 2026-08-20, issue #606/#601). The pre-TC18 architecture's
+"Layer 3 — E2E Anti-Replay" (a 32-entry sliding-window bitmap over
+CRC-16-protected sequence numbers) had no TC18 counterpart through issue
+#338 — that gap is now closed at the mechanism level: TC18 §12.7.7
+Table 24 itself defines `rx_enforce_seq`/`rx_seq_safestate_enable`
+(0x000D bits 1/2), and `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t`
+(RFC 1982 forward-window comparison) implement it, wired into `mock.c`'s
+reference dispatch composition (`frame_seq_gate_admits()`, evaluated
+once per AVTPDU frame). This is **opt-in, not automatic**: an integrator
+must enable the config bits via `regmap.h` and must replicate `mock.c`'s
+admission wiring in their own real, I/O-attached dispatch loop — this
+library ships no networked dispatcher of its own, only a reference
+composition. Residual risk even when enabled: tracker state is
+per-process/per-restart (no persistence across restarts), the RFC 1982
+comparison only distinguishes a sequence gap in `[1,127]` from ordinary
+8-bit wraparound, and detection granularity is per-AVTPDU-frame, not
+per-ACF-message. See `tara.md` TS-002 for the residual-risk analysis and
+`include/rcp/e2e.h`'s own file header for the full scope statement.
 
-REQ-E2E-011, REQ-E2E-012, REQ-E2E-014, REQ-E2E-015, REQ-E2E-020..REQ-E2E-027
+REQ-E2E-011, REQ-E2E-012, REQ-E2E-014, REQ-E2E-015, REQ-E2E-020..REQ-E2E-027, REQ-E2E-028, REQ-E2E-029
 
 ### 1.4 Layer 4 — Discovery/Bootstrap Claim (`discovery.c`)
 
@@ -108,7 +119,7 @@ REQ-RL-003, REQ-RL-004
 |------------|--------|-------|
 | FR1 Identification & Authentication | Partial | Layer 2 policy check implemented; Layer 1 (MACsec) is a deployment-level dependency, not implemented in this library |
 | FR2 Use Control | Implemented | `rcp_authz_policy_t` per identity/address/request-type; `rcp_regmap_writer_ctx()` per register field |
-| FR3 System Integrity | Partial | E2E CRC32 safe points implemented; no replay/staleness detection (§1.3) |
+| FR3 System Integrity | Partial | E2E CRC32 safe points implemented; opt-in replay/staleness detection implemented (§1.3) — integrator must enable it, so still `Partial` rather than `Implemented` |
 | FR4 Data Confidentiality | Not implemented in-library | MACsec is the spec's own control; out of this library's scope (§1.1) |
 | FR5 Restricted Data Flow | Implemented | `(stream_id, byte_bus_id)` addressing scopes every request to its endpoint |
 | FR6 Timely Response | Implemented | Per-stream watchdog (`rcp_e2e_wd_evaluate()`) + WakeUp handshake completion gate |
@@ -140,7 +151,7 @@ countermeasure from the security layers above:
 | Threat | Countermeasure |
 |---|---|
 | Request injection / spoofing | Layer 2 (`rcp_authz_policy_permit()`); full identity assurance depends on Layer 1 (MACsec), not implemented in-library |
-| Replay attack | **None implemented.** See §1.3 and `tara.md` TS-002. |
+| Replay attack | **Mitigated (opt-in).** §1.3's TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable` gate; integrator must enable it and replicate the reference dispatch wiring. See §1.3 and `tara.md` TS-002. |
 | Rogue bootstrap claim | Layer 4 (`discovery.c` first-claimant-wins) + Layer 5 (`regmap.c` writer authorization); full identity assurance depends on Layer 1 |
 | Link-layer eavesdrop/tamper | **None implemented in-library.** MACsec is a deployment-level dependency (§1.1). |
 | Request-flood DoS | Layer 6 (token-bucket rate limiter with safety-tagged exemption) |

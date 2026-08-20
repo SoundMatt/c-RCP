@@ -57,11 +57,15 @@ claim:
   The safety mechanisms table in `SAFETY_PLAN.md` is exhaustive as of
   this document's own revision: the per-stream watchdog/safe-state
   gate, CRC32 frame integrity, register-map write authorization,
-  lifecycle configuration gating, and the WakeUp handshake completion
-  gate. Nothing else in this codebase should be read as an implied or
-  aspirational safety mechanism. In particular, replay/staleness
-  detection (H-004/SG-004) and link-layer authentication (H-007/SG-007)
-  are **not implemented** anywhere in this library — see §2 below.
+  lifecycle configuration gating, the WakeUp handshake completion gate,
+  and (as of 2026-08-20, issue #606/#601) the opt-in sequence-number
+  replay/staleness gate (H-004/SG-004). Nothing else in this codebase
+  should be read as an implied or aspirational safety mechanism. Two
+  hazards need care here: replay/staleness detection (H-004/SG-004) is
+  now **implemented, but opt-in** — see AoU-3 below for the conditions
+  under which it actually applies; link-layer authentication
+  (H-007/SG-007) remains **not implemented** anywhere in this library —
+  see §2 below.
 - **Hardware architectural metrics (SPFM/LFM/PMHF).** c-RCP is a pure
   C99 software library with no hardware element of its own; ISO
   26262-5:2018's hardware-element metrics are out of scope for this
@@ -81,7 +85,7 @@ the citation after each item is that fact's source-of-record.
 |---|---|---|
 | AoU-1 | The underlying hardware/platform c-RCP runs on meets its own safety requirements independently of this software safety case (memory protection, clocking, power integrity, and any hardware-level fault detection this library does not itself provide). | `safety-case.md` GSN node A1 |
 | AoU-2 | Link-layer authentication (MACsec, 802.1AE) is supplied by the deployment on any transport carrying safety-relevant requests. c-RCP's own transports (`udp.c`, `avtp.c`, `shmem.c`) carry AVTPDUs with no authentication or encryption layer of their own — this is a deliberate scope boundary (`tls.c` was deprecated and removed at v0.78.0 with MACsec as its designated replacement, itself out of this library's scope), not an oversight. | `HARA.md` Residual Risks (H-007), `tara.md` TS-001/TS-004 |
-| AoU-3 | Replay/staleness detection for captured-and-resent requests is supplied by the deployment or a higher layer if the integration's own risk assessment requires it. c-RCP does not reimplement the retired CRC-16 sequence-counter/replay-window mechanism; the TC18 CRC32 safe-point mechanism that replaced it is an integrity check, not a freshness check, and does not close this gap. | `HARA.md` Residual Risks (H-004), `tara.md` TS-002 |
+| AoU-3 | Replay/staleness detection for captured-and-resent requests is implemented in c-RCP as of 2026-08-20 (issue #606/#601) — TC18 §12.7.7 Table 24's own `rx_enforce_seq`/`rx_seq_safestate_enable` mechanism (`rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t`) — but it is **opt-in and does not apply automatically**. An integrator relying on it must: (1) enable `rx_enforce_seq`/`rx_seq_safestate_enable` via `regmap.h` for the relevant request stream; (2) replicate `mock.c`'s `frame_seq_gate_admits()` admission wiring (evaluate once per AVTPDU frame, before any ACF member is processed) in their own real, I/O-attached dispatch loop — c-RCP ships no networked dispatcher of its own, only a reference composition; and (3) accept the mechanism's documented residual risk: tracker state is per-process/per-restart (no persistence across restarts), RFC 1982 forward-window comparison only distinguishes a sequence gap in `[1,127]` from ordinary 8-bit wraparound, and detection granularity is per-AVTPDU-frame, not per-ACF-message. If an integrator's own risk assessment needs coverage beyond this scope (e.g. persistence across restarts, a wider replay window), that coverage remains the deployment's or a higher layer's responsibility. | `HARA.md` Residual Risks (H-004), `tara.md` TS-002, `include/rcp/e2e.h` file header |
 | AoU-4 | The first claimant to arrive at a server's reserved discovery `byte_bus_id` during `HW_UNCONFIGURED` is not cryptographically authenticated by c-RCP itself. An integrator whose threat model includes a rogue bootstrap claimant (`tara.md` TS-003) must supply that authentication at the link layer — the same control AoU-2 already requires for authenticated traffic in general. | `tara.md` TS-003 residual-risk note |
 | AoU-5 | `rcp_e2e_endpoint_in_safe_state()` fails closed (returns "not safe") on a misconfigured `safestate_sequencer` index or an unrecognized `rx_safety_measure` value, by explicit design choice rather than a spec mandate. An integrator must confirm this fail-closed posture is what their own safe-state definition actually requires before relying on it, rather than assuming a spec-mandated behavior. | `HARA.md` Residual Risks table |
 | AoU-6 | c-RCP's safety mechanisms are analyzed and tested at c-RCP's own implementation-correctness level; no separate ASIL decomposition argument (ISO 26262-9:2018 Clause 5) has been constructed for H-001 (the sole element-level hazard exceeding the ASIL-B baseline, at ASIL-C). An integrator whose item-level HARA assigns an ASIL to the corresponding vehicle-level hazard must construct their own decomposition or undecomposed-rigor argument at that ASIL — c-RCP's own ASIL-C rating does not do this for them. | `HARA.md` ASIL Determination Note |
@@ -154,12 +158,18 @@ comment for the current status of that remaining work.
 Consistent with issue #518's own scoping: this document does not
 assign ASIL-D to c-RCP (a category error for an SEOOC — ASIL attaches
 to a vehicle-level hazard via an integrator's own item-level HARA, not
-to a software element in isolation), does not close H-004 or H-007
-(both remain genuinely open per AoU-2/AoU-3 above), does not
-re-litigate `HARA.md`'s ASIL letters, and does not introduce any dual
-independent human-review/overcheck process gate — organizational
-redundancy measures of that kind are explicitly out of scope for
-c-RCP-16 and belong in a separate issue if wanted.
+to a software element in isolation), does not re-litigate `HARA.md`'s
+ASIL letters, and does not introduce any dual independent
+human-review/overcheck process gate — organizational redundancy
+measures of that kind are explicitly out of scope for c-RCP-16 and
+belong in a separate issue if wanted. It does not close H-007 (remains
+genuinely open per AoU-2 above — MACsec is out of this library's scope
+entirely). It does not *unconditionally* close H-004 either (updated
+2026-08-20, issue #606/#601): a real, opt-in mitigation now exists (see
+AoU-3), but an integrator who does not enable the config bits and
+replicate the reference dispatch wiring in their own production loop
+gets none of its benefit — H-004 is Mitigated (opt-in), not
+unconditionally Closed.
 
 ---
 _Document owner: SoundMatt/c-RCP maintainers_
