@@ -6,15 +6,20 @@
 //cfusa:test REQ-ADC-035
 //cfusa:test REQ-ADC-036
 //cfusa:test REQ-ADC-037
+//cfusa:test REQ-CANEP-023
+//cfusa:test REQ-CANEP-024
+//cfusa:test REQ-CANEP-025
+//cfusa:test REQ-CANEP-026
 //cfusa:test REQ-CANEP-028
 //cfusa:test REQ-CANEP-029
 //cfusa:test REQ-CANEP-030
 //cfusa:test REQ-CANEP-031
 //cfusa:test REQ-CANEP-032
+//cfusa:test REQ-CANEP-034
+//cfusa:test REQ-CANEP-035
 //cfusa:test REQ-CANEP-037
 //cfusa:test REQ-CANEP-039
 //cfusa:test REQ-CANEP-040
-//cfusa:test REQ-CANEP-041
 //cfusa:test REQ-ISELED-025
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
@@ -1350,17 +1355,29 @@ static void can_dispatch_multi_handler(const uint8_t *request, size_t request_le
         out_responses);
 }
 
-/* REQ-CANEP-041: the genuinely-multi-fragment counterpart to the plain,
+/* Proves REQ-CANEP-023/024/025/026/034/035 (rcp_ep_can_frame_response_
+ * fragment_count()/rcp_ep_can_encode_frame_response_fragmented()/
+ * rcp_ep_can_decode_frame_response_fragment(), all already-implemented
+ * primitives per their own //cfusa:req tags in src/ep_can.c) genuinely
+ * compose through a real rcp_mock_server_dispatch_multi_response() call --
+ * the genuinely-multi-fragment counterpart to the plain,
  * artificially-single-fragment case test_ep_can.c's own unit tests already
- * cover -- delivered through a real rcp_mock_server_dispatch_multi_response()
- * call, exactly the shape issue #610's own "Verification expectations"
- * section asks for. Uses the literal worst case #610 is about, not a toy
+ * cover in isolation, exactly the shape issue #610's own "Verification
+ * expectations" section asks for. This is a composition proof, not new
+ * functionality -- no new requirement is introduced; the six ids above
+ * already exist and are traced to their own implementation sites in
+ * src/ep_can.c. Uses the literal worst case #610 is about, not a toy
  * size: a full RCP_EP_CAN_XL_MAX_DATA_LEN (2048)-byte CAN XL response,
  * whose combined prefix-then-data payload (RCP_EP_CAN_XL_MAX_ENCODED_LEN,
  * 2058 octets) exceeds one ACF message's own real ceiling
  * (RCP_ACF_MAX_PAYLOAD, 2028 octets) -- forcing ceil(2058/2028) = 2 real
  * fragments, not a deliberately-shrunk max_fragment_payload. */
-//cfusa:test REQ-CANEP-041
+//cfusa:test REQ-CANEP-023
+//cfusa:test REQ-CANEP-024
+//cfusa:test REQ-CANEP-025
+//cfusa:test REQ-CANEP-026
+//cfusa:test REQ-CANEP-034
+//cfusa:test REQ-CANEP-035
 static void test_can_dispatch_multi_fragment_response_round_trips(void)
 {
     rcp_mock_server_t          *srv = rcp_mock_server_new();
