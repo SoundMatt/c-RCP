@@ -2171,6 +2171,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *
 
 //cfusa:req REQ-E2E-038
 //cfusa:req REQ-E2E-039
+//cfusa:req REQ-E2E-047
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
     rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
     uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, uint32_t avtp_timestamp,
@@ -2402,7 +2403,29 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 rcp_bytes_t encoded = rcp_acf_encode_gbb(&final_hdr, reassembled, reassembled_len);
                 rcp_bytes_free(&unwrapped);
                 rcp_fragment_reassembler_reset(reasm);
-                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                if (!encoded.data && reassembled_len != 0u) {
+                    /* issue #614: the fragments themselves, and their
+                     * combined CRC (REQ-E2E-038, checked above), were both
+                     * genuinely valid -- this is a well-formed request
+                     * rejected only because its own reassembled body
+                     * cannot be re-expressed as a single ACF_GBB frame.
+                     * RCP_ACF_GBB_MAX_PAYLOAD is a hard ceiling on
+                     * acf_msg_length's own 9-bit wire-format width (TC18
+                     * §13.6, acf.h) -- an inherent property of the ACF
+                     * wire format itself, not a buffer or table size a
+                     * bigger allocation could relax; see issue #614's own
+                     * writeup for why fragmentation existing in the first
+                     * place doesn't remove this ceiling on the
+                     * REASSEMBLED result. RCP_ERROR_REQUEST_REJECTED
+                     * (Table 27) is the correctly-matching catalogue
+                     * entry -- "the request was well-formed but rejected
+                     * on other grounds" -- mirroring dispatch_plain_
+                     * inner()'s own identical wording/code for its
+                     * RCP_LIFECYCLE_REJECT branch (this file, above). */
+                    *out_response = rcp_acf_build_error_response(
+                        byte_bus_id, final_hdr.info.transaction_num, RCP_ERROR_REQUEST_REJECTED);
+                    return RCP_MOCK_DISPATCH_REJECTED;
+                }
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
                                          time_sync_supported, stream_id, false, 0u, 0u, encoded.data,
                                          encoded.len, out_response);
@@ -2461,7 +2484,15 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 rcp_bytes_t encoded = rcp_acf_encode_abb(&final_hdr, reassembled, reassembled_len);
                 rcp_bytes_free(&unwrapped);
                 rcp_fragment_reassembler_reset(reasm);
-                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                if (!encoded.data && reassembled_len != 0u) {
+                    /* issue #614: see the identical ACF_GBB branch above
+                     * for the full rationale -- same wire-format ceiling
+                     * (RCP_ACF_ABB_MAX_PAYLOAD here), same RCP_ERROR_
+                     * REQUEST_REJECTED classification. */
+                    *out_response = rcp_acf_build_error_response(
+                        byte_bus_id, final_hdr.transaction_num, RCP_ERROR_REQUEST_REJECTED);
+                    return RCP_MOCK_DISPATCH_REJECTED;
+                }
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
                                          time_sync_supported, stream_id, false, 0u, 0u, encoded.data,
                                          encoded.len, out_response);
@@ -2476,6 +2507,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
 //cfusa:req REQ-TIMED-013
 //cfusa:req REQ-E2E-038
 //cfusa:req REQ-E2E-039
+//cfusa:req REQ-E2E-047
 /* REQ-TIMED-012/013 (issue #462): rcp_mock_server_dispatch_e2e_fragment()'s
  * own TSCF-aware counterpart, byte-for-byte identical to it in every
  * respect EXCEPT that this call's own tv/avtp_timestamp/gptp_reference_now
@@ -2730,7 +2762,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
                 rcp_bytes_t encoded = rcp_acf_encode_gbb(&final_hdr, reassembled, reassembled_len);
                 rcp_bytes_free(&unwrapped);
                 rcp_fragment_reassembler_reset(reasm);
-                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                if (!encoded.data && reassembled_len != 0u) {
+                    /* issue #614: see rcp_mock_server_dispatch_e2e_fragment()'s
+                     * own identical ACF_GBB branch for the full rationale
+                     * -- same wire-format ceiling (RCP_ACF_GBB_MAX_PAYLOAD
+                     * here), same RCP_ERROR_REQUEST_REJECTED
+                     * classification. */
+                    *out_response = rcp_acf_build_error_response(
+                        byte_bus_id, final_hdr.info.transaction_num, RCP_ERROR_REQUEST_REJECTED);
+                    return RCP_MOCK_DISPATCH_REJECTED;
+                }
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
                                          time_sync_supported, stream_id, tv, avtp_timestamp,
                                          gptp_reference_now, encoded.data, encoded.len, out_response);
@@ -2789,7 +2830,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
                 rcp_bytes_t encoded = rcp_acf_encode_abb(&final_hdr, reassembled, reassembled_len);
                 rcp_bytes_free(&unwrapped);
                 rcp_fragment_reassembler_reset(reasm);
-                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                if (!encoded.data && reassembled_len != 0u) {
+                    /* issue #614: see rcp_mock_server_dispatch_e2e_fragment()'s
+                     * own identical ACF_ABB branch for the full rationale
+                     * -- same wire-format ceiling (RCP_ACF_ABB_MAX_PAYLOAD
+                     * here), same RCP_ERROR_REQUEST_REJECTED
+                     * classification. */
+                    *out_response = rcp_acf_build_error_response(
+                        byte_bus_id, final_hdr.transaction_num, RCP_ERROR_REQUEST_REJECTED);
+                    return RCP_MOCK_DISPATCH_REJECTED;
+                }
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
                                          time_sync_supported, stream_id, tv, avtp_timestamp,
                                          gptp_reference_now, encoded.data, encoded.len, out_response);
