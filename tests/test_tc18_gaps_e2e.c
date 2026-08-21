@@ -2510,6 +2510,142 @@ static void test_dispatch_e2e_fragment_can_xl_write_request_rejected_when_reasse
     rcp_mock_server_destroy(srv);
 }
 
+/* ── issue #614: a genuinely valid, correctly-reassembled, correctly-CRC'd
+ * worst-case CAN XL write request still cannot be re-expressed as a single
+ * ACF_ABB frame (RCP_ACF_ABB_MAX_PAYLOAD=2036 < the 2058-octet combined
+ * payload) -- unlike the reassembler-ceiling test above (which forces
+ * rejection via an artificially small max_total_len, well BELOW this
+ * request's real size), this test uses the reassembler's own real,
+ * unmodified default ceiling (comfortably above 2058) so reassembly and
+ * the fragmented CRC check both genuinely SUCCEED; the only thing that
+ * fails is the encode-back-to-one-frame step immediately after. Before
+ * the #614 fix, this silently returned RCP_MOCK_DISPATCH_REJECTED with
+ * *out_response left zeroed -- a well-formed, correctly-transmitted
+ * request vanishing with no observable error at all. This test proves
+ * the caller now gets back a genuine Table 27 error response instead. ── */
+//cfusa:test REQ-E2E-047
+static void test_dispatch_e2e_fragment_can_xl_write_request_rejected_with_error_response_when_too_large_to_reencode(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_ep_can_xl_header_t       xl  = {0};
+    uint8_t                       tx_data[RCP_EP_CAN_XL_MAX_DATA_LEN];
+    rcp_bytes_t                   frames[2] = {{0}, {0}};
+    size_t                         count;
+    size_t                         i;
+    uint8_t                        combined[RCP_EP_CAN_XL_MAX_ENCODED_LEN];
+    size_t                          combined_len = 0;
+    uint8_t                         first_hdr[RCP_ACF_ABB_HEADER_LEN];
+    size_t                           final_payload_len = 0;
+    rcp_bytes_t                      final_wire;
+    uint32_t                         want;
+    size_t                            pad_octets;
+    size_t                            crc_offset;
+    rcp_bytes_t                       resp = {0};
+    rcp_mock_dispatch_result_t        second_result;
+
+    xl.sdt = 0x5u;
+    xl.vcid = 0x9u;
+    xl.af   = 0xCAFEBABEu;
+    for (i = 0; i < sizeof(tx_data); i++) tx_data[i] = (uint8_t)(i * 11u + 5u);
+
+    set_up_frag_stream(srv, counting_handler);
+
+    count = rcp_ep_can_frame_request_fragment_count(RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u, &xl,
+                                                      sizeof(tx_data), RCP_ACF_ABB_MAX_PAYLOAD);
+    TEST_ASSERT_EQUAL_size_t(2u, count);
+    TEST_ASSERT_EQUAL_size_t(
+        count, rcp_ep_can_encode_frame_request_fragmented(0x11u, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u,
+                                                           &xl, tx_data, sizeof(tx_data), 0x99u,
+                                                           RCP_ACF_ABB_MAX_PAYLOAD, frames));
+    TEST_ASSERT_NOT_NULL(frames[0].data);
+    TEST_ASSERT_NOT_NULL(frames[1].data);
+
+    /* Real, valid fragmented CRC -- unlike the reassembler-ceiling test
+     * above, this test needs reassembly to genuinely COMPLETE and PASS
+     * its CRC check, so the encode-ceiling failure is what's actually
+     * being exercised, not an earlier rejection for an unrelated reason. */
+    {
+        rcp_acf_byte_message_info_t h0;
+        rcp_acf_byte_message_info_t h1;
+        const uint8_t               *p0;
+        const uint8_t               *p1;
+        size_t                        p0len;
+        size_t                        p1len;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frames[0].data, frames[0].len, &h0, &p0, &p0len));
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frames[1].data, frames[1].len, &h1, &p1, &p1len));
+        rcp_memcpy_bounded(combined, sizeof(combined), p0, p0len);
+        rcp_memcpy_bounded(combined + p0len, sizeof(combined) - p0len, p1, p1len);
+        combined_len       = p0len + p1len;
+        final_payload_len = p1len;
+        rcp_memcpy_bounded(first_hdr, sizeof(first_hdr), frames[0].data, RCP_ACF_ABB_HEADER_LEN);
+    }
+    TEST_ASSERT_EQUAL_size_t((size_t)RCP_EP_CAN_XL_MAX_ENCODED_LEN, combined_len);
+
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frames[1].data,
+                               frames[1].len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+    want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS,
+                                           first_hdr, RCP_ACF_ABB_HEADER_LEN, combined, combined_len);
+    pad_octets = rcp_acf_pad_len(final_payload_len);
+    crc_offset = frames[1].len - pad_octets;
+    final_wire.data[crc_offset + 0u] = (uint8_t)(want >> 24);
+    final_wire.data[crc_offset + 1u] = (uint8_t)(want >> 16);
+    final_wire.data[crc_offset + 2u] = (uint8_t)(want >> 8);
+    final_wire.data[crc_offset + 3u] = (uint8_t)want;
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, frames[0].data, frames[0].len,
+                                                             &resp));
+    TEST_ASSERT_NULL(resp.data);
+    rcp_bytes_free(&resp);
+
+    second_result = rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                            RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                            TEST_TS, final_wire.data, final_wire.len,
+                                                            &resp);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, second_result);
+    /* The handler must never be reached -- this request never gets far
+     * enough to be admitted, exactly like the reassembler-ceiling
+     * sibling test above. */
+    TEST_ASSERT_FALSE(g_handler_called);
+
+    /* The actual #614 fix: *out_response is no longer left zeroed for
+     * this specific rejection reason -- it's a genuine Table 27
+     * RCP_ERROR_REQUEST_REJECTED error response, addressed to this
+     * request's own real transaction_num (0x99, threaded through both
+     * fragments by rcp_ep_can_encode_frame_request_fragmented() above),
+     * exactly like every other "admitted far enough to identify, but not
+     * processed" rejection this codebase already builds one for
+     * (dispatch_plain_inner()'s own RCP_LIFECYCLE_REJECT branch). */
+    TEST_ASSERT_NOT_NULL(resp.data);
+    {
+        rcp_acf_byte_message_info_t resp_hdr;
+        const uint8_t               *resp_payload;
+        size_t                        resp_payload_len;
+
+        TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &resp_hdr,
+                                                          &resp_payload, &resp_payload_len));
+        TEST_ASSERT_EQUAL_UINT8(1u, resp_hdr.rsp);
+        TEST_ASSERT_EQUAL_UINT8(1u, resp_hdr.err);
+        TEST_ASSERT_EQUAL_UINT8(0x99u, resp_hdr.transaction_num);
+        TEST_ASSERT_EQUAL_UINT8(0x11u, resp_hdr.byte_bus_id);
+        TEST_ASSERT_EQUAL_size_t(1u, resp_payload_len);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_REJECTED, resp_payload[0]);
+    }
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&frames[0]);
+    rcp_bytes_free(&frames[1]);
+    rcp_mock_server_destroy(srv);
+}
+
 /* An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
  * call for it) has no reassembler slot to use -- the documented
  * fallback delegates to rcp_mock_server_dispatch_e2e() unchanged rather
@@ -4325,6 +4461,7 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_fragment_too_large_reassembly_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_can_xl_write_request_round_trips);
     RUN_TEST(test_dispatch_e2e_fragment_can_xl_write_request_rejected_when_reassembled_total_exceeds_ceiling);
+    RUN_TEST(test_dispatch_e2e_fragment_can_xl_write_request_rejected_with_error_response_when_too_large_to_reencode);
     RUN_TEST(test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e);
     RUN_TEST(test_dispatch_e2e_fragment_already_faulted_stream_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_plain_command_mode_falls_back_to_dispatch_plain);
