@@ -117,3 +117,31 @@ Cross-implementation note: cpp-RCP mirrors REQ-AVTP-031 (the reserved-
 bytes predicate) and inherits the same conflict; the default above is a
 wire-visible behaviour change that go-RCP/cpp-RCP/rust-RCP should
 reconcile.
+
+**Interaction with the lifecycle states (TC18-12.3.1.1-002 /
+TC18-12.3.1.2-002 / TC18-12.6.1-002).** Under `_AS_NTSCF` the frame is
+*timed and admitted* as NTSCF, but the state-dependent subtype rules
+(only NTSCF in HW_UNCONFIGURED; TSCF dropped in HW_CONFIGURED) are applied
+to the subtype on the wire (REQ-INGRESS-036). Read the other way, the
+TC18-13.3-003 relabelling would let every conformant TSCF AVTPDU past
+those rules, which they exist to prevent. In RCP_CONFIGURED the two
+readings agree, because `_AS_NTSCF` only applies when time sync is
+supported. Cross-implementation note: go-RCP/cpp-RCP/rust-RCP should
+filter on the wire subtype too.
+
+### NTSCF octet 1 in the safe-command-mode header CRC (TC18-13.6-002 / TC18-13.6-005)
+
+The NTSCF header-CRC field set (TC18-13.6-005) marks the whole of
+AVTPDU octet 1 as CRC input. In NTSCF that octet carries sv, version and
+r *and* the top three bits of `ntscf_data_length`, so it is 0x80 only for
+payloads under 256 octets; `rcp_avtp_encode_ntscf()` emits 0x81..0x87
+above that. c-RCP covers the octet exactly as transmitted, length bits
+included, on every receive path (REQ-INGRESS-018): the pipeline uses the
+parsed byte, and the legacy `rcp_mock_server_dispatch*()` wrappers
+synthesize the byte the encoder would emit for the payload they are
+given. The low length octet and `sequence_num` are not CRC input.
+
+Cross-implementation note: this is wire-visible. A peer that masks octet
+1 down to sv/version/r (0x80) computes a different CRC for every NTSCF
+safe-command-mode frame of 256 octets or more, and c-RCP answers
+CRC_ERROR. go-RCP/cpp-RCP/rust-RCP should cover octet 1 in full.

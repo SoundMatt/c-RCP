@@ -113,7 +113,8 @@
  * investigation and the fix. The span is now, in order: the AVTPDU
  * subtype byte (1 octet -- 0x05 TSCF / 0x82 NTSCF), the header's own
  * second octet (1 octet -- TSCF's packed sv|version|mr|rsv|tv or NTSCF's
- * packed sv|version|r, exactly as transmitted), a tu byte (1 octet, LSB
+ * packed sv|version|r|ntscf_data_length[10:8], exactly as transmitted,
+ * length bits included), a tu byte (1 octet, LSB
  * = the TSCF tu bit, forced 0 under NTSCF framing -- see below), the
  * 8-byte StreamID this request stream is addressed by (avtp.h's own
  * addressing model; pass 0 for the all-zero stand-in an NTSCF-framed
@@ -156,12 +157,23 @@
  * not match this library's prior output at all. Figure 21 (NTSCF)
  * confirms the same shape minus the fields NTSCF's own header doesn't
  * have (no avtp_timestamp row, no tu column) -- orange there is
- * subtype(0x82) + the sv/version/r byte, full, + stream_id; both
+ * subtype(0x82) + byte 1, full, + stream_id; both
  * figures' own prose directly under each ("The fields marked in orange
  * in the TSCF/NSCF header shall be used to calculate a header CRC, which
  * is then used are seed value for the calculation of the individual CRCs
  * of each ACF type under this header") independently corroborates the
  * diagram, not just the color-coding alone.
+ *
+ * NTSCF byte 1 "full" means all eight bits: sv, version, r AND the top
+ * three bits of ntscf_data_length (bits 2:0; rcp_avtp_encode_ntscf()
+ * sets them for any payload of 256 octets or more, giving 0x81..0x87).
+ * Issue #618 makes this explicit because an earlier wording here
+ * ("the sv/version/r byte") read as if the length bits were excluded; a
+ * caller that passed a bare 0x80 for a large NTSCF frame would compute a
+ * different CRC from a peer that covers the byte as transmitted. The
+ * low length byte (byte 2) and sequence_num (byte 3) stay outside the
+ * CRC, as above. Recorded as a cross-implementation note in
+ * docs/TC18-NON-NORMATIVE-CLAUSES.md.
  *
  * Fixed here by feeding avtp_subtype + header_octet1 + a tu byte ahead
  * of stream_id/avtp_timestamp in rcp_e2e_compute_crc()/_compute_
@@ -202,7 +214,8 @@
  * field width.
  *
  * header_octet1 (TSCF's sv|version|mr|rsv|tv byte, or NTSCF's
- * sv|version|r byte) is NOT similarly derivable -- mr and tv are
+ * sv|version|r|ntscf_data_length[10:8] byte) is NOT similarly derivable
+ * -- mr and tv are
  * genuinely per-message wire values (avtp.h's own rcp_avtp_tscf_header_t
  * comments: "mr: media clock restart, carried through unmodified"; "tv:
  * avtp_timestamp valid") -- so it remains a required caller-supplied
@@ -211,8 +224,10 @@
  * Issue #618: src/mock.c's receive pipeline passes exactly that -- the
  * frame's own subtype, raw header octet 1, tu and avtp_timestamp, taken
  * from the parsed AVTPDU header (rcp_ingress_parse_avtpdu(), ingress.h)
- * or, for its legacy wrappers, synthesized as 0x80 | tv with tu = 0 (what
- * rcp_avtp_encode_ntscf()/_tscf() emit) -- and, for a reassembled
+ * or, for its legacy wrappers, synthesized as the byte
+ * rcp_avtp_encode_tscf()/_ntscf() emit for that payload (0x80 | tv for
+ * TSCF, 0x80 | ntscf_data_length[10:8] for NTSCF) with tu = 0 -- and,
+ * for a reassembled
  * message, the FIRST fragment's stored values. The placeholder byte it
  * used before (0x00, which no real peer can send since sv is always 1)
  * is gone.
@@ -465,8 +480,8 @@ uint32_t rcp_e2e_crc32(const uint8_t *data, size_t len);
 
 /* The coverage-span-specific wrapper: CRC32 over avtp_subtype (1 byte --
  * 0x05 TSCF / 0x82 NTSCF) + header_octet1 (1 byte -- TSCF's packed
- * sv|version|mr|rsv|tv or NTSCF's packed sv|version|r, exactly as
- * transmitted) + a tu byte (1 byte, LSB = tu; pass false for NTSCF,
+ * sv|version|mr|rsv|tv or NTSCF's packed sv|version|r|ntscf_data_length
+ * [10:8], exactly as transmitted) + a tu byte (1 byte, LSB = tu; pass false for NTSCF,
  * which has no tu bit of its own -- see rcp_e2e_wrap_framed()) +
  * stream_id (8 bytes, big-endian) + avtp_timestamp (4 bytes, big-endian
  * -- IEEE 1722's own field width; pass 0 for the NTSCF all-zero

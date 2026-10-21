@@ -59,12 +59,19 @@ wire-visible** -- read before upgrading:
   TIME_GATE: a conformant TSCF frame now waits for its presentation
   time instead of being dropped (or, under the old IGNORE, run early).
   `rcp_mock_server_set_tscf_unsupported_time_sync_policy()` now governs
-  only the unsupported-time-sync rule. All TSCF paths agree.
+  only the unsupported-time-sync rule. All TSCF paths agree. The
+  `_AS_NTSCF` relabelling decides timing only: a TSCF AVTPDU is still
+  dropped in HW_UNCONFIGURED and HW_CONFIGURED under every reserved-zero
+  policy, because the lifecycle subtype rules see the wire subtype.
 - **Safe-command-mode CRC over the real header.** The reference server
   checks the CRC over the received header_octet1/tu/avtp_timestamp (the
-  legacy wrappers synthesize 0x80 | tv, tu = 0); the 0x00 placeholder is
-  gone. A peer computing over the real sv=1 byte is now accepted, and a
-  request wrapped over 0x00 is now a CRC_ERROR.
+  legacy wrappers synthesize the byte `rcp_avtp_encode_*()` emits for the
+  payload -- 0x80 | tv for TSCF, 0x80 | ntscf_data_length[10:8] for
+  NTSCF -- with tu = 0); the 0x00 placeholder is gone. NTSCF octet 1 is
+  covered in full, length bits included, so a payload of 256 octets or
+  more is checked over 0x81..0x87, on every path. A peer computing over
+  the real sv=1 byte is now accepted, and a request wrapped over 0x00 is
+  now a CRC_ERROR.
 - **Dropped frames have no side effects.** The lifecycle filter runs
   before the stream-fault gate and the CRC stage on every path: a frame
   that must be dropped no longer gets POCI_FAILURE/CRC_ERROR responses,
@@ -93,6 +100,16 @@ wire-visible** -- read before upgrading:
   (`RCP_MOCK_MAX_FRAME_MEMBERS` no longer limits anything).
 - New `rcp_lifecycle_should_accept_subtype()`; `rcp_l2_set_rcvbuf()`/
   `rcp_l2_get_rcvbuf()` (SO_RCVBUF, burst reception).
+- **Legacy-wrapper behaviour an integrator can see:** the frame wrappers
+  kick the watchdog once per AVTPDU, not once per member;
+  `rcp_mock_server_dispatch_multi_response()` now runs a plain slot's
+  handler (it used to ignore it), and plain `rcp_mock_server_dispatch()`
+  runs a multi-response slot's handler with its responses joined; the
+  deprecated per-stream reassembler accessor returns NULL until a
+  fragment or a `rcp_mock_server_fragment_reassembler_for()` call binds a
+  context. The legacy wrappers cannot express mr = 1 or tu = 1, so a peer
+  that sets either fails the CRC through them; use
+  `rcp_mock_server_receive_avtpdu()`.
 - **Deprecated** (see the Deprecation & Removal Log): the ten legacy
   `rcp_mock_server_dispatch*()` entry points and the per-stream
   `rcp_mock_server_fragment_reassembler()`.

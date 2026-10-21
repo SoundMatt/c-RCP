@@ -19128,9 +19128,13 @@ Gaps closed (audit indices 0, 6, 7, 9, 56, 101, 110, 111, 112, 128, 131,
   (`rcp_mock_server_set_tscf_reserved_zero_policy()`), default TIME_GATE,
   applied identically on every TSCF path; the conflict with
   TC18-11.1-001/11.2-001 is recorded in docs/TC18-NON-NORMATIVE-CLAUSES.md.
+  The lifecycle subtype rules filter on the wire subtype, so the
+  `_AS_NTSCF` relabelling never lets TSCF through in HW_UNCONFIGURED/
+  HW_CONFIGURED.
 - Safe-command-mode CRC computed over the real received header byte
-  (sv = 1), not a 0x00 placeholder; fragmented CRC over the first
-  fragment's stored header.
+  (sv = 1; for NTSCF all of octet 1, ntscf_data_length[10:8] included,
+  on the legacy wrappers too), not a 0x00 placeholder; fragmented CRC
+  over the first fragment's stored header.
 - Lifecycle filtering runs before every side-effecting gate: dropped
   frames/members produce no response, latch, status change, sequence
   change or safe-state broadcast.
@@ -19147,7 +19151,7 @@ Gaps closed (audit indices 0, 6, 7, 9, 56, 101, 110, 111, 112, 128, 131,
 - `rcp_l2_set_rcvbuf()`/`rcp_l2_get_rcvbuf()` for burst reception
   (TC18-12.8.2-004), with a veth burst test in CI.
 
-New requirements REQ-INGRESS-001..035; REQ-AVTP-032/033, REQ-ACF-021,
+New requirements REQ-INGRESS-001..036; REQ-AVTP-032/033, REQ-ACF-021,
 REQ-WDG-010, REQ-E2E-021/038/039 and REQ-ISELED-025 updated.
 
 **Next** (wave 1, coordinated): #617 (admission internals), #619

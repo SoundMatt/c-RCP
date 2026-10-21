@@ -59,9 +59,11 @@ void tearDown(void) {}
  * header-CRC bytes rcp_e2e_compute_crc()/_wrap()/_unwrap() require.
  * Issue #618: mock.c no longer substitutes a placeholder header byte --
  * its CRC stage covers the real received header (REQ-INGRESS-018), and
- * the legacy rcp_mock_server_dispatch_e2e*() wrappers synthesize exactly
- * what rcp_avtp_encode_ntscf()/_tscf() emit: sv=1, version 0, mr=0, so
- * header_octet1 = 0x80 | tv and tu = 0. TEST_OCTET1 is therefore the
+ * the legacy rcp_mock_server_dispatch_e2e*() wrappers synthesize the byte
+ * rcp_avtp_encode_ntscf()/_tscf() emit for the payload: sv=1, version 0,
+ * mr=0, so header_octet1 = 0x80 | tv for TSCF and 0x80 |
+ * ntscf_data_length[10:8] for NTSCF (0x80 below 256 octets), with tu = 0.
+ * TEST_OCTET1 is therefore the
  * real sv=1 byte a conformant peer computes its CRC over (0x80; tests
  * that pass tv=true use TEST_OCTET1_TV, 0x81). Coverage for "every bit
  * of header_octet1/tu is fed into the CRC" lives in test_e2e.c's own
@@ -4655,28 +4657,38 @@ static void test_plain_endpoint_reassembles_fragments_without_a_stream_row(void)
 
 /* Builds the final fragment of a two-fragment safe-command-mode message
  * on an NTSCF stream: f1 wrapped, its trailer replaced by the real
- * fragmented CRC over the first fragment's header. */
-static rcp_bytes_t e2e_final_with_fragmented_crc(const rcp_bytes_t *f0, const rcp_bytes_t *f1,
-                                                 const uint8_t *p0, size_t p0len, const uint8_t *p1,
-                                                 size_t p1len)
+ * fragmented CRC over the first fragment's header, whose AVTPDU octet 1
+ * was first_octet1. */
+static rcp_bytes_t e2e_final_with_fragmented_crc_over(const rcp_bytes_t *f0, const rcp_bytes_t *f1,
+                                                      const uint8_t *p0, size_t p0len,
+                                                      const uint8_t *p1, size_t p1len,
+                                                      uint8_t first_octet1)
 {
-    uint8_t     all[32];
-    rcp_bytes_t w = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, f1->data, f1->len);
-    uint32_t    want;
-    size_t      off;
+    static uint8_t all[512];
+    rcp_bytes_t    w = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, f1->data, f1->len);
+    uint32_t       want;
+    size_t         off;
 
     TEST_ASSERT_NOT_NULL(w.data);
     TEST_ASSERT_TRUE(p0len + p1len <= sizeof(all));
     memcpy(all, p0, p0len);
     memcpy(&all[p0len], p1, p1len);
-    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, 0x80u, false, TEST_SID, 0u,
-                                          f0->data, RCP_ACF_ABB_HEADER_LEN, all, p0len + p1len);
+    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, first_octet1, false, TEST_SID,
+                                          0u, f0->data, RCP_ACF_ABB_HEADER_LEN, all,
+                                          p0len + p1len);
     off = f1->len - rcp_acf_pad_len(RCP_ACF_ABB_HEADER_LEN + p1len);
     w.data[off]      = (uint8_t)(want >> 24);
     w.data[off + 1u] = (uint8_t)(want >> 16);
     w.data[off + 2u] = (uint8_t)(want >> 8);
     w.data[off + 3u] = (uint8_t)want;
     return w;
+}
+
+static rcp_bytes_t e2e_final_with_fragmented_crc(const rcp_bytes_t *f0, const rcp_bytes_t *f1,
+                                                 const uint8_t *p0, size_t p0len, const uint8_t *p1,
+                                                 size_t p1len)
+{
+    return e2e_final_with_fragmented_crc_over(f0, f1, p0, p0len, p1, p1len, 0x80u);
 }
 
 /* T6: a fragmented safe-command-mode request on a stream with no
@@ -4714,6 +4726,172 @@ static void test_crc_endpoint_reassembles_without_a_stream_row(void)
     rcp_bytes_free(&f0);
     rcp_bytes_free(&f1);
     rcp_mock_server_destroy(srv);
+}
+
+/* Paths a large-NTSCF CRC verdict must agree on (REQ-INGRESS-018). */
+typedef enum {
+    LARGE_PATH_RECEIVE = 0,
+    LARGE_PATH_DISPATCH,
+    LARGE_PATH_DISPATCH_E2E,
+    LARGE_PATH_DISPATCH_FRAME_E2E,
+    LARGE_PATH_COUNT
+} large_path_t;
+
+/* One safe-command-mode request w through one path, on a fresh
+ * RCP_CONFIGURED server with EP 0x11 in safe command mode. */
+static rcp_mock_dispatch_result_t large_ntscf_verdict(large_path_t path, const rcp_bytes_t *w)
+{
+    rcp_mock_server_t             *srv    = rcp_mock_server_new();
+    rcp_bytes_t                    resp   = {0};
+    rcp_mock_frame_member_result_t fr[2];
+    rcp_mock_dispatch_result_t     result = RCP_MOCK_DISPATCH_REJECTED;
+    rcp_bytes_t                    pdu    = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    switch (path) {
+    case LARGE_PATH_RECEIVE:
+        pdu = e2e_pdu(false, 0u, 0u, 0u, w->data, w->len, 0);
+        TEST_ASSERT_NOT_NULL(pdu.data);
+        result = e2e_receive_one(srv, &pdu);
+        break;
+    case LARGE_PATH_DISPATCH:
+        result = rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                          true, TEST_SID, w->data, w->len, &resp);
+        break;
+    case LARGE_PATH_DISPATCH_E2E:
+        result = rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                              RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, 0u, w->data,
+                                              w->len, &resp);
+        break;
+    case LARGE_PATH_DISPATCH_FRAME_E2E:
+    default:
+        TEST_ASSERT_EQUAL_UINT(1u, rcp_mock_server_dispatch_frame_e2e(
+                                       srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 0u, 0u,
+                                       w->data, w->len, fr, 2));
+        result = fr[0].result;
+        rcp_bytes_free(&fr[0].response);
+        break;
+    }
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&pdu);
+    rcp_mock_server_destroy(srv);
+    return result;
+}
+
+/* REQ-INGRESS-018 / TC18-13.6-005: NTSCF octet 1 carries
+ * ntscf_data_length[10:8], so a payload of 256 octets or more is sent with
+ * octet 1 = 0x81..0x87 and the header CRC covers that byte as transmitted.
+ * A 312-octet wrapped request built over the real wire byte is accepted
+ * by receive_avtpdu() and by every legacy wrapper that checks the CRC;
+ * the same request wrapped over a bare 0x80 (length bits dropped) is a
+ * CRC_ERROR on all of them. Before the fix the legacy wrappers always
+ * synthesized 0x80 and the two families gave opposite verdicts. */
+//cfusa:test REQ-INGRESS-018
+static void test_large_ntscf_crc_covers_octet1_length_bits_on_every_path(void)
+{
+    static uint8_t pl[300];
+    rcp_bytes_t    m;
+    rcp_bytes_t    bare;
+    rcp_bytes_t    real;
+    rcp_bytes_t    pdu;
+    uint8_t        wire_octet1;
+    size_t         p;
+
+    memset(pl, 0x5A, sizeof(pl));
+    m    = make_abb(0, 0, 0, pl, sizeof(pl));
+    bare = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, m.data, m.len);
+    TEST_ASSERT_NOT_NULL(bare.data);
+    TEST_ASSERT_TRUE(bare.len >= 256u);
+    /* what rcp_avtp_encode_ntscf() puts on the wire for this payload */
+    pdu = e2e_pdu(false, 0u, 0u, 0u, bare.data, bare.len, 0);
+    TEST_ASSERT_NOT_NULL(pdu.data);
+    wire_octet1 = pdu.data[1];
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)(0x80u | ((bare.len >> 8) & 0x07u)), wire_octet1);
+    TEST_ASSERT_EQUAL_HEX8(0x81u, wire_octet1);
+    rcp_bytes_free(&pdu);
+    real = rcp_e2e_wrap_framed(TEST_SID, true, wire_octet1, false, 0u, m.data, m.len);
+    TEST_ASSERT_NOT_NULL(real.data);
+    TEST_ASSERT_EQUAL_UINT(bare.len, real.len);
+
+    for (p = 0; p < (size_t)LARGE_PATH_COUNT; p++) {
+        TEST_ASSERT_EQUAL_MESSAGE(RCP_MOCK_DISPATCH_OK, large_ntscf_verdict((large_path_t)p, &real),
+                                  "real octet 1 rejected");
+        TEST_ASSERT_EQUAL_MESSAGE(RCP_MOCK_DISPATCH_CRC_ERROR,
+                                  large_ntscf_verdict((large_path_t)p, &bare),
+                                  "length bits not covered");
+    }
+    rcp_bytes_free(&real);
+    rcp_bytes_free(&bare);
+    rcp_bytes_free(&m);
+}
+
+/* The same rule for the fragmented CRC: the first fragment's AVTPDU is
+ * 308 octets (octet 1 = 0x81), and the final fragment's fragmented CRC is
+ * seeded with that stored byte. receive_avtpdu() and
+ * dispatch_e2e_fragment() both accept the message when the CRC is
+ * computed over 0x81 and both reject it over 0x80 (e.g. the CAN XL
+ * worst-case write, whose first fragment is at least this large). */
+//cfusa:test REQ-INGRESS-018
+//cfusa:test REQ-INGRESS-014
+static void test_large_first_fragment_crc_covers_octet1_length_bits(void)
+{
+    static uint8_t p0[300];
+    const uint8_t  p1[4] = {5, 6, 7, 8};
+    rcp_bytes_t    f0;
+    rcp_bytes_t    f1;
+    rcp_bytes_t    pdu0;
+    uint8_t        wire_octet1;
+    int            over_real, via_receive;
+
+    memset(p0, 0x33, sizeof(p0));
+    f0   = e2e_frag(0x11, 0x22, 1, 0, p0, sizeof(p0));
+    f1   = e2e_frag(0x11, 0x22, 0, 1, p1, sizeof(p1));
+    pdu0 = e2e_pdu(false, 0u, 0u, 0u, f0.data, f0.len, 0);
+    TEST_ASSERT_NOT_NULL(pdu0.data);
+    wire_octet1 = pdu0.data[1];
+    TEST_ASSERT_EQUAL_HEX8(0x81u, wire_octet1);
+
+    for (over_real = 0; over_real < 2; over_real++) {
+        for (via_receive = 0; via_receive < 2; via_receive++) {
+            rcp_mock_server_t *srv  = rcp_mock_server_new();
+            rcp_bytes_t        w1   = e2e_final_with_fragmented_crc_over(
+                &f0, &f1, p0, sizeof(p0), p1, sizeof(p1), over_real ? wire_octet1 : 0x80u);
+            rcp_bytes_t        resp = {0};
+            rcp_mock_dispatch_result_t want =
+                over_real ? RCP_MOCK_DISPATCH_OK : RCP_MOCK_DISPATCH_CRC_ERROR;
+
+            to_rcp_configured(srv);
+            rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+            TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+            g_handler_called = false;
+            if (via_receive) {
+                rcp_bytes_t pdu1 = e2e_pdu(false, 0u, 0u, 0u, w1.data, w1.len, 1);
+
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, e2e_receive_one(srv, &pdu0));
+                TEST_ASSERT_EQUAL(want, e2e_receive_one(srv, &pdu1));
+                rcp_bytes_free(&pdu1);
+            } else {
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                                  rcp_mock_server_dispatch_e2e_fragment(
+                                      srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                      true, TEST_SID, 0u, f0.data, f0.len, &resp));
+                rcp_bytes_free(&resp);
+                TEST_ASSERT_EQUAL(want, rcp_mock_server_dispatch_e2e_fragment(
+                                            srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                            RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, 0u, w1.data,
+                                            w1.len, &resp));
+            }
+            TEST_ASSERT_EQUAL(over_real != 0, g_handler_called);
+            rcp_bytes_free(&resp);
+            rcp_bytes_free(&w1);
+            rcp_mock_server_destroy(srv);
+        }
+    }
+    rcp_bytes_free(&pdu0);
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
 }
 
 /* T6: interleaved fragmented requests to bus 3 and bus 5 on ONE stream,
@@ -5252,6 +5430,8 @@ int main(void)
     RUN_TEST(test_legacy_e2e_wrappers_reject_the_old_placeholder_header);
     RUN_TEST(test_plain_endpoint_reassembles_fragments_without_a_stream_row);
     RUN_TEST(test_crc_endpoint_reassembles_without_a_stream_row);
+    RUN_TEST(test_large_ntscf_crc_covers_octet1_length_bits_on_every_path);
+    RUN_TEST(test_large_first_fragment_crc_covers_octet1_length_bits);
     RUN_TEST(test_interleaved_fragments_to_two_endpoints_on_one_stream);
     RUN_TEST(test_fragment_transaction_num_change_rejects_and_resets);
     RUN_TEST(test_reassembly_pool_exhaustion_rejects);

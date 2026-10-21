@@ -847,10 +847,10 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_request(const uint8_t *b, size_t len,
  * rcp_fragment_reassembler_feed() to get there -- so it is reused verbatim
  * for a reassembled REQUEST's combined payload too, exactly as it already
  * is for a reassembled response's. Likewise, reassembly itself needs no new
- * mock.c code: srv's own generic frag_reasm[]/rcp_fragment_reassembler_t
- * accumulator (mock.h, REQ-E2E-038/039) already reassembles any endpoint
- * type's fragmented request, CAN included -- see
- * rcp_mock_server_dispatch_e2e_fragment(). */
+ * mock.c code: the receive pipeline's generic per-(stream_id, byte_bus_id)
+ * reassembly pool (mock.h, REQ-E2E-038/039, REQ-INGRESS-014) already
+ * reassembles any endpoint type's fragmented request, CAN included -- see
+ * rcp_mock_server_receive_avtpdu(). */
 
 /* The number of ACF frames rcp_ep_can_encode_frame_request_fragmented()
  * would produce for this request's combined prefix-then-data payload (see
