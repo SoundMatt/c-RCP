@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, tc18-remediation]
   pull_request:
-    branches: [main]
+    branches: [main, tc18-remediation]
   workflow_dispatch:
 
 concurrency:
