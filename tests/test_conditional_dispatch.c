@@ -179,8 +179,9 @@ static rcp_mock_dispatch_result_t submit(rcp_mock_server_t *srv, const rcp_bytes
     rcp_bytes_t                resp = {0};
     rcp_mock_dispatch_result_t r;
 
-    r = rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true, 1u,
-                                  frame->data, frame->len, &resp);
+    /* Issue #618: acf_msg_type is the frame's own (octet 0 bits 7:1). */
+    r = rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, (uint8_t)(frame->data[0] >> 1),
+                                  true, 1u, frame->data, frame->len, &resp);
     rcp_bytes_free(&resp);
     return r;
 }
@@ -195,8 +196,11 @@ static rcp_mock_dispatch_result_t submit_to(rcp_mock_server_t *srv, rcp_byte_bus
     rcp_bytes_t                resp = {0};
     rcp_mock_dispatch_result_t r;
 
-    r = rcp_mock_server_dispatch(srv, byte_bus_id, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB,
-                                  true, 1u, frame->data, frame->len, &resp);
+    /* Issue #618: acf_msg_type is the frame's own (octet 0 bits 7:1) --
+     * the legacy wrappers cross-check it against the header now. */
+    r = rcp_mock_server_dispatch(srv, byte_bus_id, RCP_AVTP_SUBTYPE_NTSCF,
+                                  (uint8_t)(frame->data[0] >> 1), true, 1u, frame->data,
+                                  frame->len, &resp);
     rcp_bytes_free(&resp);
     return r;
 }
@@ -214,10 +218,30 @@ static rcp_mock_dispatch_result_t submit_tscf(rcp_mock_server_t *srv, const rcp_
 {
     rcp_bytes_t                resp = {0};
     rcp_mock_dispatch_result_t r;
+    rcp_avtp_tscf_header_t     hdr  = {0};
+    rcp_avtp_tscf_header_t     dec;
+    rcp_bytes_t                avtpdu;
+    const uint8_t             *payload;
+    size_t                     payload_len;
 
-    r = rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_GBB, true, 1u,
-                                       tv, avtp_timestamp, false, gptp_reference_now, frame->data,
-                                       frame->len, &resp);
+    /* Issue #618: the reserved-bytes flag is the one a real, conformant
+     * TSCF header decodes to (rcp_avtp_encode_tscf() -> decode ->
+     * rcp_avtp_tscf_reserved_all_zero()), not a literal false; the
+     * default reserved-zero policy (TIME_GATE) keeps the presentation-
+     * time gate these tests exercise. */
+    hdr.sv             = 1u;
+    hdr.tv             = (uint8_t)(tv ? 1u : 0u);
+    hdr.avtp_timestamp = avtp_timestamp;
+    avtpdu             = rcp_avtp_encode_tscf(&hdr, frame->data, frame->len);
+    TEST_ASSERT_NOT_NULL(avtpdu.data);
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK,
+                      rcp_avtp_decode_tscf(avtpdu.data, avtpdu.len, &dec, &payload, &payload_len));
+
+    r = rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, (uint8_t)(frame->data[0] >> 1),
+                                       true, 1u, dec.tv != 0u, dec.avtp_timestamp,
+                                       rcp_avtp_tscf_reserved_all_zero(&dec), gptp_reference_now,
+                                       payload, payload_len, &resp);
+    rcp_bytes_free(&avtpdu);
     rcp_bytes_free(&resp);
     return r;
 }

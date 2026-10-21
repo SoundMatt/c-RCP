@@ -47,6 +47,8 @@
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
+#include <rcp/mock.h>
+#include <rcp/scheduler.h>
 
 #include <string.h>
 
@@ -1303,9 +1305,96 @@ static void test_fragment_worst_case_response_round_trip_respects_read_size(void
     for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
 }
 
+/* ── Issue #618 (T8): ISELED multi-response output survives a queued run ── */
+
+static const uint8_t kIseledChip[8] = {0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8};
+
+/* Answers every ISELED command on EP 5 with kIseledChip split into
+ * 3-octet response fragments (3 frames). */
+static void iseled_fragmenting_handler(const uint8_t *request, size_t request_len,
+                                       rcp_bytes_t *out_responses, size_t out_cap,
+                                       size_t *out_count, void *user_data)
+{
+    const uint8_t *tx;
+    size_t         tx_len;
+    uint8_t        tn;
+
+    (void)user_data;
+    *out_count = 0;
+    if (rcp_ep_iseled_decode_command_request(request, request_len, 5u, &tx, &tx_len, &tn) !=
+            RCP_EP_ISELED_OK ||
+        out_cap < 3u) {
+        return;
+    }
+    *out_count = rcp_ep_iseled_encode_response_fragmented(5u, kIseledChip, sizeof(kIseledChip),
+                                                          (uint16_t)sizeof(kIseledChip), tn, false,
+                                                          0u, 3u, out_responses);
+}
+
+/* A command queued on a disabled ISELED endpoint used to lose its output
+ * entirely when drained (the drain path only knew plain handlers). Now
+ * rcp_mock_server_drain_endpoint() runs it through the one execution path
+ * and returns all three fragments joined as one ACF member stream, which
+ * splits back and reassembles to the chip data. */
+//cfusa:test REQ-INGRESS-020
+//cfusa:test REQ-ISELED-025
+static void test_iseled_queued_command_drains_all_response_fragments(void)
+{
+    rcp_lifecycle_plausibility_snapshot_t       snap;
+    rcp_lifecycle_writer_ctx_t                  none = {0};
+    rcp_lifecycle_writer_ctx_t                  root = {true, false, false, false, false};
+    rcp_mock_server_t                          *srv  = rcp_mock_server_new();
+    rcp_bytes_t req = rcp_ep_iseled_encode_command_request(5u, (const uint8_t *)"\x01", 1u, 0x46u);
+    rcp_bytes_t outs[4];
+    size_t      count = 9;
+    rcp_bytes_t joined = {0};
+    size_t      offsets[8];
+    size_t      n, i, total = 0;
+    uint8_t     chip[16];
+
+    memset(&snap, 0, sizeof(snap));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                                   &snap, root, true));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint_multi_response(
+                                       srv, 5u, 0u, false, iseled_fragmenting_handler, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+                      rcp_mock_server_dispatch_multi_response(srv, 5u, RCP_AVTP_SUBTYPE_NTSCF,
+                                                              RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                                              req.data, req.len, outs, 4u, &count));
+    TEST_ASSERT_EQUAL_size_t(0u, count);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 5u, true));
+    TEST_ASSERT_TRUE(rcp_mock_server_drain_endpoint(srv, 5u, &joined));
+    n = rcp_sched_split_frame_members(joined.data, joined.len, offsets, 8u);
+    TEST_ASSERT_EQUAL_size_t(3u, n);
+    for (i = 0; i < n; i++) {
+        size_t         end = (i + 1u < n) ? offsets[i + 1u] : joined.len;
+        const uint8_t *rx;
+        size_t         rx_len;
+        bool           timed;
+        uint64_t       ts;
+        uint8_t        tn;
+
+        TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+                          rcp_ep_iseled_decode_response(&joined.data[offsets[i]], end - offsets[i],
+                                                        5u, &rx, &rx_len, &timed, &ts, &tn));
+        TEST_ASSERT_EQUAL_UINT8(0x46u, tn);
+        memcpy(&chip[total], rx, rx_len);
+        total += rx_len;
+    }
+    TEST_ASSERT_EQUAL_size_t(sizeof(kIseledChip), total);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(kIseledChip, chip, sizeof(kIseledChip));
+
+    rcp_bytes_free(&joined);
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_iseled_queued_command_drains_all_response_fragments);
 
     RUN_TEST(test_symbol_encode_round_trips_every_nibble);
     RUN_TEST(test_symbol_encode_masks_high_bits);

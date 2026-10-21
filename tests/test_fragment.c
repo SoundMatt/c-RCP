@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "unity.h"
 
+#include <rcp/acf.h>
 #include <rcp/alloc.h>
+#include <rcp/avtp.h>
 #include <rcp/e2e.h>
 #include <rcp/fragment.h>
+#include <rcp/lifecycle.h>
+#include <rcp/mock.h>
 
 #include <string.h>
 
@@ -609,9 +613,118 @@ static void test_plan_composes_with_e2e_fragment_carries_crc_rule(void)
     }
 }
 
+/* ── Issue #618 (T6): the receive pipeline reassembles every plan ────────── */
+
+static size_t  g_pipeline_runs;
+static uint8_t g_pipeline_payload[64];
+static size_t  g_pipeline_payload_len;
+
+static void pipeline_capture(const uint8_t *request, size_t request_len, rcp_bytes_t *out_response,
+                             void *user_data)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *pl;
+    size_t                      pl_len;
+
+    (void)out_response;
+    (void)user_data;
+    g_pipeline_runs++;
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(request, request_len, &hdr, &pl, &pl_len));
+    TEST_ASSERT_TRUE(pl_len <= sizeof(g_pipeline_payload));
+    memcpy(g_pipeline_payload, pl, pl_len);
+    g_pipeline_payload_len = pl_len;
+}
+
+/* Encodes every segment of rcp_fragment_plan(payload_len, max) as an
+ * ACF_ABB fragment to bus 7 and returns how many it wrote. */
+static size_t plan_fragments(const uint8_t *payload, size_t payload_len, size_t max,
+                             rcp_bytes_t *out, size_t cap)
+{
+    rcp_fragment_segment_t seg[8];
+    size_t                 n = rcp_fragment_plan_count(payload_len, max);
+    size_t                 i;
+
+    TEST_ASSERT_TRUE(n > 0u && n <= cap && n <= 8u);
+    TEST_ASSERT_EQUAL(RCP_FRAGMENT_OK, rcp_fragment_plan(payload_len, max, seg, n));
+    for (i = 0; i < n; i++) {
+        rcp_acf_byte_message_info_t h;
+
+        memset(&h, 0, sizeof(h));
+        h.byte_bus_id     = 7;
+        h.transaction_num = 0x61;
+        h.op              = (uint8_t)RCP_ACF_OP_WRITE;
+        h.ms              = (uint8_t)(seg[i].ms ? 1u : 0u);
+        h.read_size_or_segment_num = (uint16_t)(seg[i].ms ? seg[i].segment_num : 0u);
+        out[i] = rcp_acf_encode_abb(&h, &payload[seg[i].offset], seg[i].len);
+        TEST_ASSERT_NOT_NULL(out[i].data);
+    }
+    return n;
+}
+
+static rcp_mock_dispatch_result_t pipeline_feed(rcp_mock_server_t *srv, const rcp_bytes_t *f)
+{
+    rcp_bytes_t resp = {0};
+    rcp_mock_dispatch_result_t r = rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF,
+                                                            RCP_ACF_MSG_TYPE_ABB, true, 0x77u,
+                                                            f->data, f->len, &resp);
+    rcp_bytes_free(&resp);
+    return r;
+}
+
+/* A 3-fragment plan (rcp_fragment_plan()) fed through the receive
+ * pipeline to a plain-command-mode endpoint: the first two are collected,
+ * the last completes the message, which runs exactly once with the whole
+ * original payload. Replaying the plan with a segment skipped is refused
+ * by the reassembler's own ordering rule and runs nothing. */
+//cfusa:test REQ-INGRESS-014
+static void test_receive_pipeline_reassembles_a_planned_message(void)
+{
+    rcp_lifecycle_plausibility_snapshot_t       snap;
+    rcp_lifecycle_writer_ctx_t                  none = {0};
+    rcp_lifecycle_writer_ctx_t                  root = {true, false, false, false, false};
+    rcp_mock_server_t                          *srv  = rcp_mock_server_new();
+    uint8_t                                     payload[20];
+    rcp_bytes_t                                 f[8];
+    size_t                                      n, i;
+
+    for (i = 0; i < sizeof(payload); i++) payload[i] = (uint8_t)(0x80u + i);
+    memset(&snap, 0, sizeof(snap));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                                   &snap, root, true));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 7, 1, true, pipeline_capture,
+                                                                NULL));
+    n = plan_fragments(payload, sizeof(payload), 8u, f, 8u);
+    TEST_ASSERT_EQUAL_size_t(3u, n);
+
+    g_pipeline_runs = 0;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, pipeline_feed(srv, &f[0]));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, pipeline_feed(srv, &f[1]));
+    TEST_ASSERT_EQUAL_size_t(0u, g_pipeline_runs);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, pipeline_feed(srv, &f[2]));
+    TEST_ASSERT_EQUAL_size_t(1u, g_pipeline_runs);
+    TEST_ASSERT_EQUAL_size_t(sizeof(payload), g_pipeline_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(payload, g_pipeline_payload, sizeof(payload));
+
+    /* segment 1 skipped: segment 2 is out of order */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, pipeline_feed(srv, &f[0]));
+    {
+        rcp_bytes_t seg2 = rcp_bytes_dup(f[1].data, f[1].len);
+        seg2.data[7] = 2u; /* segment_num 2 */
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, pipeline_feed(srv, &seg2));
+        rcp_bytes_free(&seg2);
+    }
+    TEST_ASSERT_EQUAL_size_t(1u, g_pipeline_runs);
+
+    for (i = 0; i < n; i++) rcp_bytes_free(&f[i]);
+    rcp_mock_server_destroy(srv);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_receive_pipeline_reassembles_a_planned_message);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
     RUN_TEST(test_reasm_result_string_never_null_and_distinct);

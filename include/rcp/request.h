@@ -1150,7 +1150,7 @@ bool rcp_timed_due(uint64_t presentation_time, uint64_t now);
  * from a real dispatch path (rcp_mock_server_dispatch()'s own
  * time_sync_supported parameter -- TC18's own gPTP-lock concept -- is
  * already threaded through every dispatch entry point; see mock.c's
- * dispatch_plain_inner()). PRESENTATION_TIME_TOO_FAR's own trigger
+ * rx_admit_member()). PRESENTATION_TIME_TOO_FAR's own trigger
  * (rcp_timed_too_far(), against a "product specific limit" TC18 itself
  * leaves implementation-defined) has no configured admission-horizon
  * value anywhere in this codebase's register map to evaluate against --

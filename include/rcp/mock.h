@@ -70,66 +70,57 @@
  * and fragment.h already established; the callback shape itself is this
  * module's own direct descendant of the old rcp_mock_handler_fn.
  *
- * rcp_mock_server_dispatch() is the entry point a caller drives with one
- * already-framed request: it runs lifecycle.h's own
- * rcp_lifecycle_should_accept() admission check first (a dropped frame
- * never reaches an endpoint at all, matching a real server), then looks up
- * the addressed byte_bus_id's slot and submits the frame to its
- * rcp_server_endpoint_t queue -- exactly the same pre-load-then-drain
- * behavior a real disabled endpoint exhibits. rcp_mock_server_drain_endpoint()
- * is the other half: pulling a queued frame back out (once re-enabled) and
- * running it through the same registered handler.
+ * rcp_mock_server_receive_avtpdu() (see "One ingress pipeline" below) is
+ * the receive path: a whole AVTPDU in, every ACF member through the same
+ * stages, each member's outcome to a caller-supplied sink. Lifecycle
+ * filtering runs first (a dropped frame never reaches an endpoint at
+ * all, matching a real server); an admitted request is submitted to the
+ * addressed slot's rcp_server_endpoint_t queue -- exactly the same
+ * pre-load-then-drain behavior a real disabled endpoint exhibits.
+ * rcp_mock_server_drain_endpoint() is the other half: pulling a queued
+ * frame back out (once re-enabled) and running it through the same
+ * registered handler.
  *
- * rcp_mock_server_dispatch_frame() is the TC18 §12.9.1.1 multi-request-
- * per-frame entry point: given a raw, not-yet-split NTSCF/TSCF payload
- * (potentially several ACF messages concatenated back to back), it uses
- * scheduler.h's rcp_sched_split_frame_members() to enumerate them, peeks
- * each member's own byte_bus_id (decoding just its shared byte_message_info
- * header -- acf.h), and dispatches each one to rcp_mock_server_dispatch()
- * individually, addressed to its own endpoint, exactly as if a caller had
- * split and dispatched them by hand. A single-member frame behaves
- * identically to calling rcp_mock_server_dispatch() once directly -- this
- * is a strict superset, not a parallel code path.
+ * The older, per-feature entry points (rcp_mock_server_dispatch(),
+ * _dispatch_frame(), the E2E/TSCF/fragment variants, issues #197/#336/
+ * #462) remain as deprecated thin wrappers over the same stages -- see
+ * each one's own doc comment. Since issue #618 none of them skips a
+ * stage: the plain dispatch()/dispatch_frame() pair verifies a
+ * safe-command-mode endpoint's CRC and reassembles fragments exactly as
+ * the E2E variants do.
  *
- * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() (issue #197,
- * added after this module's original milestone) are the E2E-aware
- * counterparts of the two entry points above: for an endpoint with
- * req_crc_enable set (rcp_mock_server_set_endpoint_req_crc_enable()),
- * a request's e2e.h CRC32 trailer is verified -- and, on mismatch, the
- * request is never even admitted, only a conformant error response
- * built -- before anything else happens. This is deliberately not a
- * change to the plain dispatch()/dispatch_frame() pair, which keep
- * ignoring e2e.h entirely, exactly as before: nothing about this
- * milestone's "own small pure helpers, operate on caller-owned data"
- * layering discipline changes, this is purely additive surface wiring
- * an already-existing pure primitive (e2e.h's rcp_e2e_unwrap_framed())
- * into this double's own dispatch path for the first time.
+ * ── One ingress pipeline (issue #618) ──────────────────────────────────────
  *
- * ── Reconciliation note (2026-08-20, issue #606) ────────────────────────────
+ * rcp_mock_server_receive_avtpdu() is the receive path: it takes a whole,
+ * raw AVTPDU and runs it through one fixed sequence of stages -- parse
+ * (ingress.h) -> frame timing decision -> subtype filter -> member
+ * pre-pass -> sequence gate -> per member (lifecycle filter -> stream-
+ * fault gate -> Table 4 fixed fields -> endpoint lookup -> reassembly ->
+ * CRC -> admission). Frame identity (subtype, stream_id, sequence_num,
+ * timestamp, header_octet1) comes from the parsed header and member
+ * identity (byte_bus_id, acf_msg_type, transaction_num) from each ACF
+ * header, never from caller arguments. rcp_mock_server_pump_transport()
+ * is the transport glue: one rcp_avtp_transport_recv() followed by
+ * receive_avtpdu().
  *
- * A handful of comments elsewhere in this codebase (e2e.h's own file
- * header among them) describe calls that flow through this file's
- * dispatch functions as "real, live production dispatch paths." That is
- * not a contradiction of this header's own repeated "test double" framing
- * above, once read for what it actually distinguishes: this repo's own
- * long-established ROADMAP.md usage of "real dispatch"/"production
- * dispatch" means "actually wired into this file's own
- * dispatch()/dispatch_frame()/etc. call chain," in contrast with "a pure
- * primitive that exists and is directly unit-tested, but that nothing in
- * this codebase's own dispatch composition ever calls" -- an internal
- * distinction about this repo's own call graph, not a claim about a real
- * fielded vehicle's RC Server. Both things are true at once: this file is
- * in-process and zero-I/O by design (test-double framing, accurate, for a
- * downstream integrator's own testing purposes), AND it is simultaneously
- * this library's only concrete reference composition of the per-message
- * admission primitives (server.h's rcp_server_endpoint_admit()) with the
- * e2e.h evaluate()/latch primitives -- no other file in src/ (udp.c, l2.c,
- * cli.c included) assembles them into a working dispatcher at all. An
- * integrator's own real, I/O-attached production dispatch loop is
- * expected to replicate this file's composition pattern (README.md's
- * Quick Start says exactly this: "the same shape a real transport ...
- * hands to a real RC Server"); this library does not ship that networked
- * loop itself.
+ * The ten rcp_mock_server_dispatch*() entry points below predate that
+ * pipeline. They are kept, deprecated, as thin wrappers over the same
+ * internal stages (each builds a synthetic header from its arguments and
+ * enters the pipeline after the parse stage), so their behaviour can no
+ * longer drift apart: every one of them now applies the lifecycle filter
+ * before any gate, the stream-fault gate, the Table 4 fixed-field check,
+ * reassembly, the safe-command-mode CRC (over the real header byte, sv=1)
+ * and full admission -- including for multi-response endpoints. Removal
+ * is scheduled in CHANGELOG.md's Deprecation & Removal Log.
+ *
+ * An integrator's own I/O-attached receive loop is expected to call
+ * rcp_mock_server_receive_avtpdu() (or, for its own server composition,
+ * the pure rcp_ingress_*() stages in ingress.h) rather than replicate
+ * this file's composition by hand. This file remains in-process and
+ * zero-I/O by design: the "real dispatch" phrasing elsewhere in this
+ * codebase means "wired into this file's own pipeline", an internal
+ * call-graph distinction (issue #606), not a claim about a fielded
+ * vehicle's RC Server.
  */
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
@@ -138,6 +129,7 @@
 #include "rcp/discovery.h"
 #include "rcp/e2e.h"
 #include "rcp/fragment.h"
+#include "rcp/ingress.h"
 #include "rcp/lifecycle.h"
 #include "rcp/power.h"
 #include "rcp/rcp.h"
@@ -650,19 +642,42 @@ bool rcp_mock_server_check_watchdog(rcp_mock_server_t *srv, uint8_t request_stre
  * server double's own worst-case per-stream memory use unreasonably. */
 #define RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN ((size_t)65536u)
 
-/* srv's own reassembly accumulator for the request stream identified by
- * stream_id -- direct-pointer access, the same convention
- * rcp_mock_server_discovery_claim() already establishes for a plain,
- * fully public struct type (rcp_fragment_reassembler_t, fragment.h).
- * A caller wanting a tighter or looser max_total_len than
- * RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN calls
- * rcp_fragment_reassembler_init() directly against the returned
- * pointer. Returns NULL for a stream_id this server has no configured
- * request stream for (unresolvable via
- * rcp_regmap_request_stream_cfg_resolve_index()) -- there is no slot to
- * return a pointer to. */
+/* Issue #618 (step 6, REQ-INGRESS-014/016): how many fragmented requests
+ * srv can be collecting at once, across all streams and endpoints. A
+ * first fragment arriving while every context is busy is rejected
+ * (RCP_MOCK_DISPATCH_REJECTED, RCP_MOCK_RX_REASON_FRAGMENT_POOL_EXHAUSTED)
+ * -- an integrator sizes this for its worst-case number of concurrently
+ * fragmenting (stream_id, byte_bus_id) pairs (SEOOC_BOUNDARY.md AoU-9).
+ * Override with -DRCP_MOCK_MAX_CONCURRENT_REASSEMBLIES=<n>. */
+#ifndef RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES
+#define RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES 8
+#endif
+
+/* DEPRECATED (issue #618): reassembly is keyed per (stream_id,
+ * byte_bus_id), so a per-stream accessor can only return one of a
+ * stream's contexts. Returns the reassembler of the first bound context
+ * on stream_id, or NULL when none is bound -- for a stream with a single
+ * fragmenting endpoint that is the same reassembler the per-endpoint
+ * accessor below returns. Use rcp_mock_server_fragment_reassembler_for()
+ * instead; removal is scheduled in CHANGELOG.md's Deprecation & Removal
+ * Log. */
 rcp_fragment_reassembler_t *rcp_mock_server_fragment_reassembler(rcp_mock_server_t *srv,
                                                                   uint64_t stream_id);
+
+/* REQ-INGRESS-028: the reassembly accumulator for the endpoint addressed
+ * by (stream_id, byte_bus_id) -- direct-pointer access, the same
+ * convention rcp_mock_server_discovery_claim() already establishes for a
+ * plain, fully public struct type (rcp_fragment_reassembler_t,
+ * fragment.h). Binds a free pool context to that pair if none is bound
+ * yet (returns NULL only when the pool is exhausted) and pins it: a
+ * pinned context stays bound after each message completes, so a bound a
+ * caller sets with rcp_fragment_reassembler_init() against the returned
+ * pointer (tighter or looser than RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_
+ * LEN) persists across messages. Call it before the first fragment
+ * arrives, while nothing is being collected. */
+rcp_fragment_reassembler_t *rcp_mock_server_fragment_reassembler_for(rcp_mock_server_t *srv,
+                                                                      uint64_t stream_id,
+                                                                      rcp_byte_bus_id_t byte_bus_id);
 
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
@@ -763,15 +778,13 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
 bool rcp_mock_server_set_endpoint_enable_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
                                                     rcp_byte_bus_id_t byte_bus_id, bool enable);
 
-/* Sets whether rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e()
- * require a valid e2e.h CRC32 trailer on requests addressed to the
+/* Sets whether the receive pipeline (every dispatch path, issue #618)
+ * requires a valid e2e.h CRC32 trailer on requests addressed to the
  * endpoint at byte_bus_id -- this test double's own in-process stand-in
  * for TC18 §12.7.1's ep_req_crc_enable (rcp_regmap_ep_functional_cfg_t),
  * which every concrete endpoint type's own cfg struct composes but which
  * this module's type-erased rcp_mock_endpoint_slot_t has no way to read
- * generically (each endpoint type is a different concrete struct). Has
- * no effect on the plain rcp_mock_server_dispatch()/_dispatch_frame() --
- * those never consult it, unchanged from every version before this one.
+ * generically (each endpoint type is a different concrete struct).
  * Defaults false ("plain command mode", TC18 §13.6) for every endpoint
  * added via rcp_mock_server_add_endpoint(). Returns true iff byte_bus_id
  * names a registered endpoint. */
@@ -815,45 +828,52 @@ bool rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(rcp_mock_server_t *sr
                                                              rcp_byte_bus_id_t byte_bus_id,
                                                              bool enable);
 
-/* REQ-AVTP-021/022 (issue #431, TC18 §13.3): sets srv's own server-wide
- * disposition for §13.3's two "...or dropped, depending on the
- * configuration of the RC Server" rules -- one shared policy knob for
- * both, per rcp_avtp_tscf_fallback_t's own doc comment (avtp.h):
+/* REQ-AVTP-029/030 (issue #431, TC18 §13.3 rule 1): sets srv's own
+ * disposition for a TSCF frame received while time_sync_supported is
+ * false -- RCP_AVTP_TSCF_FALLBACK_DROP (0, the calloc() default) drops it
+ * silently; RCP_AVTP_TSCF_FALLBACK_IGNORE admits it with the presentation
+ * time ignored ("executed as if no presentation time were included"; the
+ * subtype stays TSCF, so the state-specific TSCF drops in lifecycle.h
+ * still apply).
  *
- *   - RCP_AVTP_TSCF_FALLBACK_DROP (0, the default for every
- *     rcp_mock_server_t -- srv is calloc()'d): reproduces this library's
- *     pre-issue-#431 behavior exactly for both rules -- a TSCF frame
- *     received while time_sync_supported is false is dropped
- *     (rcp_lifecycle_should_accept(), unchanged), and rcp_mock_server_
- *     dispatch_tscf()'s own tscf_reserved_all_zero parameter set true is
- *     also dropped (RCP_MOCK_DISPATCH_DROPPED).
- *   - RCP_AVTP_TSCF_FALLBACK_IGNORE: rule 1 (unsupported time sync) is
- *     no longer dropped by rcp_lifecycle_should_accept() -- the request
- *     is admitted with its own presentation-time gate suppressed
- *     (dispatch_plain_inner()'s own effective_tv, mock.c -- "executed as
- *     if no presentation time were included", TC18 §13.3's own wording).
- *     Rule 2 (reserved-bytes-all-zero) is a full substitution instead --
- *     rcp_mock_server_dispatch_tscf() processes the frame exactly as if
- *     avtp_subtype had been RCP_AVTP_SUBTYPE_NTSCF all along (§13.3's own
- *     "queued as if the header was in NTSCF format" wording is literal,
- *     unlike rule 1's narrower "ignore the presentation time" wording --
- *     see rcp_avtp_tscf_reserved_all_zero()'s own doc comment, avtp.h,
- *     for why these two rules' own IGNORE-side mechanics genuinely
- *     differ despite sharing this one config knob).
- *
- * Has no effect on rcp_mock_server_dispatch()/_dispatch_frame() beyond
- * whatever rcp_lifecycle_should_accept() itself does with it -- rule 2's
- * own full-NTSCF-substitution mechanic is wired only into
- * rcp_mock_server_dispatch_tscf(), the sole entry point with an actual
- * decoded TSCF header (and therefore actual reserved-byte content) to
- * substitute in the first place. */
+ * Issue #618: this knob no longer governs TC18-13.3-003's reserved-bytes
+ * rule -- that has its own knob, rcp_mock_server_set_tscf_reserved_zero_
+ * policy() below. Both are read by the one frame-level timing decision
+ * (rcp_ingress_resolve_timing()), so they apply identically on every
+ * receive path. */
 void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t       *srv,
                                                              rcp_avtp_tscf_fallback_t policy);
 
-/* REQ-WDG-010 (issue #201): associates keeper with srv so that
- * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() call
- * rcp_watchdog_keeper_kick(keeper, stream_id) for every request they
- * receive on that stream -- TC18 §12.7.7: "the watchdog is reset with
+/* Issue #618 (REQ-INGRESS-005, TC18-13.3-003): sets srv's own disposition
+ * for a TSCF frame whose reserved bytes are all zero -- which is every
+ * frame an IEEE 1722-conformant sender emits:
+ *
+ *   - RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE (0, the calloc() default,
+ *     REQ-INGRESS-004): the presentation-time gate applies as usual
+ *     (TC18-11.1-001/11.2-001/11.2.1-003);
+ *   - RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF (REQ-AVTP-033): processed
+ *     exactly as if the header were NTSCF -- subtype and tv substituted;
+ *   - RCP_AVTP_TSCF_RESERVED_ZERO_DROP (REQ-AVTP-032): dropped silently.
+ *
+ * The same decision applies on rcp_mock_server_receive_avtpdu() and every
+ * TSCF-aware legacy wrapper (the ones without a reserved-bytes argument
+ * assume the conformant all-zero value). See docs/TC18-NON-NORMATIVE-
+ * CLAUSES.md for why TIME_GATE is the default. */
+void rcp_mock_server_set_tscf_reserved_zero_policy(rcp_mock_server_t                   *srv,
+                                                     rcp_avtp_tscf_reserved_zero_policy_t policy);
+
+/* REQ-INGRESS-021: how many times, since srv was created, an execution's
+ * output did not fit the response capacity it was given (a multi-
+ * response handler reporting more responses than out_cap, or more than
+ * RCP_MOCK_MAX_RESPONSES_PER_EXEC responses on a single-response
+ * surface). Excess responses are freed, never delivered, but always
+ * counted here (and flagged per member on rcp_mock_server_receive_
+ * avtpdu() via responses_truncated). */
+size_t rcp_mock_server_response_overflow_count(const rcp_mock_server_t *srv);
+
+/* REQ-WDG-010 (issue #201): associates keeper with srv so that every
+ * receive path calls rcp_watchdog_keeper_kick(keeper, stream_id) for every
+ * request it receives on that stream -- TC18 §12.7.7: "the watchdog is reset with
  * each request received from this RC Client." Kicked unconditionally at
  * the top of dispatch_e2e(), before "plain command mode" delegation,
  * CRC validation, or admission are even attempted: the rule is about
@@ -862,15 +882,9 @@ void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t    
  * queue) still means the RC Client is alive and talking, which is all
  * the watchdog's own liveness concern is about.
  *
- * Deliberately does NOT touch the plain rcp_mock_server_dispatch()/
- * _dispatch_frame() -- neither takes a stream_id parameter at all (no
- * key to kick by), and widening their own signature would be a much
- * larger, more invasive change across every existing call site in this
- * codebase's own test suite than this fix's own narrow scope justifies.
- * A caller reaching endpoints only through the plain dispatch path gets
- * no watchdog kicking; this is a real, separate, still-open gap,
- * documented rather than silently left implicit (REQ-WDG-010's own
- * .fusa-reqs.json text).
+ * Issue #618 (REQ-INGRESS-027): rcp_mock_server_receive_avtpdu() kicks
+ * once per AVTPDU, and only once the AVTPDU parses; the legacy wrappers
+ * (which all carry a stream_id) kick once per call.
  *
  * keeper may be NULL (the default for every rcp_mock_server_t) to
  * disable kicking entirely -- srv does NOT take ownership of keeper;
@@ -880,12 +894,12 @@ void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t    
 void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
                                           rcp_watchdog_keeper_t *keeper);
 
-/* REQ-E2E-021 (issue #201): associates tracker with srv so that
- * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() (a) reject EVERY
- * request on a stream tracker reports faulted
- * (rcp_e2e_stream_fault_tracker_is_faulted()) with
- * RCP_MOCK_DISPATCH_STREAM_FAULTED, checked before plain-command-mode
- * delegation, CRC validation, or admission -- TC18 §12.7.7's own "stream
+/* REQ-E2E-021 (issue #201): associates tracker with srv so that every
+ * receive path (a) rejects EVERY request on a stream tracker reports
+ * faulted (rcp_e2e_stream_fault_tracker_is_faulted()) with
+ * RCP_MOCK_DISPATCH_STREAM_FAULTED, checked per member after the
+ * lifecycle filter (issue #618, REQ-INGRESS-029) and before the CRC
+ * check or admission -- TC18 §12.7.7's own "stream
  * is blocked until released" is a whole-STREAM property (this tracker
  * is keyed by stream_id, not byte_bus_id), so the block applies
  * uniformly regardless of the addressed endpoint's own req_crc_enable;
@@ -948,7 +962,7 @@ typedef enum {
      * and the member selected RCP_CHAINED_CS_ABORT_ON_ERROR, or an earlier
      * member had already aborted the chain. */
     RCP_MOCK_DISPATCH_CHAIN_ABORTED   = 8,
-    /* rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() only: the
+    /* Any path (issue #618; formerly the E2E entry points only): the
      * addressed endpoint has req_crc_enable set (see
      * rcp_mock_server_set_endpoint_req_crc_enable()) and request's
      * trailing CRC32 (e2e.h) did not validate -- TC18 §13.6: the request
@@ -957,8 +971,8 @@ typedef enum {
      * enough to read a transaction_num back out of (RCP_ERROR_NONE
      * otherwise -- nothing conformant to build a response from). */
     RCP_MOCK_DISPATCH_CRC_ERROR       = 9,
-    /* REQ-E2E-021 (issue #201): rcp_mock_server_dispatch_e2e()/
-     * _dispatch_frame_e2e() only -- a stream fault tracker is set
+    /* REQ-E2E-021 (issue #201), any path since issue #618 -- a stream
+     * fault tracker is set
      * (rcp_mock_server_set_stream_fault_tracker()) and reports
      * stream_id already latched faulted (TC18 §12.7.7's own "stream is
      * blocked until released" consequence of an earlier CRC error on
@@ -971,8 +985,9 @@ typedef enum {
      * CRC failure), under the same "frame long enough to read a
      * transaction_num back out of" condition. */
     RCP_MOCK_DISPATCH_STREAM_FAULTED  = 10,
-    /* REQ-E2E-028 (issue #338): rcp_mock_server_dispatch_frame()/
-     * _dispatch_frame_e2e() only -- the frame's own sequence_num failed
+    /* REQ-E2E-028 (issue #338): frames only (rcp_mock_server_receive_
+     * avtpdu() and the _dispatch_frame*() wrappers) -- the frame's own
+     * sequence_num failed
      * rcp_e2e_seq_evaluate()'s admission check (TC18 §12.7.7 Table 24
      * rx_enforce_seq: a replayed or reordered AVTPDU). Every member of the
      * frame is rejected together (sequence_num is a property of the whole
@@ -981,8 +996,8 @@ typedef enum {
      * left zeroed, the same "no per-member wire response" convention
      * RCP_MOCK_DISPATCH_DROPPED already establishes. */
     RCP_MOCK_DISPATCH_SEQ_ERROR       = 11,
-    /* REQ-E2E-038/039 (issue #336): rcp_mock_server_dispatch_e2e_fragment()
-     * only -- this call carried an ms=1 (intermediate) fragment, or an
+    /* REQ-E2E-038/039 (issue #336), any path since issue #618
+     * (REQ-INGRESS-014) -- this call carried an ms=1 (intermediate) fragment, or an
      * ms=0 final fragment that successfully extended an in-progress
      * reassembly, and the logical message is not yet complete. Nothing
      * was admitted or executed; *out_response is left zeroed, the same
@@ -994,7 +1009,149 @@ typedef enum {
      * failure) -- FRAGMENT_PENDING itself is never a completing call's
      * own result. */
     RCP_MOCK_DISPATCH_FRAGMENT_PENDING = 12,
+    /* Issue #618 (REQ-INGRESS-022/023), legacy wrappers only, never
+     * wire-visible (no response): the request is long enough to unpack
+     * and its own header disagrees with the caller-supplied
+     * byte_bus_id/acf_msg_type, or an untimed wrapper
+     * (rcp_mock_server_dispatch()/_dispatch_frame()) was handed a TSCF
+     * frame it cannot honour. Checked only after the lifecycle DROP
+     * decision, so a frame that must be dropped still reports DROPPED. */
+    RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH = 13,
 } rcp_mock_dispatch_result_t;
+
+/* Issue #618 (step 8): how many responses one execution can deliver on
+ * the single-response surfaces (rcp_mock_server_dispatch(), _tick(),
+ * _drain_endpoint(), the frame wrappers' per-member response -- all of
+ * which join a multi-response run's output into one ACF member stream)
+ * and per member on rcp_mock_server_receive_avtpdu(). Bounds stack use
+ * per run (SEOOC_BOUNDARY.md AoU-10). Override with
+ * -DRCP_MOCK_MAX_RESPONSES_PER_EXEC=<n>. */
+#ifndef RCP_MOCK_MAX_RESPONSES_PER_EXEC
+#define RCP_MOCK_MAX_RESPONSES_PER_EXEC 64
+#endif
+
+/* ── Ingress pipeline (issue #618) ───────────────────────────────────────── */
+
+/* Caller-supplied receive context for one AVTPDU. time_sync_supported/
+ * gptp_reference_now are the server's own time-sync capability and
+ * current gPTP clock (server-owned time is #627); via_non_unicast_frame
+ * is the frame's destination-MAC class for the unicast-write rule (its
+ * consumer is #632; carried but not yet read). NULL means all-false/0. */
+typedef struct {
+    bool     time_sync_supported;
+    uint64_t gptp_reference_now;
+    bool     via_non_unicast_frame;
+} rcp_mock_rx_ctx_t;
+
+/* Which stage decided a member's outcome (diagnostics; the wire outcome
+ * is result + responses). */
+typedef enum {
+    RCP_MOCK_RX_REASON_NONE                    = 0,
+    RCP_MOCK_RX_REASON_LIFECYCLE_DROP          = 1,
+    RCP_MOCK_RX_REASON_LIFECYCLE_REJECT        = 2,
+    RCP_MOCK_RX_REASON_STREAM_FAULTED          = 3,
+    RCP_MOCK_RX_REASON_FIXED_FIELDS            = 4,
+    RCP_MOCK_RX_REASON_UNKNOWN_ENDPOINT        = 5,
+    RCP_MOCK_RX_REASON_FRAGMENT_POOL_EXHAUSTED = 6,
+    RCP_MOCK_RX_REASON_FRAGMENT_TN_MISMATCH    = 7,
+    RCP_MOCK_RX_REASON_FRAGMENT_SEQUENCE       = 8,
+    RCP_MOCK_RX_REASON_REASSEMBLED_TOO_LARGE   = 9,
+    RCP_MOCK_RX_REASON_CRC                     = 10,
+    RCP_MOCK_RX_REASON_SEQUENCE                = 11,
+    RCP_MOCK_RX_REASON_CHAIN                   = 12,
+    RCP_MOCK_RX_REASON_ADMISSION               = 13,
+    RCP_MOCK_RX_REASON_HEADER_MISMATCH         = 14,
+} rcp_mock_rx_reason_t;
+
+/* One member's outcome, handed to the sink. responses[0..response_count)
+ * are the member's responses in order (an entry may be zeroed by per-
+ * stream response routing, REQ-RMAP-048/049). The sink may take ownership
+ * of any response by moving it out and zeroing the entry; whatever is
+ * left is freed when the sink returns. The struct itself is only valid
+ * for the duration of the call. */
+typedef struct {
+    size_t                     member_index;
+    rcp_byte_bus_id_t          byte_bus_id;
+    uint8_t                    acf_msg_type;
+    uint8_t                    transaction_num;
+    rcp_mock_dispatch_result_t result;
+    rcp_mock_rx_reason_t       reason;
+    bool                       responses_truncated;
+    rcp_bytes_t               *responses;
+    size_t                     response_count;
+} rcp_mock_rx_member_t;
+
+typedef void (*rcp_mock_rx_sink_fn)(rcp_mock_rx_member_t *m, void *user);
+
+/* What happened to the AVTPDU as a whole. Every outcome except ACCEPTED,
+ * SEQ_ERROR and HEADER_MISMATCH is a silent drop with no side effect: the
+ * sink is not called, and no response, stream-fault latch, stream-status
+ * change, sequence-tracker change or safe-state broadcast happens. */
+typedef enum {
+    RCP_MOCK_RX_FRAME_ACCEPTED        = 0, /* members processed */
+    RCP_MOCK_RX_FRAME_PARSE_ERROR     = 1, /* not an AVTPDU this revision
+                                               accepts (see parse_error) */
+    RCP_MOCK_RX_FRAME_TIMING_DROP     = 2, /* §13.3 drop decision */
+    RCP_MOCK_RX_FRAME_LIFECYCLE_DROP  = 3, /* subtype filter, or no member
+                                               would pass the per-member
+                                               filter */
+    RCP_MOCK_RX_FRAME_MALFORMED       = 4, /* payload is not a whole
+                                               sequence of ACF members */
+    RCP_MOCK_RX_FRAME_EMPTY           = 5, /* no members */
+    RCP_MOCK_RX_FRAME_SEQ_ERROR       = 6, /* sequence gate rejected the
+                                               frame; every member reported
+                                               RCP_MOCK_DISPATCH_SEQ_ERROR */
+    RCP_MOCK_RX_FRAME_HEADER_MISMATCH = 7, /* legacy untimed frame wrapper
+                                               given a TSCF frame */
+} rcp_mock_rx_frame_outcome_t;
+
+typedef struct {
+    rcp_mock_rx_frame_outcome_t outcome;
+    rcp_ingress_errc_t          parse_error;       /* PARSE_ERROR only */
+    rcp_ingress_timing_t        timing;            /* the frame's timing decision */
+    size_t                      member_count;      /* members in the payload */
+    size_t                      members_processed; /* members handed to the sink */
+} rcp_mock_rx_summary_t;
+
+/* REQ-INGRESS-009 (step 5): runs one raw AVTPDU avtpdu[0..len) through
+ * srv in this fixed order:
+ *
+ *   a. rcp_ingress_parse_avtpdu(); on failure a silent drop with no side
+ *      effects and no watchdog kick. On success the watchdog keeper (if
+ *      any) is kicked for the frame's stream_id (REQ-INGRESS-027).
+ *   b. rcp_ingress_resolve_timing() under srv's two §13.3 knobs -- one
+ *      decision for every member (TC18-12.9.1.1-003).
+ *   c. rcp_lifecycle_should_accept_subtype().
+ *   d. an allocation-free pre-pass over the members: a malformed or empty
+ *      payload, or one none of whose members would pass the per-member
+ *      lifecycle filter, is dropped silently here (REQ-INGRESS-026).
+ *   e. the sequence gate, once, with the parsed sequence_num
+ *      (REQ-E2E-028/029).
+ *   f. per member, in order (TC18-12.9.1.1-002), with identity taken from
+ *      the member's own header: lifecycle filter, stream-fault gate,
+ *      Table 4 fixed fields, endpoint lookup, reassembly, CRC over the
+ *      real header, admission/execution, chain bookkeeping, per-stream
+ *      response routing, then sink(member, user).
+ *
+ * There is no limit on the number of members (REQ-INGRESS-008). sink may
+ * be NULL (responses are then freed). ctx may be NULL (time sync
+ * unsupported, gPTP 0). *out_summary (optional) reports the frame-level
+ * outcome. Always returns RCP_MOCK_OK: a dropped frame is not an error. */
+rcp_mock_errc_t rcp_mock_server_receive_avtpdu(rcp_mock_server_t *srv, const uint8_t *avtpdu,
+                                               size_t len, const rcp_mock_rx_ctx_t *ctx,
+                                               rcp_mock_rx_sink_fn sink, void *user,
+                                               rcp_mock_rx_summary_t *out_summary);
+
+/* REQ-INGRESS-025: receive glue -- one rcp_avtp_transport_recv(t, ctx,
+ * buf, buf_cap, ...) followed by rcp_mock_server_receive_avtpdu() on the
+ * received bytes. buf is the caller's own receive buffer (no allocation
+ * here; size it for the largest AVTPDU the transport can deliver).
+ * Returns the transport's own rcp_errc_t when recv() fails (nothing is
+ * processed; *out_summary, if given, is left zeroed), RCP_OK otherwise. */
+int rcp_mock_server_pump_transport(rcp_mock_server_t *srv, rcp_avtp_transport_t *t,
+                                   const rcp_context_t *ctx, const rcp_mock_rx_ctx_t *rx,
+                                   uint8_t *buf, size_t buf_cap, rcp_mock_rx_sink_fn sink,
+                                   void *user, rcp_mock_rx_summary_t *out_summary);
 
 /* Runs one already-framed request through srv: first
  * rcp_lifecycle_should_accept(srv's own state, time_sync_supported,
@@ -1018,7 +1175,22 @@ typedef enum {
  * ties the reset to, mirroring rcp_mock_server_dispatch_e2e()'s own
  * identical ordering. A caller with no watchdog keeper set passes
  * whatever stream_id its own transport layer reports; the value is
- * simply never looked up. */
+ * simply never looked up.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It builds a
+ * synthetic header from its arguments (header_octet1 = 0x80 | tv, tu = 0 --
+ * what rcp_avtp_encode_*() emits) and enters the pipeline after the parse
+ * stage, so it applies the lifecycle filter first, then the stream-fault
+ * gate, the Table 4 fixed fields, reassembly, the safe-command-mode CRC over
+ * that header and full admission -- exactly the stages every other path
+ * applies. A request of at least 8 octets whose own header disagrees with the
+ * byte_bus_id/acf_msg_type arguments is refused with
+ * RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH (REQ-INGRESS-022); this untimed
+ * wrapper also refuses a TSCF frame the lifecycle filter would not drop
+ * (REQ-INGRESS-023) -- use rcp_mock_server_dispatch_tscf() or
+ * rcp_mock_server_receive_avtpdu() for TSCF. Removal is scheduled in
+ * CHANGELOG.md's Deprecation & Removal Log, after go/cpp/rust reconciliation. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                                                      rcp_byte_bus_id_t byte_bus_id,
                                                      uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -1054,17 +1226,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
  * TC18 §13.3's second configurable rule: "If the reserved bytes in the
  * header are all zero, then the request shall be queued as if the
  * header was in NTSCF format or dropped, depending on configuration."
- * Consulted against srv's own rcp_mock_server_set_tscf_unsupported_
- * time_sync_policy() setting (the same shared policy knob rule 1's own
- * unsupported-time-sync case uses -- see that setter's own doc comment
- * for why one knob covers both): RCP_AVTP_TSCF_FALLBACK_DROP drops the
- * frame outright (RCP_MOCK_DISPATCH_DROPPED, *out_response left
- * zeroed); RCP_AVTP_TSCF_FALLBACK_IGNORE processes it as if avtp_subtype
- * had genuinely been RCP_AVTP_SUBTYPE_NTSCF all along -- a literal, full
- * substitution (both avtp_subtype and tv are overridden together),
- * unlike the unsupported-time-sync rule's own narrower "ignore only the
- * presentation time" substitution (dispatch_plain_inner()'s own
- * effective_tv, mock.c). Ignored entirely when avtp_subtype is not
+ * Consulted against srv's own reserved-zero policy (issue #618:
+ * rcp_mock_server_set_tscf_reserved_zero_policy(), its own knob now):
+ * RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE (the default) keeps the
+ * presentation-time gate; _DROP drops the frame outright
+ * (RCP_MOCK_DISPATCH_DROPPED, *out_response left zeroed); _AS_NTSCF
+ * processes it as if avtp_subtype had genuinely been
+ * RCP_AVTP_SUBTYPE_NTSCF all along -- a literal, full substitution (both
+ * subtype and tv), unlike the unsupported-time-sync rule's narrower
+ * "ignore only the presentation time" (rcp_ingress_resolve_timing(),
+ * ingress.h). Ignored entirely when avtp_subtype is not
  * RCP_AVTP_SUBTYPE_TSCF -- this rule has nothing to apply to a frame
  * that was never TSCF-headed in the first place.
  *
@@ -1072,7 +1243,23 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
  * rcp_mock_server_dispatch() itself -- every one of that function's
  * own 130+ existing call sites across this codebase is completely
  * unaffected; a caller with a real TSCF header simply has somewhere
- * new to hand tv=true/avtp_timestamp instead. */
+ * new to hand tv=true/avtp_timestamp instead.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It builds a
+ * synthetic header from its arguments (header_octet1 = 0x80 | tv, tu = 0 --
+ * what rcp_avtp_encode_*() emits) with tscf_reserved_all_zero as given and
+ * enters the pipeline after the parse stage, so it applies the lifecycle
+ * filter first, then the stream-fault gate, the Table 4 fixed fields,
+ * reassembly, the safe-command-mode CRC over that header and full admission
+ * -- exactly the stages every other path applies. A request of at least 8
+ * octets whose own header disagrees with the byte_bus_id/acf_msg_type
+ * arguments is refused with RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH
+ * (REQ-INGRESS-022). tscf_reserved_all_zero is now judged against srv's own
+ * reserved-zero policy (rcp_mock_server_set_tscf_reserved_zero_policy(),
+ * default TIME_GATE), not the unsupported-time-sync knob. Removal is
+ * scheduled in CHANGELOG.md's Deprecation & Removal Log, after go/cpp/rust
+ * reconciliation. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
                                                           rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -1109,60 +1296,35 @@ typedef void (*rcp_mock_endpoint_multi_response_handler_fn)(const uint8_t *reque
  * capacity/duplicate-bus-id semantics; internally calls it directly,
  * with a NULL plain handler, to reuse its own slot-allocation logic
  * rather than duplicating it). A slot uses EITHER handler kind, never
- * both -- every dispatch entry point OTHER than rcp_mock_server_
- * dispatch_multi_response() (plain dispatch()/_dispatch_e2e()/
- * _dispatch_frame()/etc.) ignores a slot's own multi-response handler
- * entirely and calls its plain one instead (NULL for a multi-response-
- * only slot -- see run_handler()'s own doc comment for what a NULL
- * handler does: no response, the same as an unset plain handler).
- * Conversely, rcp_mock_server_dispatch_multi_response() ignores a
- * slot's own plain handler and calls only its multi-response one. */
+ * both. Issue #618 (REQ-INGRESS-019/020): every path executes a slot
+ * through one function (slot_execute(), mock.c) that calls whichever
+ * handler the slot has -- immediate admission, drain, tick, on every
+ * entry point. A multi-response handler may report more responses than
+ * out_cap ("ask first" idiom); the excess is counted by
+ * rcp_mock_server_response_overflow_count(), never silently lost. The
+ * single-response surfaces deliver a multi-response run's output joined
+ * into one ACF member stream. */
 rcp_mock_errc_t rcp_mock_server_add_endpoint_multi_response(
     rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t ep_type, bool ep_enable,
     rcp_mock_endpoint_multi_response_handler_fn handler, void *user_data);
 
-/* REQ-ISELED-025: identical to rcp_mock_server_dispatch() through
- * lifecycle admission and endpoint lookup -- RCP_MOCK_DISPATCH_DROPPED/
- * _REJECTED/_ERR_UNKNOWN_BUS all mean exactly what they already do
- * there (a _REJECTED outcome still populates out_responses[0] with a
- * real error response, exactly as rcp_mock_server_dispatch()'s own
- * *out_response would, when out_cap permits it). Past that point this
- * entry point diverges deliberately: an admitted request always runs
- * IMMEDIATELY against the addressed slot's own multi-response handler
- * (rcp_mock_server_add_endpoint_multi_response()) -- there is no
- * queued/pending outcome here. A multi-response handler is, by
- * construction, a synchronous read/report operation: TC18 §13.7.12.1's
- * own response-aggregation rule is about ONE request producing SEVERAL
- * response frames, not about deferring when that request runs -- the
- * conditional-request admission machinery (rcp_server_endpoint_admit(),
- * request_compound.h/_triggered.h/etc.) is an orthogonal concern this
- * entry point does not touch, matching test_tc18_gaps_ep2.c's own
- * already-proven iseled_dispatch_handler() fixture's own treatment of
- * every dispatched ISELED command. Every response this call produces
- * (whether the single _REJECTED error above, or 0..out_cap handler
- * outputs) is passed through suppress_response_per_stream_cfg()'s own
- * discovery-stream ack/response-suppression rule, exactly as every
- * other dispatch entry point's own response already is.
- *
- * *out_response_count (zeroed on entry) is always populated on
- * RCP_MOCK_DISPATCH_OK; out_responses[0..*out_response_count) are
- * populated (any response suppress_response_per_stream_cfg() drops is
- * left zeroed at its own index, not compacted out -- a caller checks
- * each index's own .data for NULL exactly as it already would for a
- * single suppressed rcp_mock_server_dispatch() response), the rest of
- * out_responses[0..out_cap) left zeroed. A byte_bus_id registered via
- * the PLAIN rcp_mock_server_add_endpoint() instead (no multi-response
- * handler registered) produces RCP_MOCK_DISPATCH_OK with
- * *out_response_count == 0 -- fire-and-forget, the same convention a
- * NULL/no-op plain handler already gets through every other dispatch
- * entry point. Handler output beyond out_cap is silently dropped by
- * the handler's own contract (rcp_mock_endpoint_multi_response_
- * handler_fn's own doc comment), not by this function -- it never
- * inspects *out_count itself beyond what the handler reports.
- *
- * REQ-WDG-010: kicked unconditionally, before lifecycle/admission, the
- * same "receipt, not validation" rule and ordering as every other
- * dispatch entry point's own identical kick. */
+/* REQ-ISELED-025, DEPRECATED (issue #618): rcp_mock_server_dispatch()
+ * with the caller's own response array -- out_responses[0..out_cap)
+ * zeroed on entry, *out_response_count set to how many entries are
+ * populated (an entry zeroed by per-stream response routing is left in
+ * place, not compacted out). Since issue #618 this is a thin wrapper over
+ * the ingress pipeline like every other entry point: the request goes
+ * through the lifecycle filter, stream-fault gate, Table 4 fixed fields,
+ * reassembly, the safe-command-mode CRC and full admission, so it can be
+ * QUEUED, PENDING (then produced by rcp_mock_server_tick_multi()),
+ * CRC_ERROR or STREAM_FAULTED -- it no longer runs every request
+ * immediately and unchecked (audit #248). A plain-handler slot produces
+ * at most one response; an unknown byte_bus_id stays
+ * RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS with no response. A header that
+ * disagrees with byte_bus_id/acf_msg_type is RCP_MOCK_DISPATCH_ERR_
+ * HEADER_MISMATCH (REQ-INGRESS-022). Kicks the watchdog once per call.
+ * Prefer rcp_mock_server_receive_avtpdu(); removal is scheduled in
+ * CHANGELOG.md's Deprecation & Removal Log. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
     rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
     uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, const uint8_t *request,
@@ -1254,11 +1416,10 @@ bool rcp_mock_server_take_deferred_response_on_stream(rcp_mock_server_t *srv, ui
 
 /* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ─────────────────────── */
 
-/* The fixed number of ACF members rcp_mock_server_dispatch_frame() can
- * enumerate/dispatch from a single frame -- mirrors RCP_MOCK_MAX_ENDPOINTS'
- * "fixed table, trivial memory behavior" rationale. A real frame's member
- * count is bounded far below this by AVTPDU payload limits (avtp.h) in
- * practice. */
+/* Historical bound on frame members. Issue #618: no receive path is
+ * limited by this any more -- the member iterator (ingress.h) walks any
+ * number of members, and the frame wrappers process up to their out_cap.
+ * Kept as a convenient out_results size for existing callers. */
 #define RCP_MOCK_MAX_FRAME_MEMBERS ((size_t)32u)
 
 /* One frame member's own dispatch outcome, as populated by
@@ -1331,7 +1492,24 @@ typedef struct {
  *     RCP_MOCK_DISPATCH_SEQ_ERROR (byte_bus_id 0, response zeroed,
  *     mirroring RCP_MOCK_DISPATCH_DROPPED's own "no per-member wire
  *     response" convention) and this function returns immediately,
- *     without decoding or dispatching any member at all. */
+ *     without decoding or dispatching any member at all.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. frame is the
+ * AVTPDU payload; the wrapper builds a synthetic header from its arguments
+ * (header_octet1 = 0x80 | tv, tu = 0; a TSCF frame's reserved bytes assumed
+ * all zero) and runs the payload through the same frame stages -- member
+ * pre-pass, the once-per-AVTPDU sequence gate with sequence_num, then every
+ * member, identity read from its own header, through the lifecycle filter,
+ * stream-fault gate, Table 4 fixed fields, reassembly, CRC and admission.
+ * There is no member cap any more (RCP_MOCK_MAX_FRAME_MEMBERS no longer
+ * limits anything); at most out_cap members are processed and reported, as
+ * before. A frame dropped as a whole reports each member
+ * RCP_MOCK_DISPATCH_DROPPED; a malformed or empty payload returns 0; a TSCF
+ * avtp_subtype the lifecycle filter would not drop is refused member by
+ * member with RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH, since this wrapper
+ * carries no presentation time (REQ-INGRESS-023). Removal is scheduled in
+ * CHANGELOG.md's Deprecation & Removal Log. */
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                        bool time_sync_supported, uint64_t stream_id,
                                        uint8_t sequence_num,
@@ -1379,7 +1557,21 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
  * RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS path as always), this function
  * delegates to rcp_mock_server_dispatch() unchanged: "plain command
  * mode" (TC18 §13.6) never touches e2e.h at all, matching every
- * pre-existing caller's behavior exactly. */
+ * pre-existing caller's behavior exactly.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It builds a
+ * synthetic header from its arguments (header_octet1 = 0x80 | tv, tu = 0 --
+ * what rcp_avtp_encode_*() emits) with tv = 0 and the TSCF reserved bytes
+ * assumed all zero and enters the pipeline after the parse stage, so it
+ * applies the lifecycle filter first, then the stream-fault gate, the Table 4
+ * fixed fields, reassembly, the safe-command-mode CRC over that header and
+ * full admission -- exactly the stages every other path applies. A request of
+ * at least 8 octets whose own header disagrees with the
+ * byte_bus_id/acf_msg_type arguments is refused with
+ * RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH (REQ-INGRESS-022). Removal is
+ * scheduled in CHANGELOG.md's Deprecation & Removal Log, after go/cpp/rust
+ * reconciliation. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
                                                           rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -1415,7 +1607,20 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
  * TSCF header simply has somewhere new to hand tv=true/
  * gptp_reference_now instead, the same "new function, not a breaking
  * change" pattern rcp_mock_server_dispatch_tscf() itself already
- * established alongside rcp_mock_server_dispatch(). */
+ * established alongside rcp_mock_server_dispatch().
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It builds a
+ * synthetic header from its arguments (header_octet1 = 0x80 | tv, tu = 0 --
+ * what rcp_avtp_encode_*() emits) with the TSCF reserved bytes assumed all
+ * zero and enters the pipeline after the parse stage, so it applies the
+ * lifecycle filter first, then the stream-fault gate, the Table 4 fixed
+ * fields, reassembly, the safe-command-mode CRC over that header and full
+ * admission -- exactly the stages every other path applies. A request of at
+ * least 8 octets whose own header disagrees with the byte_bus_id/acf_msg_type
+ * arguments is refused with RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH
+ * (REQ-INGRESS-022). Removal is scheduled in CHANGELOG.md's Deprecation &
+ * Removal Log, after go/cpp/rust reconciliation. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *srv,
                                                                rcp_byte_bus_id_t byte_bus_id,
                                                                uint8_t avtp_subtype,
@@ -1486,11 +1691,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *
  *     for this stream is reset either way (success or CRC mismatch),
  *     ready for the next logical message.
  *
- * Scope note: this function handles ONE request at a time
- * (rcp_mock_server_dispatch_e2e()'s own counterpart), not a whole
- * multi-member AVTPDU frame -- rcp_mock_server_dispatch_frame_e2e()'s
- * own per-member fragmentation integration is a separate, not-yet-
- * attempted extension of this same mechanism. */
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It is now
+ * identical to rcp_mock_server_dispatch_e2e(): reassembly is part of every
+ * path, keyed per (stream_id, byte_bus_id), for plain and safe-command-mode
+ * endpoints alike, with or without a request-stream row (REQ-INGRESS-014),
+ * and the fragmented CRC uses the first fragment's real header
+ * (REQ-INGRESS-018). The description above (per-stream reassembler,
+ * plain-endpoint delegation) predates that. Removal is scheduled in
+ * CHANGELOG.md's Deprecation & Removal Log. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
     rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
     uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, uint32_t avtp_timestamp,
@@ -1509,7 +1719,22 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
  *
  * This is a NEW, additional entry point, not a signature change to
  * rcp_mock_server_dispatch_e2e_fragment() -- same "new function, not a
- * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above. */
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. It builds a
+ * synthetic header from its arguments (header_octet1 = 0x80 | tv, tu = 0 --
+ * what rcp_avtp_encode_*() emits) with the TSCF reserved bytes assumed all
+ * zero and enters the pipeline after the parse stage, so it applies the
+ * lifecycle filter first, then the stream-fault gate, the Table 4 fixed
+ * fields, reassembly, the safe-command-mode CRC over that header and full
+ * admission -- exactly the stages every other path applies. A request of at
+ * least 8 octets whose own header disagrees with the byte_bus_id/acf_msg_type
+ * arguments is refused with RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH
+ * (REQ-INGRESS-022). It is now identical to
+ * rcp_mock_server_dispatch_e2e_tscf() (REQ-INGRESS-014). Removal is scheduled
+ * in CHANGELOG.md's Deprecation & Removal Log, after go/cpp/rust
+ * reconciliation. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
     rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
     uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, bool tv,
@@ -1531,7 +1756,21 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
  * parameter and its own once-per-frame REQ-E2E-028/029 gate -- see that
  * function's own doc comment; this variant's gate runs before any
  * member's own E2E/CRC handling, exactly where the plain variant's runs
- * relative to lifecycle/admission. */
+ * relative to lifecycle/admission.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. frame is the
+ * AVTPDU payload; the wrapper builds a synthetic header from its arguments
+ * (header_octet1 = 0x80 | tv, tu = 0; a TSCF frame's reserved bytes assumed
+ * all zero) and runs the payload through the same frame stages -- member
+ * pre-pass, the once-per-AVTPDU sequence gate with sequence_num, then every
+ * member, identity read from its own header, through the lifecycle filter,
+ * stream-fault gate, Table 4 fixed fields, reassembly, CRC and admission.
+ * There is no member cap any more (RCP_MOCK_MAX_FRAME_MEMBERS no longer
+ * limits anything); at most out_cap members are processed and reported, as
+ * before. A frame dropped as a whole reports each member
+ * RCP_MOCK_DISPATCH_DROPPED; a malformed or empty payload returns 0. Removal
+ * is scheduled in CHANGELOG.md's Deprecation & Removal Log. */
 size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                            bool time_sync_supported, uint64_t stream_id,
                                            uint32_t avtp_timestamp, uint8_t sequence_num,
@@ -1553,7 +1792,21 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
  *
  * This is a NEW, additional entry point, not a signature change to
  * rcp_mock_server_dispatch_frame_e2e() -- same "new function, not a
- * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above. */
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above.
+ *
+ * DEPRECATED (issue #618): a thin wrapper over the ingress pipeline
+ * (rcp_mock_server_receive_avtpdu()), kept for existing callers. frame is the
+ * AVTPDU payload; the wrapper builds a synthetic header from its arguments
+ * (header_octet1 = 0x80 | tv, tu = 0; a TSCF frame's reserved bytes assumed
+ * all zero) and runs the payload through the same frame stages -- member
+ * pre-pass, the once-per-AVTPDU sequence gate with sequence_num, then every
+ * member, identity read from its own header, through the lifecycle filter,
+ * stream-fault gate, Table 4 fixed fields, reassembly, CRC and admission.
+ * There is no member cap any more (RCP_MOCK_MAX_FRAME_MEMBERS no longer
+ * limits anything); at most out_cap members are processed and reported, as
+ * before. A frame dropped as a whole reports each member
+ * RCP_MOCK_DISPATCH_DROPPED; a malformed or empty payload returns 0. Removal
+ * is scheduled in CHANGELOG.md's Deprecation & Removal Log. */
 size_t rcp_mock_server_dispatch_frame_e2e_tscf(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                                 bool time_sync_supported, uint64_t stream_id,
                                                 bool tv, uint32_t avtp_timestamp,
@@ -1611,6 +1864,26 @@ bool rcp_mock_server_tick(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
 bool rcp_mock_server_tick_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
                                      rcp_byte_bus_id_t byte_bus_id,
                                      const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_response);
+
+/* Issue #618 (REQ-INGRESS-020): rcp_mock_server_tick() with every response
+ * of the run delivered separately: out_responses[0..*out_count) (each
+ * entry zeroed on entry; caller frees every populated one). A stored
+ * request on a multi-response endpoint produces its whole output here.
+ * rcp_mock_server_tick()/_tick_on_stream()/_drain_endpoint*() deliver the
+ * same responses joined into one ACF member stream (split back with
+ * rcp_sched_split_frame_members()). Output beyond out_cap is counted by
+ * rcp_mock_server_response_overflow_count(). */
+bool rcp_mock_server_tick_multi(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                 const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_responses,
+                                 size_t out_cap, size_t *out_count);
+
+/* Stream-scoped counterpart of rcp_mock_server_tick_multi(), for the slot
+ * at (stream_id, byte_bus_id) -- see rcp_mock_server_tick_on_stream(). */
+bool rcp_mock_server_tick_multi_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                           rcp_byte_bus_id_t byte_bus_id,
+                                           const rcp_server_tick_ctx_t *ctx,
+                                           rcp_bytes_t *out_responses, size_t out_cap,
+                                           size_t *out_count);
 
 /* Reports one observed trigger occurrence, emitted by endpoint source_ep
  * as its trigger signal number signal_nr, to every endpoint registered on
@@ -1682,8 +1955,8 @@ size_t rcp_mock_server_watchdog_purge_on_stream(rcp_mock_server_t *srv, uint64_t
  * produces from a request's own stream_id -- this function does not
  * re-resolve stream_id itself, matching the "resolve once at the
  * dispatch call site, pass the resolved identity down" precedent
- * dispatch_plain()'s own REQ-SEQ-013 sequencer-ownership check already
- * established in this same module. A request_stream_index naming no row
+ * the admission stage's (rx_admit_member(), mock.c) own REQ-SEQ-013
+ * sequencer-ownership check already established in this same module. A request_stream_index naming no row
  * in srv's own EP_ID_config table (including 0, the "stream not
  * resolved" sentinel rcp_regmap_request_stream_cfg_resolve_index() itself
  * returns on a miss) purges nothing and returns 0 -- this function never

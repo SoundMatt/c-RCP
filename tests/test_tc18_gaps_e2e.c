@@ -35,6 +35,8 @@
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
 #include <rcp/e2e.h>
+#include <rcp/fragment.h>
+#include <rcp/ingress.h>
 #include <rcp/ep_can.h>
 #include <rcp/mock.h>
 #include <rcp/regmap.h>
@@ -54,22 +56,19 @@ void tearDown(void) {}
 #define TEST_TS  ((uint32_t)0x11223344u)
 
 /* issue #465: avtp_subtype/header_octet1/tu -- the Figure 20/21
- * header-CRC bytes rcp_e2e_compute_crc()/_wrap()/_unwrap() now require.
- * TEST_OCTET1/TEST_TU are deliberately equal to src/mock.c's own
- * documented RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER/_TU_PLACEHOLDER
- * (0x00/false) -- most tests in this file build a request with the raw
- * wrap()/wrap_framed() primitives and then feed it into
- * rcp_mock_server_dispatch_e2e()/_fragment(), whose own internal
- * rcp_e2e_unwrap_framed()/_compute_fragmented_crc() calls always use
- * that same placeholder (mock.c has no per-message header_octet1/tu of
- * its own to pass -- see mock.c's own file-top comment); using anything
- * else here would make every one of those round-trips spuriously CRC-
- * mismatch. Coverage for "header_octet1/tu are actually fed into the
- * CRC" (flipping just one of them changes the result) lives in
- * test_e2e.c's own dedicated tests instead, which call the raw
- * primitives directly and are not constrained by mock.c's placeholder. */
+ * header-CRC bytes rcp_e2e_compute_crc()/_wrap()/_unwrap() require.
+ * Issue #618: mock.c no longer substitutes a placeholder header byte --
+ * its CRC stage covers the real received header (REQ-INGRESS-018), and
+ * the legacy rcp_mock_server_dispatch_e2e*() wrappers synthesize exactly
+ * what rcp_avtp_encode_ntscf()/_tscf() emit: sv=1, version 0, mr=0, so
+ * header_octet1 = 0x80 | tv and tu = 0. TEST_OCTET1 is therefore the
+ * real sv=1 byte a conformant peer computes its CRC over (0x80; tests
+ * that pass tv=true use TEST_OCTET1_TV, 0x81). Coverage for "every bit
+ * of header_octet1/tu is fed into the CRC" lives in test_e2e.c's own
+ * dedicated tests and in this file's REQ-INGRESS-018 tests. */
 #define TEST_SUBTYPE ((uint8_t)0x05u) /* TSCF */
-#define TEST_OCTET1  ((uint8_t)0x00u)
+#define TEST_OCTET1  ((uint8_t)0x80u)
+#define TEST_OCTET1_TV ((uint8_t)0x81u)
 #define TEST_TU      (false)
 
 /* Encodes one ACF_ABB message through acf.c's own encoder, i.e. exactly
@@ -250,7 +249,13 @@ static void test_dispatch_e2e_safe_mode_rejects_an_unprotected_request(void)
     const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
 
-    to_hw_configured(srv);
+    /* Issue #618 (audit #245): RCP_CONFIGURED, not HW_CONFIGURED. In
+     * HW_CONFIGURED this non-EP0 member must be dropped silently by the
+     * lifecycle filter, which now runs before the CRC stage -- this test
+     * used to pass only because the CRC check ran (and answered) first.
+     * test_ingress_dropped_member_has_no_crc_side_effects() pins the
+     * HW_* case itself. */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
 
@@ -847,7 +852,13 @@ static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
     TEST_ASSERT_NOT_NULL(w.data);
     w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
 
-    to_hw_configured(srv);
+    /* Issue #618 (audit #245): RCP_CONFIGURED, not HW_CONFIGURED. In
+     * HW_CONFIGURED this non-EP0 member must be dropped silently by the
+     * lifecycle filter, which now runs before the CRC stage -- this test
+     * used to pass only because the CRC check ran (and answered) first.
+     * test_ingress_dropped_member_has_no_crc_side_effects() pins the
+     * HW_* case itself. */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
 
@@ -1429,7 +1440,13 @@ static void test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_reject
     k = rcp_watchdog_keeper_new(cfg, &stream, 1u);
     TEST_ASSERT_NOT_NULL(k);
 
-    to_hw_configured(srv);
+    /* Issue #618 (audit #245): RCP_CONFIGURED, not HW_CONFIGURED. In
+     * HW_CONFIGURED this non-EP0 member must be dropped silently by the
+     * lifecycle filter, which now runs before the CRC stage -- this test
+     * used to pass only because the CRC check ran (and answered) first.
+     * test_ingress_dropped_member_has_no_crc_side_effects() pins the
+     * HW_* case itself. */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
     rcp_mock_server_set_watchdog_keeper(srv, k);
@@ -2069,14 +2086,11 @@ static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
 
     rcp_memcpy_bounded(concatenated, sizeof(concatenated), p0, 4);
     rcp_memcpy_bounded(concatenated + 4, sizeof(concatenated) - 4, p1, 4);
-    /* issue #465: mock.c's own dispatch_e2e_fragment() passes the REAL
-     * avtp_subtype it was given (RCP_AVTP_SUBTYPE_NTSCF here, matching
-     * the dispatch calls below), but has no per-message header_octet1/tu
-     * bits available -- it feeds its own documented placeholder
-     * (0x00/false, mirrored literally here; see src/mock.c's
-     * RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER/_TU_PLACEHOLDER) for both,
-     * uniformly regardless of framing. */
-    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, 0x00u, false, TEST_SID,
+    /* issue #465/#618: the fragmented CRC covers the REAL first-AVTPDU
+     * header -- subtype NTSCF, header_octet1 0x80 (sv=1, what the legacy
+     * wrapper synthesizes and a conformant sender emits), tu forced 0
+     * and avtp_timestamp forced 0 under NTSCF framing. */
+    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, TEST_OCTET1, false, TEST_SID,
                                            0u /* forced, NTSCF has no timestamp field */,
                                            f0.data, 8u, concatenated, sizeof(concatenated));
     final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
@@ -2158,7 +2172,8 @@ static void test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_rese
 
 /* A reassembly that would exceed the stream's own configured
  * max_total_len is rejected outright -- rcp_mock_server_fragment_
- * reassembler()'s own documented escape hatch for a caller wanting a
+ * reassembler_for()'s own documented escape hatch (issue #618: per
+ * (stream_id, byte_bus_id) context) for a caller wanting a
  * tighter bound than RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN,
  * exercised here to keep the test cheap (no 64KiB payload needed). */
 //cfusa:test REQ-E2E-038
@@ -2173,7 +2188,7 @@ static void test_dispatch_e2e_fragment_too_large_reassembly_is_rejected(void)
 
     set_up_frag_stream(srv, counting_handler);
 
-    reasm = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    reasm = rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 0x11);
     TEST_ASSERT_NOT_NULL(reasm);
     rcp_fragment_reassembler_init(reasm, 2u); /* smaller than p0's own 4 octets */
 
@@ -2422,7 +2437,7 @@ static void test_dispatch_e2e_fragment_can_xl_write_request_round_trips(void)
  *
  * Same worst-case CAN XL write request and the same generic reassembly
  * mechanism as the round-trip test above, but with the stream's own
- * reassembler ceiling (rcp_mock_server_fragment_reassembler()'s escape
+ * reassembler ceiling (rcp_mock_server_fragment_reassembler_for()'s escape
  * hatch, matching test_dispatch_e2e_fragment_too_large_reassembly_is_
  * rejected() above) deliberately set to admit the first fragment alone
  * (frag0_len octets) but be exceeded once the second fragment's own
@@ -2471,7 +2486,7 @@ static void test_dispatch_e2e_fragment_can_xl_write_request_rejected_when_reasse
         frag0_len = p0len;
     }
 
-    reasm = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    reasm = rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 0x11);
     TEST_ASSERT_NOT_NULL(reasm);
     /* Admits fragment 0 (frag0_len octets) alone; the combined total
      * (RCP_EP_CAN_XL_MAX_ENCODED_LEN, 2058) exceeds it once fragment 1's
@@ -2775,9 +2790,13 @@ static void test_dispatch_e2e_fragment_plain_command_mode_falls_back_to_dispatch
     rcp_mock_server_destroy(srv);
 }
 
-/* A fragment shorter than ACF's own fixed 8-octet header (or otherwise
- * failing rcp_acf_unpack_header()) is rejected outright, before any
- * reassembler state is touched. */
+/* A fragment shorter than ACF's own fixed 8-octet header is never fed to
+ * a reassembler and never executed. Issue #618: there is one pipeline
+ * now, so on a safe-command-mode endpoint the outcome is exactly
+ * rcp_mock_server_dispatch_e2e()'s for the same bytes -- too short to
+ * carry a CRC trailer, RCP_MOCK_DISPATCH_CRC_ERROR with no response (the
+ * fragment entry point used to answer RCP_MOCK_DISPATCH_REJECTED here,
+ * a divergence between two paths for one frame). */
 static void test_dispatch_e2e_fragment_too_short_header_is_rejected(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -2787,11 +2806,13 @@ static void test_dispatch_e2e_fragment_too_short_header_is_rejected(void)
     set_up_frag_stream(srv, counting_handler);
 
     g_handler_called = false;
-    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
                       rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
                                                              RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
                                                              TEST_TS, tiny, sizeof(tiny), &resp));
     TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
 
     rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
@@ -2982,7 +3003,7 @@ static void test_dispatch_e2e_tscf_safe_mode_with_tv_true_postpones_a_standard_r
     const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
     rcp_bytes_t          wrapped =
-        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
+        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1_TV /* tv=1 on the wire */, TEST_TU, TEST_TS, plain.data, plain.len);
 
     to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
@@ -3084,7 +3105,7 @@ static void test_dispatch_e2e_fragment_tscf_with_tv_true_postpones_a_standard_re
     rcp_bytes_t          resp = {0};
 
     set_up_frag_stream(srv, counting_handler);
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1_TV /* tv=1 on the wire */, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     g_handler_called = false;
@@ -3399,7 +3420,7 @@ static void test_dispatch_e2e_fragment_tscf_too_large_reassembly_is_rejected(voi
 
     set_up_frag_stream(srv, counting_handler);
 
-    reasm = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    reasm = rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 0x11);
     TEST_ASSERT_NOT_NULL(reasm);
     rcp_fragment_reassembler_init(reasm, 2u);
 
@@ -3497,7 +3518,7 @@ static void test_dispatch_frame_e2e_tscf_with_tv_true_postpones_a_standard_reque
     rcp_mock_server_t             *srv = rcp_mock_server_new();
     const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
     rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
-    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1_TV /* tv=1 on the wire */, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
     rcp_mock_frame_member_result_t  results[4];
     size_t                          dispatched;
 
@@ -3765,11 +3786,12 @@ static void *fails_after_n_mallocs(size_t size)
     return NULL;
 }
 
-/* counting_handler() (above) asserts request_len > 0 -- exactly what a
- * genuinely-empty reassembled payload's own fallback dispatch_plain()
- * call produces (a real, deliberate 0-length request, not a bug), so
- * the empty-payload closure test below needs its own tolerant handler
- * instead. */
+/* counting_handler() (above) asserts request_len > 0; the empty-payload
+ * tests below use this tolerant handler instead so that a regression to
+ * the pre-#618 fail-open path (handing the endpoint a NULL/0-length
+ * request after a failed re-encode) is reported by those tests' own
+ * g_handler_called assertion rather than by an assertion inside the
+ * handler. */
 static void empty_tolerant_handler(const uint8_t *request, size_t request_len,
                                     rcp_bytes_t *out_response, void *user_data)
 {
@@ -3894,14 +3916,12 @@ static void test_dispatch_e2e_fragment_abb_encode_failure_with_payload_is_reject
 
 /* Zero reassembled_len (both fragments carry an EMPTY payload), encode
  * still fails (rcp_acf_encode_gbb()/_abb() always allocates a real
- * header-sized buffer, regardless of payload length): closes
- * `reassembled_len != 0u`'s own FALSE side, paired against the
- * TRUE-side tests just above (both share `!encoded.data` == true, only
- * reassembled_len differs). Not REJECTED this time -- dispatch_plain()
- * is called with a NULL/0-length "encoded" frame instead, the same
- * fail-toward-a-harmless-empty-request shape a genuinely empty (but
- * successfully encoded) payload would take. */
-static void test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_falls_through(void)
+ * header-sized buffer, regardless of payload length). Issue #618
+ * corrected this test: the old fragment path fell through here and
+ * dispatched a NULL/0-length "request" to the endpoint; the unified
+ * rebuild step (rx_rebuild_reassembled(), mock.c) rejects every failed
+ * re-encode instead, whatever the payload length -- fail closed. */
+static void test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_is_rejected(void)
 {
     rcp_mock_server_t *srv  = rcp_mock_server_new();
     rcp_bytes_t         f0  = make_gbb(1, 0, 0, NULL, 0);
@@ -3934,16 +3954,17 @@ static void test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_falls_th
     rcp_alloc_set_hooks(&hooks);
 
     g_handler_called = false;
-    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
                       rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
                                                              RCP_ACF_MSG_TYPE_GBB, true, TEST_SID,
                                                              TEST_TS, final_wire.data, final_wire.len,
                                                              &resp));
-    /* Encode genuinely failed (reassembled_len == 0, malloc still
-     * failed) -- dispatch_plain() ran with a NULL/0-length request
-     * instead, and the enabled endpoint's own handler executed
-     * immediately on it. */
-    TEST_ASSERT_TRUE(g_handler_called);
+    /* Issue #618: the rebuild fails closed -- no NULL/0-length request
+     * is ever handed to the endpoint. The REQUEST_REJECTED response
+     * cannot be built either (malloc still failing), so none is sent. */
+    rcp_alloc_reset_hooks();
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_alloc_reset_hooks();
     rcp_bytes_free(&final_wire);
@@ -3957,7 +3978,7 @@ static void test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_falls_th
  * DIFFERENT source lines in mock.c's own if/else msg-type branches, so
  * the GBB-only empty-payload test just above does not carry over to
  * this one. */
-static void test_dispatch_e2e_fragment_abb_encode_failure_empty_payload_falls_through(void)
+static void test_dispatch_e2e_fragment_abb_encode_failure_empty_payload_is_rejected(void)
 {
     rcp_mock_server_t *srv  = rcp_mock_server_new();
     rcp_bytes_t         f0  = make_abb(1, 0, 0, NULL, 0);
@@ -3990,12 +4011,17 @@ static void test_dispatch_e2e_fragment_abb_encode_failure_empty_payload_falls_th
     rcp_alloc_set_hooks(&hooks);
 
     g_handler_called = false;
-    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
                       rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
                                                              RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
                                                              TEST_TS, final_wire.data, final_wire.len,
                                                              &resp));
-    TEST_ASSERT_TRUE(g_handler_called);
+    /* Issue #618: the rebuild fails closed -- no NULL/0-length request
+     * is ever handed to the endpoint. The REQUEST_REJECTED response
+     * cannot be built either (malloc still failing), so none is sent. */
+    rcp_alloc_reset_hooks();
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_alloc_reset_hooks();
     rcp_bytes_free(&final_wire);
@@ -4117,7 +4143,7 @@ static void test_dispatch_e2e_fragment_tscf_abb_encode_failure_with_payload_is_r
 /* L2733's own GBB encode-fail guard needs this SAME empty-payload
  * closure independently -- L2733 (GBB) and L2792 (ABB) are two
  * DIFFERENT source lines. */
-static void test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_falls_through(void)
+static void test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_is_rejected(void)
 {
     rcp_mock_server_t *srv  = rcp_mock_server_new();
     rcp_bytes_t         f0  = make_gbb(1, 0, 0, NULL, 0);
@@ -4151,12 +4177,17 @@ static void test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_fal
     rcp_alloc_set_hooks(&hooks);
 
     g_handler_called = false;
-    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
                       rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
                                                                   RCP_ACF_MSG_TYPE_GBB, true, TEST_SID,
                                                                   false, TEST_TS, 0u, final_wire.data,
                                                                   final_wire.len, &resp));
-    TEST_ASSERT_TRUE(g_handler_called);
+    /* Issue #618: the rebuild fails closed -- no NULL/0-length request
+     * is ever handed to the endpoint. The REQUEST_REJECTED response
+     * cannot be built either (malloc still failing), so none is sent. */
+    rcp_alloc_reset_hooks();
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_alloc_reset_hooks();
     rcp_bytes_free(&final_wire);
@@ -4165,7 +4196,7 @@ static void test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_fal
     rcp_mock_server_destroy(srv);
 }
 
-static void test_dispatch_e2e_fragment_tscf_abb_encode_failure_empty_payload_falls_through(void)
+static void test_dispatch_e2e_fragment_tscf_abb_encode_failure_empty_payload_is_rejected(void)
 {
     rcp_mock_server_t *srv  = rcp_mock_server_new();
     rcp_bytes_t         f0  = make_abb(1, 0, 0, NULL, 0);
@@ -4199,12 +4230,17 @@ static void test_dispatch_e2e_fragment_tscf_abb_encode_failure_empty_payload_fal
     rcp_alloc_set_hooks(&hooks);
 
     g_handler_called = false;
-    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
                       rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
                                                                   RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
                                                                   false, TEST_TS, 0u, final_wire.data,
                                                                   final_wire.len, &resp));
-    TEST_ASSERT_TRUE(g_handler_called);
+    /* Issue #618: the rebuild fails closed -- no NULL/0-length request
+     * is ever handed to the endpoint. The REQUEST_REJECTED response
+     * cannot be built either (malloc still failing), so none is sent. */
+    rcp_alloc_reset_hooks();
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_alloc_reset_hooks();
     rcp_bytes_free(&final_wire);
@@ -4412,6 +4448,721 @@ static void test_dispatch_frame_e2e_tscf_prev_errored_classifier_mcdc(void)
     }
 }
 
+/* ── Issue #618: CRC over the real header, reassembly on every path ───────── */
+
+typedef struct {
+    size_t                     n;
+    rcp_mock_dispatch_result_t result[16];
+    rcp_mock_rx_reason_t       reason[16];
+} e2e_rx_capture_t;
+
+static void e2e_rx_sink(rcp_mock_rx_member_t *m, void *user)
+{
+    e2e_rx_capture_t *c = (e2e_rx_capture_t *)user;
+
+    if (c->n < 16u) {
+        c->result[c->n] = m->result;
+        c->reason[c->n] = m->reason;
+    }
+    c->n++;
+}
+
+static rcp_bytes_t e2e_frag(rcp_byte_bus_id_t bus, uint8_t tn, uint8_t ms, uint16_t seg,
+                            const uint8_t *payload, size_t payload_len)
+{
+    rcp_acf_byte_message_info_t h;
+
+    memset(&h, 0, sizeof(h));
+    h.byte_bus_id              = bus;
+    h.transaction_num          = tn;
+    h.op                       = (uint8_t)RCP_ACF_OP_WRITE;
+    h.ms                       = ms;
+    h.read_size_or_segment_num = seg;
+    return rcp_acf_encode_abb(&h, payload, payload_len);
+}
+
+/* An AVTPDU carrying payload under a real header: NTSCF, or TSCF with the
+ * given tv/tu/mr bits. */
+static rcp_bytes_t e2e_pdu(bool tscf, uint8_t tv, uint8_t tu, uint8_t mr, const uint8_t *payload,
+                           size_t len, uint8_t seq)
+{
+    if (tscf) {
+        rcp_avtp_tscf_header_t h;
+
+        memset(&h, 0, sizeof(h));
+        h.sv             = 1;
+        h.tv             = tv;
+        h.tu             = tu;
+        h.mr             = mr;
+        h.sequence_num   = seq;
+        h.stream_id      = rcp_stream_id_from_u64(TEST_SID);
+        h.avtp_timestamp = TEST_TS;
+        return rcp_avtp_encode_tscf(&h, payload, len);
+    } else {
+        rcp_avtp_ntscf_header_t h;
+
+        memset(&h, 0, sizeof(h));
+        h.sv           = 1;
+        h.sequence_num = seq;
+        h.stream_id    = rcp_stream_id_from_u64(TEST_SID);
+        return rcp_avtp_encode_ntscf(&h, payload, len);
+    }
+}
+
+static rcp_mock_dispatch_result_t e2e_receive_one(rcp_mock_server_t *srv, const rcp_bytes_t *pdu)
+{
+    e2e_rx_capture_t  cap;
+    rcp_mock_rx_ctx_t ctx = {true, 0u, false};
+
+    memset(&cap, 0, sizeof(cap));
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu->data, pdu->len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL_UINT(1u, cap.n);
+    return cap.result[0];
+}
+
+/* T5 (audits #131/#216, acceptance criterion 1): a request wrapped over
+ * the real sv=1 header byte -- NTSCF 0x80, TSCF tv=1 0x81, and TSCF with
+ * tu=1 -- is accepted through receive_avtpdu(); the same frame with one
+ * header bit flipped on the wire (mr, or tu) is a CRC_ERROR. */
+//cfusa:test REQ-INGRESS-018
+//cfusa:test REQ-INGRESS-034
+//cfusa:test REQ-E2E-031
+static void test_receive_avtpdu_crc_covers_the_real_header(void)
+{
+    const uint8_t pl[4] = {0xC1, 0xC2, 0xC3, 0xC4};
+    rcp_bytes_t   m     = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t   wn    = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, m.data, m.len);
+    rcp_bytes_t   wt    = rcp_e2e_wrap(RCP_AVTP_SUBTYPE_TSCF, 0x81u, false, TEST_SID, TEST_TS,
+                                       m.data, m.len);
+    rcp_bytes_t   wu    = rcp_e2e_wrap(RCP_AVTP_SUBTYPE_TSCF, 0x81u, true, TEST_SID, TEST_TS,
+                                       m.data, m.len);
+    /* filled at run time: MSVC's C mode rejects a non-constant aggregate
+     * initializer (C4204 under /W4 /WX) */
+    struct {
+        const rcp_bytes_t         *w;
+        bool                       tscf;
+        uint8_t                    tu, mr;
+        rcp_mock_dispatch_result_t want;
+    } cases[6];
+    size_t i;
+
+#define CRC_CASE(k, ww, ts, tuv, mrv, res)                                                          \
+    cases[k].w = (ww); cases[k].tscf = (ts); cases[k].tu = (uint8_t)(tuv);                         \
+    cases[k].mr = (uint8_t)(mrv); cases[k].want = (res)
+    CRC_CASE(0, &wn, false, 0u, 0u, RCP_MOCK_DISPATCH_OK);
+    CRC_CASE(1, &wt, true, 0u, 0u, RCP_MOCK_DISPATCH_PENDING);
+    CRC_CASE(2, &wu, true, 1u, 0u, RCP_MOCK_DISPATCH_PENDING);
+    CRC_CASE(3, &wt, true, 0u, 1u, RCP_MOCK_DISPATCH_CRC_ERROR); /* mr flipped */
+    CRC_CASE(4, &wt, true, 1u, 0u, RCP_MOCK_DISPATCH_CRC_ERROR); /* tu flipped */
+    CRC_CASE(5, &wu, true, 0u, 0u, RCP_MOCK_DISPATCH_CRC_ERROR); /* tu flipped back */
+#undef CRC_CASE
+
+    for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rcp_mock_server_t *srv = rcp_mock_server_new();
+        rcp_bytes_t        pdu = e2e_pdu(cases[i].tscf, (uint8_t)(cases[i].tscf ? 1u : 0u), cases[i].tu,
+                                         cases[i].mr, cases[i].w->data, cases[i].w->len, 0);
+
+        to_rcp_configured(srv);
+        rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+        TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+        TEST_ASSERT_EQUAL(cases[i].want, e2e_receive_one(srv, &pdu));
+        rcp_bytes_free(&pdu);
+        rcp_mock_server_destroy(srv);
+    }
+    rcp_bytes_free(&wn);
+    rcp_bytes_free(&wt);
+    rcp_bytes_free(&wu);
+    rcp_bytes_free(&m);
+}
+
+/* T5: the legacy E2E wrappers check against the header they synthesize
+ * (0x80 | tv, tu = 0) -- the old placeholder byte 0x00, which no real
+ * peer can send (sv is always 1), is now a CRC mismatch, the audit probe
+ * inverted. */
+//cfusa:test REQ-INGRESS-018
+static void test_legacy_e2e_wrappers_reject_the_old_placeholder_header(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t        m    = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t        old  = rcp_e2e_wrap_framed(TEST_SID, true, 0x00u, false, 0u, m.data, m.len);
+    rcp_bytes_t        real = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, m.data, m.len);
+    rcp_bytes_t        resp = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                   RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, 0u,
+                                                   old.data, old.len, &resp));
+    rcp_bytes_free(&resp);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                   RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, 0u,
+                                                   real.data, real.len, &resp));
+    rcp_bytes_free(&resp);
+    /* the plain dispatch() wrapper applies the same CRC stage */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, real.data,
+                                               real.len, &resp));
+    rcp_bytes_free(&resp);
+
+    rcp_bytes_free(&old);
+    rcp_bytes_free(&real);
+    rcp_bytes_free(&m);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6 (audit #101): an ms=1 fragment to a PLAIN endpoint is collected, not
+ * executed; the final fragment then runs it once with the reassembled
+ * payload -- through the plain dispatch() wrapper, on a stream that has
+ * no request-stream row at all. */
+//cfusa:test REQ-INGRESS-014
+static void test_plain_endpoint_reassembles_fragments_without_a_stream_row(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p0[4] = {0x10, 0x11, 0x12, 0x13};
+    const uint8_t      p1[3] = {0x14, 0x15, 0x16};
+    rcp_bytes_t        f0   = e2e_frag(0x11, 0x22, 1, 0, p0, sizeof(p0));
+    rcp_bytes_t        f1   = e2e_frag(0x11, 0x22, 0, 1, p1, sizeof(p1));
+    rcp_bytes_t        resp = {0};
+    const uint8_t      want[7] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, capturing_handler, NULL);
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f0.data,
+                                               f0.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NOT_NULL(rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 0x11));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f1.data,
+                                               f1.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(sizeof(want), g_captured_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(want, g_captured_payload, sizeof(want));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Builds the final fragment of a two-fragment safe-command-mode message
+ * on an NTSCF stream: f1 wrapped, its trailer replaced by the real
+ * fragmented CRC over the first fragment's header. */
+static rcp_bytes_t e2e_final_with_fragmented_crc(const rcp_bytes_t *f0, const rcp_bytes_t *f1,
+                                                 const uint8_t *p0, size_t p0len, const uint8_t *p1,
+                                                 size_t p1len)
+{
+    uint8_t     all[32];
+    rcp_bytes_t w = rcp_e2e_wrap_framed(TEST_SID, true, 0x80u, false, 0u, f1->data, f1->len);
+    uint32_t    want;
+    size_t      off;
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    TEST_ASSERT_TRUE(p0len + p1len <= sizeof(all));
+    memcpy(all, p0, p0len);
+    memcpy(&all[p0len], p1, p1len);
+    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, 0x80u, false, TEST_SID, 0u,
+                                          f0->data, RCP_ACF_ABB_HEADER_LEN, all, p0len + p1len);
+    off = f1->len - rcp_acf_pad_len(RCP_ACF_ABB_HEADER_LEN + p1len);
+    w.data[off]      = (uint8_t)(want >> 24);
+    w.data[off + 1u] = (uint8_t)(want >> 16);
+    w.data[off + 2u] = (uint8_t)(want >> 8);
+    w.data[off + 3u] = (uint8_t)want;
+    return w;
+}
+
+/* T6: a fragmented safe-command-mode request on a stream with no
+ * request-stream row reassembles and passes the fragmented CRC (the old
+ * path fell back to the unfragmented dispatch there). */
+//cfusa:test REQ-INGRESS-014
+//cfusa:test REQ-INGRESS-018
+static void test_crc_endpoint_reassembles_without_a_stream_row(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p0[4] = {1, 2, 3, 4};
+    const uint8_t      p1[4] = {5, 6, 7, 8};
+    rcp_bytes_t        f0   = e2e_frag(0x11, 0x22, 1, 0, p0, 4);
+    rcp_bytes_t        f1   = e2e_frag(0x11, 0x22, 0, 1, p1, 4);
+    rcp_bytes_t        w1   = e2e_final_with_fragmented_crc(&f0, &f1, p0, 4, p1, 4);
+    rcp_bytes_t        resp = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, capturing_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                            RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                            0u, f0.data, f0.len, &resp));
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                            RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                            0u, w1.data, w1.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(8u, g_captured_payload_len);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w1);
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: interleaved fragmented requests to bus 3 and bus 5 on ONE stream,
+ * delivered as multi-member AVTPDUs through receive_avtpdu(), both
+ * reassemble correctly -- the contexts are keyed per (stream_id,
+ * byte_bus_id), and the per-endpoint accessor sees two distinct ones. */
+//cfusa:test REQ-INGRESS-014
+//cfusa:test REQ-INGRESS-028
+static void test_interleaved_fragments_to_two_endpoints_on_one_stream(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    const uint8_t      a0[4] = {0xA0, 0xA1, 0xA2, 0xA3}, a1[4] = {0xA4, 0xA5, 0xA6, 0xA7};
+    const uint8_t      b0[4] = {0xB0, 0xB1, 0xB2, 0xB3}, b1[4] = {0xB4, 0xB5, 0xB6, 0xB7};
+    rcp_bytes_t        fa0 = e2e_frag(3, 0x31, 1, 0, a0, 4), fa1 = e2e_frag(3, 0x31, 0, 1, a1, 4);
+    rcp_bytes_t        fb0 = e2e_frag(5, 0x51, 1, 0, b0, 4), fb1 = e2e_frag(5, 0x51, 0, 1, b1, 4);
+    uint8_t            buf[64];
+    rcp_bytes_t        pdu1, pdu2;
+    e2e_rx_capture_t   cap;
+    rcp_mock_rx_ctx_t  ctx = {true, 0u, false};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 3, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 5, 1, true, counting_handler, NULL);
+    memcpy(buf, fa0.data, fa0.len);
+    memcpy(&buf[fa0.len], fb0.data, fb0.len);
+    pdu1 = e2e_pdu(false, 0, 0, 0, buf, fa0.len + fb0.len, 0);
+    memcpy(buf, fb1.data, fb1.len);
+    memcpy(&buf[fb1.len], fa1.data, fa1.len);
+    pdu2 = e2e_pdu(false, 0, 0, 0, buf, fb1.len + fa1.len, 1);
+
+    memset(&cap, 0, sizeof(cap));
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu1.data, pdu1.len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, cap.result[0]);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, cap.result[1]);
+    TEST_ASSERT_TRUE(rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 3) !=
+                     rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 5));
+    TEST_ASSERT_TRUE(rcp_fragment_reassembler_is_collecting(
+        rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 3)));
+    TEST_ASSERT_TRUE(rcp_fragment_reassembler_is_collecting(
+        rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 5)));
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu2.data, pdu2.len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL_UINT(4u, cap.n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, cap.result[2]);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, cap.result[3]);
+
+    rcp_bytes_free(&pdu1);
+    rcp_bytes_free(&pdu2);
+    rcp_bytes_free(&fa0);
+    rcp_bytes_free(&fa1);
+    rcp_bytes_free(&fb0);
+    rcp_bytes_free(&fb1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: a transaction_num change mid-sequence rejects the member and resets
+ * the context (fail closed); a fresh sequence then works. */
+//cfusa:test REQ-INGRESS-015
+static void test_fragment_transaction_num_change_rejects_and_resets(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p[4] = {1, 2, 3, 4};
+    rcp_bytes_t        f0   = e2e_frag(0x11, 0x22, 1, 0, p, 4);
+    rcp_bytes_t        f1   = e2e_frag(0x11, 0x23, 1, 1, p, 4); /* other tn, intermediate */
+    rcp_bytes_t        fz   = e2e_frag(0x11, 0x24, 0, 1, p, 4); /* other tn, final */
+    rcp_bytes_t        resp = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+#define FRAG_DISPATCH(f)                                                                           \
+    rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,       \
+                             TEST_SID, (f).data, (f).len, &resp)
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, FRAG_DISPATCH(f0));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, FRAG_DISPATCH(f1));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, FRAG_DISPATCH(f0));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, FRAG_DISPATCH(fz));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+#undef FRAG_DISPATCH
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_bytes_free(&fz);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES fragmented requests in flight
+ * at once are fine; one more is REJECTED (pool exhausted). */
+//cfusa:test REQ-INGRESS-016
+static void test_reassembly_pool_exhaustion_rejects(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p[4] = {1, 2, 3, 4};
+    e2e_rx_capture_t   cap;
+    rcp_mock_rx_ctx_t  ctx = {true, 0u, false};
+    size_t             i;
+
+    to_rcp_configured(srv);
+    memset(&cap, 0, sizeof(cap));
+    for (i = 0; i <= RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES; i++) {
+        rcp_byte_bus_id_t bus = (rcp_byte_bus_id_t)(0x20u + i);
+        rcp_bytes_t       f   = e2e_frag(bus, 0x22, 1, 0, p, 4);
+        rcp_bytes_t       pdu = e2e_pdu(false, 0, 0, 0, f.data, f.len, (uint8_t)i);
+
+        rcp_mock_server_add_endpoint(srv, bus, 1, true, counting_handler, NULL);
+        cap.n = 0;
+        (void)rcp_mock_server_receive_avtpdu(srv, pdu.data, pdu.len, &ctx, e2e_rx_sink, &cap, NULL);
+        if (i < RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES) {
+            TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, cap.result[0]);
+        } else {
+            TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, cap.result[0]);
+            TEST_ASSERT_EQUAL(RCP_MOCK_RX_REASON_FRAGMENT_POOL_EXHAUSTED, cap.reason[0]);
+            TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, bus));
+        }
+        rcp_bytes_free(&pdu);
+        rcp_bytes_free(&f);
+    }
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6 (the audit #249 composition case): a fragmented member inside a
+ * multi-member AVTPDU on a sequence-enforced stream is both reassembled
+ * and sequence-checked. */
+//cfusa:test REQ-INGRESS-014
+//cfusa:test REQ-INGRESS-026
+static void test_fragmented_member_in_multi_member_frame_is_reassembled_and_sequenced(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    const uint8_t                   p[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     plain = e2e_frag(0x12, 0x01, 0, 0, p, 4);
+    rcp_bytes_t                     f0    = e2e_frag(0x11, 0x22, 1, 0, p, 4);
+    rcp_bytes_t                     f1    = e2e_frag(0x11, 0x22, 0, 1, p, 4);
+    uint8_t                         buf[64];
+    rcp_bytes_t                     pdu1, pdu2;
+    e2e_rx_capture_t                cap;
+    rcp_mock_rx_ctx_t               ctx = {true, 0u, false};
+    rcp_regmap_request_stream_cfg_t cfg[1];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id   = TEST_SID;
+    cfg[0].rx_enforce_seq = 1;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+    memcpy(buf, plain.data, plain.len);
+    memcpy(&buf[plain.len], f0.data, f0.len);
+    pdu1 = e2e_pdu(false, 0, 0, 0, buf, plain.len + f0.len, 1);
+    pdu2 = e2e_pdu(false, 0, 0, 0, f1.data, f1.len, 2);
+
+    memset(&cap, 0, sizeof(cap));
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu1.data, pdu1.len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, cap.result[0]);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, cap.result[1]);
+    /* a replay of the first AVTPDU is refused before any member runs */
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu1.data, pdu1.len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_SEQ_ERROR, cap.result[2]);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_SEQ_ERROR, cap.result[3]);
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu2.data, pdu2.len, &ctx, e2e_rx_sink, &cap, NULL);
+    TEST_ASSERT_EQUAL_UINT(5u, cap.n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, cap.result[4]);
+
+    rcp_bytes_free(&pdu1);
+    rcp_bytes_free(&pdu2);
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: half-collected messages are purged on a lifecycle transition, a
+ * safe-state broadcast for the stream, and a watchdog purge. */
+//cfusa:test REQ-INGRESS-017
+static void test_reassembly_contexts_are_purged(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    const uint8_t                   p[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     f0   = e2e_frag(0x11, 0x22, 1, 0, p, 4);
+    rcp_bytes_t                     resp = {0};
+    rcp_regmap_request_stream_cfg_t cfg[1];
+    rcp_regmap_ep_id_map_entry_t    map[1];
+    rcp_lifecycle_writer_ctx_t      root = {true, false, false, false, false};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id = TEST_SID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+    memset(map, 0, sizeof(map));
+    map[0].ep_id                = 1;
+    map[0].byte_bus_id          = 0x11;
+    map[0].request_stream_index = 1;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, map, 1));
+#define F0_DISPATCH()                                                                              \
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,                                          \
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,                  \
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f0.data,      \
+                                               f0.len, &resp));                                    \
+    TEST_ASSERT_NOT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID))
+
+    F0_DISPATCH();
+    (void)rcp_mock_server_broadcast_safe_state(srv, 1);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+
+    F0_DISPATCH();
+    (void)rcp_mock_server_watchdog_purge(srv, 0x11);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+
+    F0_DISPATCH();
+    (void)rcp_mock_server_watchdog_purge_on_stream(srv, TEST_SID, 0x11);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+
+    F0_DISPATCH();
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, root,
+                                                 true));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+#undef F0_DISPATCH
+
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: the deprecated per-stream accessor still returns the (only) context
+ * of a single-bus stream; a context pinned by the per-endpoint accessor
+ * keeps its caller-set bound across completed messages. */
+//cfusa:test REQ-INGRESS-028
+static void test_reassembler_accessors(void)
+{
+    rcp_mock_server_t          *srv  = rcp_mock_server_new();
+    const uint8_t               p[4] = {1, 2, 3, 4};
+    rcp_bytes_t                 f0   = e2e_frag(0x11, 0x22, 1, 0, p, 4);
+    rcp_bytes_t                 f1   = e2e_frag(0x11, 0x22, 0, 1, p, 4);
+    rcp_bytes_t                 resp = {0};
+    rcp_fragment_reassembler_t *r;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+    (void)rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                   TEST_SID, f0.data, f0.len, &resp);
+    r = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    TEST_ASSERT_NOT_NULL(r);
+    TEST_ASSERT_TRUE(r == rcp_mock_server_fragment_reassembler_for(srv, TEST_SID, 0x11));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f1.data,
+                                               f1.len, &resp));
+    rcp_bytes_free(&resp);
+    /* pinned by the _for() call above: still bound after completion */
+    TEST_ASSERT_TRUE(r == rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+    rcp_fragment_reassembler_init(r, 2u);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f0.data,
+                                               f0.len, &resp));
+
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: the #611 CAN XL fragmented write request -- two fragments of
+ * 1024-octet slices, each in its own NTSCF AVTPDU -- reassembles through
+ * receive_avtpdu() on a plain endpoint. */
+//cfusa:test REQ-INGRESS-014
+static void test_can_xl_write_request_reassembles_via_receive_avtpdu(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    rcp_ep_can_xl_header_t xl  = {0};
+    static uint8_t         tx[CAN_REQUEST_DISPATCHABLE_DATA_LEN];
+    rcp_bytes_t            frames[2] = {{0}, {0}};
+    size_t                 i;
+
+    xl.sdt = 0x5u;
+    xl.vcid = 0x9u;
+    xl.af   = 0xCAFEBABEu;
+    for (i = 0; i < sizeof(tx); i++) tx[i] = (uint8_t)(i * 5u + 1u);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, can_capturing_handler, NULL);
+    TEST_ASSERT_EQUAL_size_t(2u, rcp_ep_can_encode_frame_request_fragmented(
+                                     0x11u, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x321u, &xl, tx,
+                                     sizeof(tx), 0x77u, 1024u, frames));
+    g_handler_called = false;
+    for (i = 0; i < 2u; i++) {
+        rcp_bytes_t pdu = e2e_pdu(false, 0, 0, 0, frames[i].data, frames[i].len, (uint8_t)i);
+
+        TEST_ASSERT_EQUAL(i == 0u ? RCP_MOCK_DISPATCH_FRAGMENT_PENDING : RCP_MOCK_DISPATCH_OK,
+                          e2e_receive_one(srv, &pdu));
+        rcp_bytes_free(&pdu);
+        rcp_bytes_free(&frames[i]);
+    }
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(4u + 6u + sizeof(tx), g_can_captured_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, &g_can_captured_payload[10], sizeof(tx));
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: contexts on two streams for the same (unscoped) endpoint stay
+ * separate: the deprecated per-stream accessor finds each by its own
+ * stream, a third stream has none, and a stream-scoped watchdog purge
+ * only discards the matching one. */
+//cfusa:test REQ-INGRESS-014
+//cfusa:test REQ-INGRESS-017
+//cfusa:test REQ-INGRESS-028
+static void test_reassembly_contexts_are_per_stream(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p[4] = {1, 2, 3, 4};
+    rcp_bytes_t        f0   = e2e_frag(0x11, 0x22, 1, 0, p, 4);
+    rcp_bytes_t        resp = {0};
+    const uint64_t     sid_b = TEST_SID + 1u;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, f0.data,
+                                               f0.len, &resp));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                               RCP_ACF_MSG_TYPE_ABB, true, sid_b, f0.data, f0.len,
+                                               &resp));
+    TEST_ASSERT_NOT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+    TEST_ASSERT_NOT_NULL(rcp_mock_server_fragment_reassembler(srv, sid_b));
+    TEST_ASSERT_TRUE(rcp_mock_server_fragment_reassembler(srv, TEST_SID) !=
+                     rcp_mock_server_fragment_reassembler(srv, sid_b));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID + 2u));
+
+    (void)rcp_mock_server_watchdog_purge_on_stream(srv, sid_b, 0x11);
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, sid_b));
+    TEST_ASSERT_NOT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* T6: a fragment whose own header does not decode (acf_msg_length claims
+ * more octets than were received) is refused, and a sequence it would
+ * have continued is reset -- with or without a context already bound. */
+//cfusa:test REQ-INGRESS-014
+static void test_undecodable_fragment_is_rejected_and_resets(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    const uint8_t      p[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    rcp_bytes_t        f0   = e2e_frag(0x11, 0x22, 1, 0, p, 8);
+    rcp_bytes_t        f1   = e2e_frag(0x11, 0x22, 1, 1, p, 8);
+    rcp_bytes_t        resp = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+#define CUT_DISPATCH(f, n)                                                                         \
+    rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,       \
+                             TEST_SID, (f).data, (n), &resp)
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, CUT_DISPATCH(f0, f0.len - 4u));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING, CUT_DISPATCH(f0, f0.len));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, CUT_DISPATCH(f1, f1.len - 4u));
+    TEST_ASSERT_NULL(rcp_mock_server_fragment_reassembler(srv, TEST_SID));
+#undef CUT_DISPATCH
+
+    rcp_bytes_free(&f0);
+    rcp_bytes_free(&f1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Frame path: a faulted stream answers every member with STREAM_FAULTED
+ * (and that counts as the predecessor's error for a chained successor);
+ * a CRC failure in one member does likewise. */
+//cfusa:test REQ-INGRESS-029
+//cfusa:test REQ-MOCK-029
+static void test_frame_members_on_faulted_stream_and_after_crc_error(void)
+{
+    rcp_mock_server_t             *srv = rcp_mock_server_new();
+    rcp_e2e_stream_fault_tracker_t tracker;
+    const uint8_t                  p[4] = {1, 2, 3, 4};
+    rcp_bytes_t                    bad  = e2e_frag(0x11, 0x22, 0, 0, p, 4); /* no CRC trailer */
+    rcp_bytes_t                    next = rcp_chained_encode_member(0x12, 0, RCP_CHAINED_CS_ABORT_ON_ERROR,
+                                                                    0x23, NULL, 0);
+    uint8_t                        buf[64];
+    rcp_mock_frame_member_result_t fr[4];
+    size_t                         n, i;
+
+    TEST_ASSERT_NOT_NULL(next.data);
+    memcpy(buf, bad.data, bad.len);
+    memcpy(&buf[bad.len], next.data, next.len);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    memset(fr, 0, sizeof(fr));
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 0u, buf,
+                                       bad.len + next.len, fr, 4);
+    TEST_ASSERT_EQUAL_UINT(2u, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR, fr[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CHAIN_ABORTED, fr[1].result);
+    for (i = 0; i < n; i++) rcp_bytes_free(&fr[i].response);
+
+    (void)rcp_e2e_stream_fault_tracker_on_crc_error(&tracker, TEST_SID, true);
+    memset(fr, 0, sizeof(fr));
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 1u, buf,
+                                       bad.len + next.len, fr, 4);
+    TEST_ASSERT_EQUAL_UINT(2u, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED, fr[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED, fr[1].result);
+    for (i = 0; i < n; i++) rcp_bytes_free(&fr[i].response);
+
+    rcp_bytes_free(&bad);
+    rcp_bytes_free(&next);
+    rcp_mock_server_destroy(srv);
+}
+
+/* The legacy frame wrappers keep their out_cap semantics on the frame-wide
+ * outcomes too: a sequence rejection reports at most out_cap members. */
+//cfusa:test REQ-INGRESS-026
+static void test_frame_seq_error_honours_out_cap(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    const uint8_t                   p[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     a    = e2e_frag(0x11, 0x01, 0, 0, p, 4);
+    uint8_t                         buf[32];
+    rcp_mock_frame_member_result_t  fr[2];
+    rcp_regmap_request_stream_cfg_t cfg[1];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id   = TEST_SID;
+    cfg[0].rx_enforce_seq = 1;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+    memcpy(buf, a.data, a.len);
+    memcpy(&buf[a.len], a.data, a.len);
+
+    memset(fr, 0, sizeof(fr));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true,
+                                                              TEST_SID, 4u, buf, 2u * a.len, fr, 1));
+    rcp_bytes_free(&fr[0].response);
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true,
+                                                              TEST_SID, 4u, buf, 2u * a.len, fr, 1));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_SEQ_ERROR, fr[0].result);
+    TEST_ASSERT_EQUAL_UINT8(0u, fr[0].byte_bus_id);
+
+    rcp_bytes_free(&a);
+    rcp_mock_server_destroy(srv);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -4483,12 +5234,12 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_fragment_tscf_already_faulted_stream_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_gbb_encode_failure_with_payload_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_abb_encode_failure_with_payload_is_rejected);
-    RUN_TEST(test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_falls_through);
-    RUN_TEST(test_dispatch_e2e_fragment_abb_encode_failure_empty_payload_falls_through);
+    RUN_TEST(test_dispatch_e2e_fragment_gbb_encode_failure_empty_payload_is_rejected);
+    RUN_TEST(test_dispatch_e2e_fragment_abb_encode_failure_empty_payload_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_tscf_gbb_encode_failure_with_payload_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_tscf_abb_encode_failure_with_payload_is_rejected);
-    RUN_TEST(test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_falls_through);
-    RUN_TEST(test_dispatch_e2e_fragment_tscf_abb_encode_failure_empty_payload_falls_through);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_gbb_encode_failure_empty_payload_is_rejected);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_abb_encode_failure_empty_payload_is_rejected);
     RUN_TEST(test_dispatch_frame_e2e_prev_errored_classifier_mcdc);
     RUN_TEST(test_dispatch_frame_e2e_tscf_prev_errored_classifier_mcdc);
     RUN_TEST(test_dispatch_frame_e2e_tscf_with_tv_true_postpones_a_standard_request);
@@ -4497,5 +5248,22 @@ int main(void)
     RUN_TEST(test_dispatch_frame_e2e_still_ignores_presentation_time_after_462);
 
     RUN_TEST(test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad);
+    RUN_TEST(test_receive_avtpdu_crc_covers_the_real_header);
+    RUN_TEST(test_legacy_e2e_wrappers_reject_the_old_placeholder_header);
+    RUN_TEST(test_plain_endpoint_reassembles_fragments_without_a_stream_row);
+    RUN_TEST(test_crc_endpoint_reassembles_without_a_stream_row);
+    RUN_TEST(test_interleaved_fragments_to_two_endpoints_on_one_stream);
+    RUN_TEST(test_fragment_transaction_num_change_rejects_and_resets);
+    RUN_TEST(test_reassembly_pool_exhaustion_rejects);
+    RUN_TEST(test_fragmented_member_in_multi_member_frame_is_reassembled_and_sequenced);
+    RUN_TEST(test_reassembly_contexts_are_purged);
+    RUN_TEST(test_reassembler_accessors);
+    RUN_TEST(test_can_xl_write_request_reassembles_via_receive_avtpdu);
+
+    RUN_TEST(test_reassembly_contexts_are_per_stream);
+    RUN_TEST(test_undecodable_fragment_is_rejected_and_resets);
+    RUN_TEST(test_frame_members_on_faulted_stream_and_after_crc_error);
+    RUN_TEST(test_frame_seq_error_honours_out_cap);
+
     return UNITY_END();
 }

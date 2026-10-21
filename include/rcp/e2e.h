@@ -208,23 +208,14 @@
  * avtp_timestamp valid") -- so it remains a required caller-supplied
  * parameter on every function in this section, exactly the real
  * already-encoded (or about-to-be-decoded) wire byte, unmodified.
- * src/mock.c's own dispatch_e2e()/_dispatch_e2e_fragment() -- this
- * module's only in-tree caller of the wrap/unwrap/compute_crc family --
- * do not currently receive per-message sv/mr/tv/tu bits at all through
- * their own public signatures (only avtp_subtype, stream_id,
- * avtp_timestamp): extending those public signatures to carry real
- * per-message header_octet1/tu values, and threading them from wherever
- * a real caller decodes an AVTPDU header, is a separate, materially
- * larger architecture item outside issue #465's own file scope
- * (src/e2e.c, include/rcp/e2e.h) -- mock.c instead passes this module's
- * own documented placeholder (RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
- * 0x00; tu false) uniformly on both its own encode-side test fixtures and
- * decode-side dispatch calls, which keeps every existing mock.c-driven
- * round-trip self-consistent (same constant on both sides) without
- * claiming to model the real per-message sv/mr/tv/tu bits -- a caller
- * that needs the real wire-accurate values must call rcp_e2e_wrap()/
- * _unwrap() (or the _framed() variants) directly, not through mock.c's
- * simplified test-double surface.
+ * Issue #618: src/mock.c's receive pipeline passes exactly that -- the
+ * frame's own subtype, raw header octet 1, tu and avtp_timestamp, taken
+ * from the parsed AVTPDU header (rcp_ingress_parse_avtpdu(), ingress.h)
+ * or, for its legacy wrappers, synthesized as 0x80 | tv with tu = 0 (what
+ * rcp_avtp_encode_ntscf()/_tscf() emit) -- and, for a reassembled
+ * message, the FIRST fragment's stored values. The placeholder byte it
+ * used before (0x00, which no real peer can send since sv is always 1)
+ * is gone.
  *
  * Before that CRC is computed, the ACF header's own acf_msg_length field
  * (acf.h, a 9-bit quadlet count spanning bit 0 of octet 0 and all of
@@ -680,10 +671,10 @@ bool rcp_e2e_fragment_carries_crc(bool is_last_fragment);
  * that into an actual fragmented-and-protected encode/decode pipeline is
  * a caller's job, matching every other function in this module's "own
  * small pure helpers, operate on caller-owned data" layering discipline.
- * No caller in this codebase does so yet: mock.c has no fragmented-
- * message dispatch path of any kind (protected or not) to wire this
- * into, a materially larger, separate architecture item than adding this
- * one arithmetic primitive. */
+ * mock.c's receive pipeline is that caller (issue #336, reworked by
+ * issue #618): its reassembly stage keeps the first fragment's header
+ * per (stream_id, byte_bus_id) and its CRC stage calls this function
+ * for every reassembled safe-command-mode request. */
 uint32_t rcp_e2e_compute_fragmented_crc(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
                                          uint64_t stream_id, uint32_t avtp_timestamp,
                                          const uint8_t *first_fragment_header,
@@ -1037,7 +1028,7 @@ void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint6
  *
  * Wiring: UPDATED 2026-08-14 -- both halves of this note's own original
  * claim are now stale. mock.c's own dispatch functions
- * (dispatch_frame()/dispatch_plain()/rcp_mock_server_dispatch_e2e()/
+ * (the issue #618 receive pipeline: rx_crc_stage()/rx_admit_member()/
  * rcp_mock_server_check_watchdog()) -- this codebase's only reference
  * dispatch composition, not a synthetic test harness that stops at calling
  * a primitive directly (WORDING CORRECTED 2026-08-20, issue #606: "real,

@@ -70,6 +70,7 @@
 #include "../src/mem_bounded.h"
 
 #include <rcp/acf.h>
+#include <rcp/avtp.h>
 #include <rcp/ep_adc.h>
 #include <rcp/ep_can.h>
 #include <rcp/ep_iseled.h>
@@ -1761,6 +1762,78 @@ static void test_iseled_dispatch_multi_fragment_response_round_trips(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* Issue #618 (T8, audit #248): the same ISELED multi-response endpoint is
+ * no longer a separate, gate-less path. A TSCF-timed ISELED read through
+ * rcp_mock_server_receive_avtpdu() is stored (PENDING) like any other
+ * request, and the stored run delivers all three response fragments via
+ * rcp_mock_server_tick_multi(); with safe command mode enabled, an
+ * unprotected request is a CRC_ERROR and the handler never runs. */
+static size_t g_iseled_rx_n;
+static rcp_mock_dispatch_result_t g_iseled_rx_result;
+
+static void iseled_rx_sink(rcp_mock_rx_member_t *m, void *user)
+{
+    (void)user;
+    g_iseled_rx_n++;
+    g_iseled_rx_result = m->result;
+}
+
+//cfusa:test REQ-INGRESS-019
+//cfusa:test REQ-INGRESS-020
+//cfusa:test REQ-ISELED-025
+static void test_iseled_multi_response_is_admitted_scheduled_and_crc_gated(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    iseled_dispatch_state_t st  = {{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}, 8u, 3u};
+    rcp_bytes_t             req = rcp_ep_iseled_encode_command_request(5u, (const uint8_t *)"\x01",
+                                                                       1u, 0x45u);
+    rcp_avtp_tscf_header_t  h;
+    rcp_bytes_t             pdu;
+    rcp_mock_rx_ctx_t       ctx = {true, 1000u, false};
+    rcp_server_tick_ctx_t   tick;
+    rcp_bytes_t             responses[8];
+    size_t                  count = 0, i;
+
+    TEST_ASSERT_NOT_NULL(req.data);
+    memset(&h, 0, sizeof(h));
+    h.sv             = 1;
+    h.tv             = 1;
+    h.avtp_timestamp = 2000u;
+    h.stream_id      = rcp_stream_id_from_u64(1u);
+    pdu              = rcp_avtp_encode_tscf(&h, req.data, req.len);
+    TEST_ASSERT_NOT_NULL(pdu.data);
+
+    gap_to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint_multi_response(
+                                       srv, 5u, 0u, true, iseled_dispatch_multi_handler, &st));
+    g_iseled_rx_n = 0;
+    (void)rcp_mock_server_receive_avtpdu(srv, pdu.data, pdu.len, &ctx, iseled_rx_sink, NULL, NULL);
+    TEST_ASSERT_EQUAL_size_t(1u, g_iseled_rx_n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, g_iseled_rx_result);
+
+    memset(&tick, 0, sizeof(tick));
+    tick.gptp_now      = 2000u;
+    tick.gptp_locked   = true;
+    tick.endpoint_idle = true;
+    TEST_ASSERT_TRUE(rcp_mock_server_tick_multi(srv, 5u, &tick, responses, 8u, &count));
+    TEST_ASSERT_EQUAL_size_t(3u, count);
+    for (i = 0; i < count; i++) {
+        TEST_ASSERT_NOT_NULL(responses[i].data);
+        rcp_bytes_free(&responses[i]);
+    }
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 5u, true));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_multi_response(
+                          srv, 5u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u, req.data,
+                          req.len, responses, 8u, &count));
+    for (i = 0; i < count; i++) rcp_bytes_free(&responses[i]);
+
+    rcp_bytes_free(&pdu);
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
 
 /* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-MDIO-020/023):
@@ -1953,6 +2026,7 @@ int main(void)
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
     RUN_TEST(test_iseled_dispatch_single_fragment_response_round_trips);
     RUN_TEST(test_iseled_dispatch_multi_fragment_response_round_trips);
+    RUN_TEST(test_iseled_multi_response_is_admitted_scheduled_and_crc_gated);
 
     RUN_TEST(test_mdio_block_now_exposes_ep_status_via_reconfig);
     RUN_TEST(test_mdio_request_prefix_now_carries_a_two_bit_mode_field);
