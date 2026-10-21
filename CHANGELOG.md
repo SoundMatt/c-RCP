@@ -10,10 +10,11 @@ alongside `ROADMAP.md`, per RELAY spec §19.2.
 
 Per RELAY spec §19.2, this table records every module deprecation:
 the version it was deprecated in, its replacement (if any), and the
-version it was actually removed in. Both entries below deprecated and
+version it was actually removed in. Most entries below deprecated and
 removed a module in the *same* release, with no intervening MINOR
 deprecation window -- see each module's own release entry below for
-the rationale.
+the rationale; the issue #618 rows are deprecations with removal still
+pending.
 
 | Module | Deprecated in | Replacement | Removed in |
 |---|---|---|---|
@@ -31,8 +32,78 @@ the rationale.
 | `ep_lin.h`/`ep_lin.c`'s `rcp_ep_lin_compare_mode_t`/`rcp_ep_lin_compare_fires()` (an invented eight-value evt[2:0] comparison scheme, self-admittedly not spec-derived) | v0.112.0 | `rcp_acf_evt_row2_is_plain()` validation + `rcp_ep_lin_response_matches()` (delegates to acf.h's shared TC18 §13.5.1 exact-match primitive) | v0.112.0 |
 | `regmap.h`/`regmap.c`'s `rcp_regmap_options_group_consistent()` and its six paired `RCP_REGMAP_OPT_*` constants (an invented all-or-nothing-pair grouping for `svr_implemented_options`, citing a section that, on primary-source verification, does not describe it) | v0.183.0 | Five independent single-bit `RCP_REGMAP_OPT_*` constants matching TC18 §12.7.5 Table 18 exactly | v0.183.0 |
 | `acf.h`'s `RCP_ACF_ERR_BUS_ID_OVERFLOW` (`rcp_acf_errc_t`'s last value; signaled a decoded `byte_bus_id[10:8]` the 8-bit-wide `rcp_byte_bus_id_t` couldn't represent) | v0.197.0 | None -- `rcp_byte_bus_id_t` (`avtp.h`) is now `uint16_t`, wide enough for the full 11-bit wire field, so the condition this code represented can no longer occur | v0.197.0 |
+| `mock.h`'s ten legacy receive entry points: `rcp_mock_server_dispatch()`, `_dispatch_tscf()`, `_dispatch_multi_response()`, `_dispatch_e2e()`, `_dispatch_e2e_tscf()`, `_dispatch_e2e_fragment()`, `_dispatch_e2e_fragment_tscf()`, `_dispatch_frame()`, `_dispatch_frame_e2e()`, `_dispatch_frame_e2e_tscf()` (issue #618; now thin wrappers over the ingress pipeline) | Unreleased (tc18-remediation, issue #618) | `rcp_mock_server_receive_avtpdu()` / `rcp_mock_server_pump_transport()` (`mock.h`), built on `ingress.h` | Not yet -- a later release, after go-RCP/cpp-RCP/rust-RCP reconciliation |
+| `mock.h`'s `rcp_mock_server_fragment_reassembler(srv, stream_id)` (per-stream; reassembly is keyed per (stream_id, byte_bus_id) since issue #618) | Unreleased (tc18-remediation, issue #618) | `rcp_mock_server_fragment_reassembler_for(srv, stream_id, byte_bus_id)` | Not yet -- same later release |
 
 ## Releases
+
+### Unreleased (tc18-remediation) -- 2026-10-21 (fix: one ingress pipeline for every received frame, issue #618)
+
+Part of the TC18 conformance remediation (#646). **Breaking and
+wire-visible** -- read before upgrading:
+
+- **New receive pipeline.** `rcp_mock_server_receive_avtpdu()` takes a raw
+  AVTPDU and runs it through fixed stages (parse -> timing -> subtype
+  filter -> member pre-pass -> sequence gate -> per member: lifecycle
+  filter, stream-fault gate, Table 4 fixed fields, lookup, reassembly,
+  CRC, admission). `rcp_mock_server_pump_transport()` adds the `recv()`.
+  The pure stages are public in the new `<rcp/ingress.h>`.
+- **AVTP version rejection.** `rcp_avtp_decode_ntscf()`/`_tscf()` return
+  the new `RCP_AVTP_ERR_BAD_VERSION` (= 3) for a header version other
+  than 0; version 1-7 frames that used to decode are now rejected
+  (including on `adapt.c`'s client-side response path).
+- **TSCF reserved-bytes rule has its own knob, and a new default.** New
+  `rcp_avtp_tscf_reserved_zero_policy_t` and
+  `rcp_mock_server_set_tscf_reserved_zero_policy()`. The default changes
+  from DROP (through the shared `tscf_unsupported_time_sync_policy`) to
+  TIME_GATE: a conformant TSCF frame now waits for its presentation
+  time instead of being dropped (or, under the old IGNORE, run early).
+  `rcp_mock_server_set_tscf_unsupported_time_sync_policy()` now governs
+  only the unsupported-time-sync rule. All TSCF paths agree.
+- **Safe-command-mode CRC over the real header.** The reference server
+  checks the CRC over the received header_octet1/tu/avtp_timestamp (the
+  legacy wrappers synthesize 0x80 | tv, tu = 0); the 0x00 placeholder is
+  gone. A peer computing over the real sv=1 byte is now accepted, and a
+  request wrapped over 0x00 is now a CRC_ERROR.
+- **Dropped frames have no side effects.** The lifecycle filter runs
+  before the stream-fault gate and the CRC stage on every path: a frame
+  that must be dropped no longer gets POCI_FAILURE/CRC_ERROR responses,
+  latches the stream, changes stream status or broadcasts safe state.
+- **The stream-fault gate also applies to plain-command-mode endpoints**
+  and to `rcp_mock_server_dispatch()`/`_dispatch_frame()`.
+- **Plain endpoints reassemble fragments**, and so does every path,
+  keyed per (stream_id, byte_bus_id) in a bounded pool
+  (`RCP_MOCK_MAX_CONCURRENT_REASSEMBLIES`, default 8); an ms=1 request is
+  no longer executed as a complete request. A failed re-encode of a
+  reassembled request is always rejected (it used to fall through with a
+  NULL request for an empty payload).
+- **Multi-response requests are admitted and scheduled** like any other
+  (CRC, gates, store/ack, timed/conditional); stored runs produce every
+  response. New `rcp_mock_server_tick_multi()`/`_tick_multi_on_stream()`;
+  the legacy single-response surfaces join a run's responses into one
+  ACF member stream. New `RCP_MOCK_MAX_RESPONSES_PER_EXEC` (default 64)
+  and `rcp_mock_server_response_overflow_count()`.
+- **Table 4 fixed fields enforced on receive** (hs/err/rsp/rsv/cs and ABB
+  mtv) -> REJECTED with INVALID_PARAMETER; `rcp_acf_encode_abb()` now
+  always emits mtv = 0. New `rcp_acf_header_reserved_bits_zero()`.
+- **New `RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH` (= 13)**, never wire-
+  visible: a legacy wrapper whose byte_bus_id/acf_msg_type disagree with
+  the request's own header, or an untimed wrapper given TSCF.
+- **No member cap**: every member of a frame is processed
+  (`RCP_MOCK_MAX_FRAME_MEMBERS` no longer limits anything).
+- New `rcp_lifecycle_should_accept_subtype()`; `rcp_l2_set_rcvbuf()`/
+  `rcp_l2_get_rcvbuf()` (SO_RCVBUF, burst reception).
+- **Deprecated** (see the Deprecation & Removal Log): the ten legacy
+  `rcp_mock_server_dispatch*()` entry points and the per-stream
+  `rcp_mock_server_fragment_reassembler()`.
+
+Tests asserting the previous behaviour were corrected, not loosened (the
+E2E fixtures now use the real sv=1 header byte; tests that relied on the
+CRC check answering before the lifecycle filter now run in
+RCP_CONFIGURED). New suite `test_ingress`; new pipeline tests across
+`test_mock`, `test_tc18_gaps_e2e`, `test_fragment`, `test_tc18_gaps_ep2`,
+`test_ep_iseled`, `test_lifecycle`, `test_avtp`, `test_acf`,
+`test_adapt`, `test_l2` and the privileged `l2_veth_roundtrip`.
 
 ### v0.479.0 -- 2026-08-20 (fix: issue #614 -- a reassembled fragmented request too large to re-encode as a single ACF frame now gets a real Table 27 error response, not silence)
 

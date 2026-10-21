@@ -19106,6 +19106,55 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### Unreleased (tc18-remediation) -- 2026-10-21 (fix: ingress pipeline -- one receive path for every frame, issue #618)
+
+Part of the TC18 conformance remediation (#646). The library now has a
+single receive pipeline, `rcp_mock_server_receive_avtpdu()`, built from
+pure, allocation-free stages in the new `include/rcp/ingress.h` /
+`src/ingress.c` (AVTPDU parse with version check, a streaming ACF member
+iterator, the once-per-frame timing decision, the TC18-11.2.1-005 fixed
+request-field check), plus `rcp_mock_server_pump_transport()` as
+transport glue. The stages always run in one order: parse, timing,
+subtype filter, member pre-pass, sequence gate, then per member
+lifecycle filter, stream-fault gate, fixed fields, endpoint lookup,
+reassembly, CRC, admission. The ten `rcp_mock_server_dispatch*()` entry
+points are deprecated thin wrappers over the same stages.
+
+Gaps closed (audit indices 0, 6, 7, 9, 56, 101, 110, 111, 112, 128, 131,
+216, 245, 248, 249):
+
+- AVTP header version != 0 rejected (`RCP_AVTP_ERR_BAD_VERSION`).
+- TC18-13.3-003's reserved-bytes rule has its own knob
+  (`rcp_mock_server_set_tscf_reserved_zero_policy()`), default TIME_GATE,
+  applied identically on every TSCF path; the conflict with
+  TC18-11.1-001/11.2-001 is recorded in docs/TC18-NON-NORMATIVE-CLAUSES.md.
+- Safe-command-mode CRC computed over the real received header byte
+  (sv = 1), not a 0x00 placeholder; fragmented CRC over the first
+  fragment's stored header.
+- Lifecycle filtering runs before every side-effecting gate: dropped
+  frames/members produce no response, latch, status change, sequence
+  change or safe-state broadcast.
+- Reassembly on every path, for plain and CRC endpoints, in a bounded
+  pool keyed per (stream_id, byte_bus_id), with a transaction_num guard
+  and purge on lifecycle transition / safe state / watchdog purge.
+- Table 4 fixed fields enforced on receive; the ABB encoder emits mtv = 0.
+- Multi-response endpoints admitted, CRC-checked, gated and schedulable;
+  one execution path (`slot_execute()`) for immediate, drained and ticked
+  runs; `rcp_mock_server_tick_multi()`/`_tick_multi_on_stream()`.
+- No 32-member frame cap; frame identity parsed, never trusted
+  (`RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH` for disagreeing legacy
+  arguments, and for TSCF handed to an untimed wrapper).
+- `rcp_l2_set_rcvbuf()`/`rcp_l2_get_rcvbuf()` for burst reception
+  (TC18-12.8.2-004), with a veth burst test in CI.
+
+New requirements REQ-INGRESS-001..034; REQ-AVTP-032/033, REQ-ACF-021,
+REQ-WDG-010, REQ-E2E-021/038/039 and REQ-ISELED-025 updated.
+
+**Next** (wave 1, coordinated): #617 (admission internals), #619
+(Table 24-driven CRC/sequence sources in `rx_crc_stage()`/
+`rx_stream_fault_gate()`), #620 (responder/ack queues replacing the
+sink's response hand-off).
+
 ### v0.477.0 -- 2026-08-20 (docs+test: [c-RCP-23b] issue #604 --
 re-confirm watchdog.c's 33% MC/DC gap as structurally unreachable,
 not closable)

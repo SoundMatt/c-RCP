@@ -58,13 +58,12 @@ CRC-16-protected sequence numbers) had no TC18 counterpart through issue
 #338 — that gap is now closed at the mechanism level: TC18 §12.7.7
 Table 24 itself defines `rx_enforce_seq`/`rx_seq_safestate_enable`
 (0x000D bits 1/2), and `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t`
-(RFC 1982 forward-window comparison) implement it, wired into `mock.c`'s
-reference dispatch composition (`frame_seq_gate_admits()`, evaluated
-once per AVTPDU frame). This is **opt-in, not automatic**: an integrator
-must enable the config bits via `regmap.h` and must replicate `mock.c`'s
-admission wiring in their own real, I/O-attached dispatch loop — this
-library ships no networked dispatcher of its own, only a reference
-composition. Residual risk even when enabled: tracker state is
+(RFC 1982 forward-window comparison) implement it, applied by the
+single ingress pipeline (`rcp_mock_server_receive_avtpdu()`, issue #618)
+once per AVTPDU with the parsed sequence number. This is **opt-in, not
+automatic**: an integrator must enable the config bits via `regmap.h`
+and route received frames through that pipeline (or
+`rcp_mock_server_pump_transport()`). Residual risk even when enabled: tracker state is
 per-process/per-restart (no persistence across restarts), the RFC 1982
 comparison only distinguishes a sequence gap in `[1,127]` from ordinary
 8-bit wraparound, and detection granularity is per-AVTPDU-frame, not

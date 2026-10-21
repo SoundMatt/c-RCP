@@ -497,14 +497,17 @@ jobs:
       # cross-toolchain margin below that re-measured number (this job
       # itself runs clang-18 on ubuntu-22.04, not Apple Clang 21) --
       # same rationale this file's own line-coverage floor above uses
-      # for its own margin.
+      # for its own margin. Raised to 94.5 by issue #618 (ingress
+      # pipeline): a fresh local re-measurement with the same flags gives
+      # 657/678 = 96.90%; 94.5 keeps the same ~2.4-point cross-toolchain
+      # margin the original 93.0 floor kept below 95.34%.
       - name: MC/DC regression gate (ratchet floor, not 100% -- issue #599 / c-RCP-23a)
         run: |
           python3 - <<'PYEOF'
           import json
           import sys
 
-          floor = 93.0  # see step name's comment above for provenance
+          floor = 94.5  # see step name's comment above for provenance
 
           summary = json.load(open("mcdc-summary.json"))
           actual = summary["mcdc_percent"]

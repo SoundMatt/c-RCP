@@ -59,7 +59,8 @@ arbitrary TC18 peer.")*
 | `<rcp/power.h>` | Normal/StandBy/Sleep/Unpowered power-mode model and WakeUp handshake |
 | `<rcp/ep_gpio.h>`, `<rcp/ep_spi.h>`, `<rcp/ep_i2c.h>`, `<rcp/ep_uart.h>`, `<rcp/ep_adc.h>`, `<rcp/ep_pwm.h>`, `<rcp/ep_can.h>`, `<rcp/ep_lin.h>`, `<rcp/ep_mdio.h>`, `<rcp/ep_iseled.h>`, `<rcp/ep_wakeup.h>` | Per-endpoint-type request/response codecs |
 | `<rcp/request.h>`, `<rcp/request_sequencer.h>` | The request-kind taxonomy (compound, compound-wait, triggered, chained, timed, cancellation; execution priority: cancellation > triggered > timed > compound > compound-wait > chained > standard) |
-| `<rcp/mock.h>` | In-process RC-Server/endpoint test double — zero I/O, default for unit tests |
+| `<rcp/ingress.h>` | Pure receive-path stages: AVTPDU parse, ACF member iterator, frame timing decision, Table 4 fixed-field check |
+| `<rcp/mock.h>` | In-process reference RC Server — zero I/O; `rcp_mock_server_receive_avtpdu()` is the receive pipeline |
 | `<rcp/errors.h>` | Numbered TC18 wire error codes (`rcp_wire_error_t`) |
 | `<relay/relay.h>` | Shared `rcp_context_t` (deadline) and error-condition types |
 
@@ -106,44 +107,77 @@ group's request/response codec", not as a spec-conformance claim.
 
 ## Quick start
 
-The example below drives the in-process mock RC Server
-(`<rcp/mock.h>`) through its lifecycle, registers one endpoint, and
-dispatches an already-framed request — the same shape a real transport
+The example below drives the in-process reference RC Server
+(`<rcp/mock.h>`) through its lifecycle, registers one endpoint, and hands
+it one raw NTSCF AVTPDU through `rcp_mock_server_receive_avtpdu()` -- the
+single receive pipeline (parse, frame timing, lifecycle filtering,
+sequence gate, then per ACF member: stream-fault gate, Table 4 fixed
+fields, endpoint lookup, reassembly, safe-command-mode CRC, admission).
+A real I/O loop does the same with the bytes its transport receives
 (`<rcp/udp.h>` for IEEE1722-over-UDP/IP, `<rcp/l2.h>` for native
-Ethernet) hands to a real RC Server.
+Ethernet), or calls `rcp_mock_server_pump_transport()` to do the
+`recv()` too. The older `rcp_mock_server_dispatch*()` entry points are
+deprecated wrappers over the same pipeline.
 
 ```c
+#include <rcp/acf.h>
+#include <rcp/avtp.h>
 #include <rcp/lifecycle.h>
 #include <rcp/mock.h>
 #include <assert.h>
+#include <string.h>
 
-static void noop_handler(const uint8_t *req, size_t req_len,
-                          rcp_bytes_t *out_response, void *user_data) {
-    (void)req; (void)req_len; (void)out_response; (void)user_data;
-    /* A real handler decodes req via the endpoint-type-specific ep_*.h
-     * codec and encodes a result into *out_response with that same
-     * module's _encode_response(); leaving it zeroed (as it already is
-     * on entry) means "no response frame" -- a fire-and-forget request. */
+static void echo_handler(const uint8_t *req, size_t req_len,
+                         rcp_bytes_t *out_response, void *user_data) {
+    (void)user_data;
+    /* A real handler decodes req with the endpoint type's ep_*.h codec
+     * and encodes its answer with that module's _encode_response();
+     * leaving *out_response zeroed means "no response frame". */
+    *out_response = rcp_bytes_dup(req, req_len);
+}
+
+/* Receives each member's outcome; may move responses out (zero them). */
+static void on_member(rcp_mock_rx_member_t *m, void *user) {
+    *(rcp_mock_dispatch_result_t *)user = m->result;
 }
 
 int main(void) {
     rcp_mock_server_t *srv = rcp_mock_server_new();
-    assert(rcp_mock_server_state(srv) == RCP_LIFECYCLE_HW_UNCONFIGURED);
+    rcp_lifecycle_plausibility_snapshot_t snap;
+    rcp_lifecycle_writer_ctx_t none = {0}, root = {0};
+    rcp_acf_byte_message_info_t hdr;
+    rcp_avtp_ntscf_header_t ntscf;
+    const uint8_t mac[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+    rcp_bytes_t request, avtpdu;
+    rcp_mock_rx_ctx_t rx = {true /* time sync */, 0 /* gPTP now */, false};
+    rcp_mock_rx_summary_t summary;
+    rcp_mock_dispatch_result_t result = RCP_MOCK_DISPATCH_DROPPED;
 
-    static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 0};
-    rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP);
-    rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP);
-
+    memset(&snap, 0, sizeof(snap));
+    root.via_root_client_ep0 = true;
+    rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none, true);
+    rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, root, true);
     rcp_mock_server_add_endpoint(srv, /*byte_bus_id=*/1, /*ep_type=*/0,
-                                  /*ep_enable=*/true, noop_handler, NULL);
+                                 /*ep_enable=*/true, echo_handler, NULL);
 
-    const uint8_t request[] = {0x01, 0x02, 0x03};
-    rcp_bytes_t response = {0};
-    rcp_mock_dispatch_result_t rc = rcp_mock_server_dispatch(
-        srv, /*byte_bus_id=*/1, /*avtp_subtype=*/0, /*acf_msg_type=*/0,
-        /*time_sync_supported=*/false, request, sizeof(request), &response);
-    assert(rc == RCP_MOCK_DISPATCH_OK);
+    /* One ACF_ABB request to endpoint 1, inside a real NTSCF AVTPDU --
+     * exactly the bytes a transport hands over. */
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.byte_bus_id = 1;
+    hdr.op = RCP_ACF_OP_WRITE;
+    request = rcp_acf_encode_abb(&hdr, (const uint8_t *)"\x01\x02\x03", 3);
+    memset(&ntscf, 0, sizeof(ntscf));
+    ntscf.sv = 1;
+    ntscf.stream_id = rcp_stream_id_make(mac, 1);
+    avtpdu = rcp_avtp_encode_ntscf(&ntscf, request.data, request.len);
 
+    rcp_mock_server_receive_avtpdu(srv, avtpdu.data, avtpdu.len, &rx,
+                                   on_member, &result, &summary);
+    assert(summary.outcome == RCP_MOCK_RX_FRAME_ACCEPTED);
+    assert(result == RCP_MOCK_DISPATCH_OK);
+
+    rcp_bytes_free(&avtpdu);
+    rcp_bytes_free(&request);
     rcp_mock_server_destroy(srv);
     return 0;
 }

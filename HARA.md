@@ -183,6 +183,20 @@ the wiring in their own production dispatch loop — is unchanged), but it
 is no longer accurate to describe H-004 as having no implemented control
 at all; it is Mitigated (opt-in), not Open.
 
+**H-004 / SG-002 update (2026-10-21, issue #618):** the sequence gate is
+now part of the single ingress pipeline (`rcp_mock_server_receive_avtpdu()`),
+evaluated once per AVTPDU with the parsed `sequence_num`, and only for
+frames that are not dropped as a whole -- an integrator routes received
+frames through that pipeline instead of replicating the wiring. For
+SG-002, the member identity (`byte_bus_id`, `acf_msg_type`) is now read
+from each ACF header rather than taken from caller arguments, the
+legacy wrappers refuse a caller-supplied identity that disagrees with the
+header (`RCP_MOCK_DISPATCH_ERR_HEADER_MISMATCH`), and the lifecycle
+filters run before every side-effecting gate, so a request that must be
+dropped can no longer be answered, latch a stream fault or trigger a
+safe-state broadcast. Neither change alters an S/E/C classification or
+ASIL letter.
+
 ---
 
 ## Safety Goals
@@ -190,9 +204,9 @@ at all; it is Mitigated (opt-in), not Open.
 | ID | Safety Goal | ASIL | Addressed By |
 |----|-------------|------|--------------|
 | SG-001 | Safety-tagged requests to a safety-critical endpoint shall execute, or the endpoint shall be driven to a defined safe state, within the configured per-stream watchdog timeout. | ASIL-C | `rcp_e2e_wd_evaluate()`, `rcp_watchdog_keeper_t` |
-| SG-002 | Requests shall only be executed against the endpoint identified by their `(stream_id, byte_bus_id)` address; a request naming an unregistered address shall be rejected. | ASIL-A | `avtp.h` addressing, `rcp_mock_server_dispatch()` unregistered-`byte_bus_id` handling |
+| SG-002 | Requests shall only be executed against the endpoint identified by their `(stream_id, byte_bus_id)` address; a request naming an unregistered address shall be rejected. | ASIL-A | `avtp.h` addressing; the ingress pipeline's endpoint lookup with identity parsed from each ACF header (`rcp_mock_server_receive_avtpdu()`, issue #618) and the legacy wrappers' header cross-check (REQ-INGRESS-022) |
 | SG-003 | A per-stream watchdog overflow with `rx_wd_safestate_enable` set shall drive the endpoint toward its configured safe state and shall never discard a pending safety-tagged request in doing so. | ASIL-B | `rcp_e2e_wd_evaluate()`, `rcp_e2e_watchdog_purge_should_keep()`/`_classify()`; formally verified (`tla/E2ESafePoint.tla` `SafetyRequestsSurvivePurge`) |
-| SG-004 | Replayed or duplicated requests should be detected and rejected. | ASIL-A | **Mitigated (opt-in).** `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`), wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`). Integrator must enable the config bits and replicate the wiring in their own dispatch loop; see ASIL Determination Note, Residual Risks below, and `include/rcp/e2e.h`'s file header for the full residual-risk scope. |
+| SG-004 | Replayed or duplicated requests should be detected and rejected. | ASIL-A | **Mitigated (opt-in).** `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`), applied by the single ingress pipeline (`rcp_mock_server_receive_avtpdu()`, issue #618) once per AVTPDU. Integrator must enable the config bits and route received frames through that pipeline; see ASIL Determination Note, Residual Risks below, and `include/rcp/e2e.h`'s file header for the full residual-risk scope. |
 | SG-005 | A safety-tagged request shall execute only once its endpoint reports it has reached the configured safe state. | ASIL-B | `rcp_e2e_request_may_execute()`, `rcp_e2e_endpoint_in_safe_state()`; formally verified (`tla/E2ESafePoint.tla` `NoUnsafeSafetyExecution`) |
 | SG-006 | Register-map field writes shall be permitted only for the authorized writer context, and a `FUNCTIONAL_W_STAR`-class field, once locked while `RCP_CONFIGURED`, shall never accept a write until a full reset. | ASIL-A | `rcp_regmap_writer_ctx()`; formally verified (`tla/LifecycleStateMachine.tla` `FieldLockMonotonicWhileConfigured`) |
 | SG-007 | Link-layer authentication (MACsec) shall be enforced by the deployment on any transport carrying safety-relevant requests. | ASIL-A | **Deployment-level control; not implemented within this library.** See ASIL Determination Note and `tara.md` TS-001/TS-003. |
@@ -208,7 +222,7 @@ at all; it is Mitigated (opt-in), not Open.
 
 | Risk | Likelihood | Mitigation | Status |
 |------|-----------|------------|--------|
-| Residual exposure to replay/staleness even with H-004's mitigation enabled (H-004) | Low-Medium | `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`) is implemented and wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`), but is opt-in (config bits must be set), its tracker state is per-process/per-restart (no persistence — a replay immediately after a restart is not detected), RFC 1982 forward-window comparison only distinguishes a gap within `[1,127]` from ordinary wraparound, and detection is per-AVTPDU-frame, not per-ACF-message. An integrator must also replicate `mock.c`'s admit()+evaluate() wiring in their own real dispatch loop — this library ships no networked dispatcher of its own. See `include/rcp/e2e.h`'s file header for the full scope statement. | **Mitigated (opt-in) — see residual-risk scope above; not unconditionally closed** |
+| Residual exposure to replay/staleness even with H-004's mitigation enabled (H-004) | Low-Medium | `rcp_e2e_seq_evaluate()`/`rcp_e2e_seq_tracker_t` (TC18 Table 24 `rx_enforce_seq`/`rx_seq_safestate_enable`) is implemented and wired into `mock.c`'s reference dispatch (`frame_seq_gate_admits()`), but is opt-in (config bits must be set), its tracker state is per-process/per-restart (no persistence — a replay immediately after a restart is not detected), RFC 1982 forward-window comparison only distinguishes a gap within `[1,127]` from ordinary wraparound, and detection is per-AVTPDU-frame, not per-ACF-message. An integrator must also route received frames through the single ingress pipeline (`rcp_mock_server_receive_avtpdu()` / `rcp_mock_server_pump_transport()`, issue #618), which applies the gate once per AVTPDU. See `include/rcp/e2e.h`'s file header for the full scope statement. | **Mitigated (opt-in) — see residual-risk scope above; not unconditionally closed** |
 | No link-layer authentication for the native transport in this library's default posture (H-007) | Medium | MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; an integrator must supply it | **Open — deployment responsibility, not closed by this library** |
 | `rcp_e2e_endpoint_in_safe_state()` misconfiguration (invalid `safestate_sequencer` index, unrecognized `rx_safety_measure`) | Low | Fails closed (returns false) by explicit design choice, not a spec-mandated value | Accepted |
 | Discovery/bootstrap (`OS-008`) accepts any claimant at the reserved discovery `byte_bus_id` while `HW_UNCONFIGURED` | Low | No identity check exists at this stage in the spec's own bootstrap sequence; matches the same residual posture as H-007 above | Accepted, tracked alongside H-007 |

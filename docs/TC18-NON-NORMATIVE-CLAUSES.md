@@ -67,3 +67,53 @@ paraphrased and cited by section/page-line reference into the source PDF's
 | §13.7.9.1 | TC18.txt L5035 | RC Client may request an ADC reading at any time | Trivially true permissive statement; nothing in the ADC endpoint blocks arbitrary-time reads, so there is no special behavior to test. |
 | §13.7.9.2 | TC18.txt L5164 | A measured ADC value may contain the average of multiple samples | Descriptive of the already-implemented averaging feature. |
 | §13.7.11.2 | TC18.txt L5358 | CAN's functional-config field list may be extended per implementation | Non-closed-list permission (the list isn't a hard ceiling), not itself a feature to build. |
+
+## Interpretations of conflicting normative clauses
+
+Where two MUST clauses cannot both be satisfied as literally written,
+this section records which reading c-RCP implements, why, and how the
+other reading remains available. Clauses are cited by catalog ID and
+paraphrased only.
+
+### TSCF reserved bytes all zero (TC18-13.3-003 vs. TC18-11.1-001 / TC18-11.2-001 / TC18-11.2.1-003)
+
+- **TC18-13.3-003** says that a TSCF request whose header reserved bytes
+  are all zero is to be queued as if it had arrived under an NTSCF header,
+  or dropped, depending on configuration.
+- **TC18-11.1-001, TC18-11.2-001 and TC18-11.2.1-003** say that the TSCF
+  header is how a client asks for a request to run no earlier than its
+  presentation time, and that a request received under TSCF waits for
+  that time.
+- An IEEE 1722-conformant sender always transmits those reserved bytes as
+  zero; c-RCP's own `rcp_avtp_encode_tscf()` does too. Read literally,
+  TC18-13.3-003 therefore applies to every conformant TSCF frame, and
+  either strips its presentation time or drops it -- so no conformant
+  client could ever obtain the behaviour the TC18-11.x clauses require.
+
+**c-RCP's reading (issue #618, REQ-INGRESS-004/005):** the reserved-bytes
+rule has its own server configuration knob,
+`rcp_avtp_tscf_reserved_zero_policy_t` /
+`rcp_mock_server_set_tscf_reserved_zero_policy()`, separate from the
+unsupported-time-sync knob. Its default, `RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE`,
+keeps the presentation-time gate (TC18-11.x satisfied). The two literal
+readings of TC18-13.3-003 stay available as configuration:
+`RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF` (REQ-AVTP-033) and
+`RCP_AVTP_TSCF_RESERVED_ZERO_DROP` (REQ-AVTP-032). The decision is made
+once per AVTPDU by `rcp_ingress_resolve_timing()` and is identical on
+every receive path.
+
+Alternatives considered and rejected:
+
+- *Apply the reserved-bytes rule only when time synchronization is
+  unsupported.* That case is already fully decided by the §13.3
+  unsupported-time-sync rule (drop, or ignore the presentation time), so
+  the reserved-bytes rule would become dead code and TC18-13.3-003 would
+  be untestable.
+- *Keep the literal reading as the default* (c-RCP's behaviour before
+  issue #618, where it was the shared knob's default DROP). It makes TSCF
+  unusable with any conformant sender, c-RCP's own encoder included.
+
+Cross-implementation note: cpp-RCP mirrors REQ-AVTP-031 (the reserved-
+bytes predicate) and inherits the same conflict; the default above is a
+wire-visible behaviour change that go-RCP/cpp-RCP/rust-RCP should
+reconcile.
