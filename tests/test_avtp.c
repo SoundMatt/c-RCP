@@ -247,12 +247,14 @@ static void test_tscf_roundtrip_no_payload(void)
     size_t payload_len = 0;
 
     hdr.sv = 1;
-    hdr.version = 3; /* REQ-AVTP-004: nonzero test value -- TC18 fixes this
-                       * field at 0 for this spec revision, but the wire
-                       * codec itself must round-trip whatever value it's
-                       * given; a version-always-0 bug would otherwise pass
-                       * unnoticed since every other test in this file also
-                       * leaves it at its {0}-init default. */
+    hdr.version = 3; /* REQ-AVTP-004: nonzero test value -- the encoder
+                       * must still write whatever version it is given (a
+                       * version-always-0 encoder bug would otherwise pass
+                       * unnoticed). Issue #618 (REQ-INGRESS-001) changed
+                       * the decode half: a non-zero version is now
+                       * rejected, so the round trip below first proves
+                       * the rejection, then clears the field on the wire
+                       * and checks every other field round-trips. */
     hdr.tv = 1;
     hdr.tu = 0;
     hdr.mr = 1;
@@ -264,11 +266,16 @@ static void test_tscf_roundtrip_no_payload(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL_UINT(RCP_AVTP_TSCF_HEADER_LEN, frame.len);
     TEST_ASSERT_EQUAL_HEX8(RCP_AVTP_SUBTYPE_TSCF, frame.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(3u, (uint8_t)((frame.data[1] >> 4) & 0x7u));
+
+    TEST_ASSERT_EQUAL(RCP_AVTP_ERR_BAD_VERSION,
+                       rcp_avtp_decode_tscf(frame.data, frame.len, &out, &payload, &payload_len));
+    frame.data[1] = (uint8_t)(frame.data[1] & 0x8Fu);
 
     TEST_ASSERT_EQUAL(RCP_AVTP_OK,
                        rcp_avtp_decode_tscf(frame.data, frame.len, &out, &payload, &payload_len));
     TEST_ASSERT_EQUAL_UINT8(hdr.sv, out.sv);
-    TEST_ASSERT_EQUAL_UINT8(hdr.version, out.version);
+    TEST_ASSERT_EQUAL_UINT8(0u, out.version);
     TEST_ASSERT_EQUAL_UINT8(hdr.mr, out.mr);
     TEST_ASSERT_EQUAL_UINT8(hdr.tv, out.tv);
     TEST_ASSERT_EQUAL_UINT8(hdr.tu, out.tu);
@@ -644,6 +651,7 @@ static void test_avtp_strerror_unique_nonempty(void)
 {
     const rcp_avtp_errc_t codes[] = {
         RCP_AVTP_OK, RCP_AVTP_ERR_SHORT_FRAME, RCP_AVTP_ERR_BAD_SUBTYPE,
+        RCP_AVTP_ERR_BAD_VERSION,
     };
     const size_t n = sizeof(codes) / sizeof(codes[0]);
     size_t i, j;
@@ -656,6 +664,83 @@ static void test_avtp_strerror_unique_nonempty(void)
             TEST_ASSERT_TRUE(strcmp(s, rcp_avtp_strerror(codes[j])) != 0);
         }
     }
+}
+
+/* ── Issue #618: header version must be 0 (TC18-11.1-002/-004) ──────────── */
+
+/* T1: every non-zero version (1..7) is rejected by both decoders with
+ * RCP_AVTP_ERR_BAD_VERSION, and *out_hdr is left untouched; version 0 is
+ * the boundary that still decodes. */
+//cfusa:test REQ-INGRESS-001
+//cfusa:test REQ-INGRESS-030
+static void test_decode_rejects_every_nonzero_version(void)
+{
+    rcp_avtp_ntscf_header_t nh = {0};
+    rcp_avtp_tscf_header_t  th = {0};
+    rcp_bytes_t             nf;
+    rcp_bytes_t             tf;
+    uint8_t                 v;
+    uint8_t                 body[4] = {1, 2, 3, 4};
+
+    nh.sv        = 1;
+    nh.stream_id = rcp_stream_id_make(kMacA, 7);
+    th.sv        = 1;
+    th.stream_id = rcp_stream_id_make(kMacA, 8);
+
+    for (v = 0; v <= 7u; v++) {
+        rcp_avtp_ntscf_header_t nout;
+        rcp_avtp_tscf_header_t  tout;
+        const uint8_t          *payload = NULL;
+        size_t                  plen    = 0;
+
+        nh.version = v;
+        th.version = v;
+        nf         = rcp_avtp_encode_ntscf(&nh, body, sizeof(body));
+        tf         = rcp_avtp_encode_tscf(&th, body, sizeof(body));
+        TEST_ASSERT_NOT_NULL(nf.data);
+        TEST_ASSERT_NOT_NULL(tf.data);
+        memset(&nout, 0xA5, sizeof(nout));
+        memset(&tout, 0xA5, sizeof(tout));
+
+        if (v == 0u) {
+            TEST_ASSERT_EQUAL(RCP_AVTP_OK,
+                              rcp_avtp_decode_ntscf(nf.data, nf.len, &nout, &payload, &plen));
+            TEST_ASSERT_EQUAL_UINT8(0u, nout.version);
+            TEST_ASSERT_EQUAL(RCP_AVTP_OK,
+                              rcp_avtp_decode_tscf(tf.data, tf.len, &tout, &payload, &plen));
+            TEST_ASSERT_EQUAL_UINT8(0u, tout.version);
+        } else {
+            TEST_ASSERT_EQUAL(RCP_AVTP_ERR_BAD_VERSION,
+                              rcp_avtp_decode_ntscf(nf.data, nf.len, &nout, &payload, &plen));
+            TEST_ASSERT_EQUAL_HEX8(0xA5u, nout.sv);
+            TEST_ASSERT_EQUAL(RCP_AVTP_ERR_BAD_VERSION,
+                              rcp_avtp_decode_tscf(tf.data, tf.len, &tout, &payload, &plen));
+            TEST_ASSERT_EQUAL_HEX8(0xA5u, tout.sv);
+        }
+        rcp_bytes_free(&nf);
+        rcp_bytes_free(&tf);
+    }
+}
+
+/* The audit probe: a raw NTSCF header byte of 0x50 (sv=0, version 5) used
+ * to decode with RCP_AVTP_OK. The subtype check still wins over the
+ * version check. */
+//cfusa:test REQ-INGRESS-001
+static void test_decode_ntscf_rejects_raw_version_five_and_checks_subtype_first(void)
+{
+    uint8_t                 raw[RCP_AVTP_NTSCF_HEADER_LEN] = {0};
+    rcp_avtp_ntscf_header_t out;
+    const uint8_t          *payload = NULL;
+    size_t                  plen    = 0;
+
+    raw[0] = RCP_AVTP_SUBTYPE_NTSCF;
+    raw[1] = 0x50u;
+    TEST_ASSERT_EQUAL(RCP_AVTP_ERR_BAD_VERSION,
+                      rcp_avtp_decode_ntscf(raw, sizeof(raw), &out, &payload, &plen));
+    raw[0] = RCP_AVTP_SUBTYPE_TSCF;
+    TEST_ASSERT_EQUAL(RCP_AVTP_ERR_BAD_SUBTYPE,
+                      rcp_avtp_decode_ntscf(raw, sizeof(raw), &out, &payload, &plen));
+    TEST_ASSERT_NOT_NULL(rcp_avtp_strerror(RCP_AVTP_ERR_BAD_VERSION));
 }
 
 /* ── Loopback transport ────────────────────────────────────────────────────── */
@@ -859,6 +944,8 @@ int main(void)
     RUN_TEST(test_decode_tscf_reports_tu_one_and_tu_zero_faithfully);
 
     RUN_TEST(test_avtp_strerror_unique_nonempty);
+    RUN_TEST(test_decode_rejects_every_nonzero_version);
+    RUN_TEST(test_decode_ntscf_rejects_raw_version_five_and_checks_subtype_first);
 
     RUN_TEST(test_loopback_transport_send_recv_fifo_order);
     RUN_TEST(test_loopback_transport_recv_times_out_when_empty);

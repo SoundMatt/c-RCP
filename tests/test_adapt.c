@@ -1994,6 +1994,47 @@ static void test_adapt_call_gpio_read_returns_mapped_response(void)
     rcp_avtp_transport_release(server_t);
 }
 
+/* Issue #618 (T1, TC18-11.1-004): the client-side NTSCF response decode
+ * in adapter_call() now rejects a reply whose header version is not 0 --
+ * the same GPIO reply as the test above, but with version 1 on the wire,
+ * is a decode error instead of a mapped response. */
+//cfusa:test REQ-INGRESS-001
+static void test_adapt_call_rejects_reply_with_nonzero_version(void)
+{
+    rcp_avtp_transport_t   *client_t = NULL;
+    rcp_avtp_transport_t   *server_t = NULL;
+    rcp_relay_caller_t     *caller;
+    relay_context_t         ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t         req, resp = {0};
+    rcp_bytes_t             resp_acf, resp_frame;
+    rcp_avtp_ntscf_header_t hdr;
+
+    TEST_ASSERT_EQUAL(RCP_SHMEM_OK, rcp_shmem_avtp_pair_new(false, 4, &client_t, &server_t));
+    caller = rcp_adapt(client_t, make_stream(1), 9, RCP_ADAPT_EP_GPIO);
+
+    resp_acf = rcp_ep_gpio_encode_response(9, 0x000000FF, 1, false, 0);
+    TEST_ASSERT_NOT_NULL(resp_acf.data);
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.sv           = 1;
+    hdr.version      = 1;
+    hdr.sequence_num = 1;
+    hdr.stream_id    = make_stream(2);
+    resp_frame       = rcp_avtp_encode_ntscf(&hdr, resp_acf.data, resp_acf.len);
+    TEST_ASSERT_NOT_NULL(resp_frame.data);
+    rcp_bytes_free(&resp_acf);
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(server_t, resp_frame.data, resp_frame.len));
+    rcp_bytes_free(&resp_frame);
+
+    relay_message_init(&req);
+    relay_message_set_meta(&req, "rcp.adapt.op", "gpio_read");
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_DECODE, rcp_relay_caller_call(caller, &ctx, &req, &resp));
+
+    relay_message_free(&req);
+    rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
+    rcp_avtp_transport_release(server_t);
+}
+
 /* adapter_call()'s RCP_ADAPT_OP_DISCOVERY branch (src/adapt.c): unlike
  * every other op, a discovery reply is read straight off the wire with no
  * NTSCF unwrap -- rcp_discovery_encode_response() already returns a
@@ -2313,6 +2354,7 @@ int main(void)
     RUN_TEST(test_adapt_send_reports_encode_error_when_ntscf_wrap_allocation_fails);
     RUN_TEST(test_adapt_send_returns_transport_error_when_queue_is_full);
     RUN_TEST(test_adapt_call_gpio_read_returns_mapped_response);
+    RUN_TEST(test_adapt_call_rejects_reply_with_nonzero_version);
     RUN_TEST(test_adapt_call_discovery_returns_mapped_response);
     RUN_TEST(test_adapt_call_returns_decode_error_on_malformed_ntscf_reply);
     RUN_TEST(test_adapt_call_returns_transport_error_on_oversized_reply);

@@ -915,6 +915,101 @@ static void test_lifecycle_strerror_unique_nonempty(void)
     }
 }
 
+/* ── Issue #618: the frame-level subtype filter ─────────────────────────────── */
+
+/* rcp_lifecycle_should_accept_subtype() never returns REJECT, and agrees
+ * with rcp_lifecycle_should_accept() on every DROP that depends only on
+ * the subtype: for every state x time_sync x policy x subtype, whenever
+ * the subtype helper says DROP so does the full filter for every
+ * (msg_type, byte_bus_id); whenever it says ACCEPT, the full filter's
+ * outcome is decided by the per-message rules alone, i.e. it equals the
+ * outcome for the same message under an NTSCF header. */
+//cfusa:test REQ-INGRESS-007
+static void test_should_accept_subtype_agrees_with_should_accept(void)
+{
+    const rcp_lifecycle_state_t states[] = {RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                            RCP_LIFECYCLE_HW_CONFIGURED,
+                                            RCP_LIFECYCLE_RCP_CONFIGURED};
+    const uint8_t subtypes[] = {RCP_AVTP_SUBTYPE_NTSCF, RCP_AVTP_SUBTYPE_TSCF, 0x00u};
+    const uint8_t msg_types[] = {RCP_ACF_MSG_TYPE_ABB, RCP_ACF_MSG_TYPE_GBB};
+    const rcp_byte_bus_id_t buses[] = {RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, 5u};
+    size_t si, ti, pi, ui, mi, bi;
+
+    for (si = 0; si < 3; si++) {
+        for (ti = 0; ti < 2; ti++) {
+            for (pi = 0; pi < 2; pi++) {
+                for (ui = 0; ui < 3; ui++) {
+                    rcp_avtp_tscf_fallback_t policy =
+                        pi ? RCP_AVTP_TSCF_FALLBACK_IGNORE : RCP_AVTP_TSCF_FALLBACK_DROP;
+                    rcp_lifecycle_accept_t frame = rcp_lifecycle_should_accept_subtype(
+                        states[si], ti != 0, subtypes[ui], policy);
+
+                    TEST_ASSERT_TRUE(frame != RCP_LIFECYCLE_REJECT);
+                    for (mi = 0; mi < 2; mi++) {
+                        for (bi = 0; bi < 2; bi++) {
+                            rcp_lifecycle_accept_t full = rcp_lifecycle_should_accept(
+                                states[si], ti != 0, subtypes[ui], msg_types[mi], buses[bi],
+                                policy);
+                            if (frame == RCP_LIFECYCLE_DROP) {
+                                TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, full);
+                            } else {
+                                /* the subtype passed, so the outcome is the
+                                 * per-message rule for an NTSCF frame */
+                                TEST_ASSERT_EQUAL(rcp_lifecycle_should_accept(
+                                                      states[si], true, RCP_AVTP_SUBTYPE_NTSCF,
+                                                      msg_types[mi], buses[bi], policy),
+                                                  full);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* The individual rules, one MC/DC pair each. */
+//cfusa:test REQ-INGRESS-007
+//cfusa:test REQ-INGRESS-031
+static void test_should_accept_subtype_rules(void)
+{
+    /* general time-sync rule (any state) */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_RCP_CONFIGURED, false,
+                                                          RCP_AVTP_SUBTYPE_TSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_RCP_CONFIGURED, false,
+                                                          RCP_AVTP_SUBTYPE_TSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_IGNORE));
+    /* HW_UNCONFIGURED: only NTSCF (TC18-12.3.1.1-002) */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
+                                                          RCP_AVTP_SUBTYPE_NTSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
+                                                          RCP_AVTP_SUBTYPE_TSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_HW_UNCONFIGURED, true, 0x00u,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    /* HW_CONFIGURED: TSCF dropped (TC18-12.3.1.2-002), NTSCF accepted */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_HW_CONFIGURED, true,
+                                                          RCP_AVTP_SUBTYPE_TSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_HW_CONFIGURED, true,
+                                                          RCP_AVTP_SUBTYPE_NTSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+    /* RCP_CONFIGURED with time sync: TSCF accepted */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT,
+                      rcp_lifecycle_should_accept_subtype(RCP_LIFECYCLE_RCP_CONFIGURED, true,
+                                                          RCP_AVTP_SUBTYPE_TSCF,
+                                                          RCP_AVTP_TSCF_FALLBACK_DROP));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -974,6 +1069,8 @@ int main(void)
     RUN_TEST(test_read_only_never_writable_in_any_state_by_any_writer);
 
     RUN_TEST(test_lifecycle_strerror_unique_nonempty);
+    RUN_TEST(test_should_accept_subtype_agrees_with_should_accept);
+    RUN_TEST(test_should_accept_subtype_rules);
 
     return UNITY_END();
 }

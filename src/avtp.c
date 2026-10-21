@@ -15,6 +15,7 @@ const char *rcp_avtp_strerror(rcp_avtp_errc_t e)
     case RCP_AVTP_OK:              return "rcp/avtp: success";
     case RCP_AVTP_ERR_SHORT_FRAME: return "rcp/avtp: frame too short";
     case RCP_AVTP_ERR_BAD_SUBTYPE: return "rcp/avtp: unexpected AVTP subtype";
+    case RCP_AVTP_ERR_BAD_VERSION: return "rcp/avtp: unsupported AVTP header version";
     default:                       return "rcp/avtp: unknown error";
     }
 }
@@ -145,6 +146,7 @@ rcp_bytes_t rcp_avtp_encode_ntscf(const rcp_avtp_ntscf_header_t *hdr,
 //cfusa:req REQ-AVTP-005
 //cfusa:req REQ-AVTP-007
 //cfusa:req REQ-AVTP-009
+//cfusa:req REQ-INGRESS-001
 rcp_avtp_errc_t rcp_avtp_decode_ntscf(const uint8_t *b, size_t len,
                                       rcp_avtp_ntscf_header_t *out_hdr,
                                       const uint8_t **out_payload, size_t *out_payload_len)
@@ -153,6 +155,7 @@ rcp_avtp_errc_t rcp_avtp_decode_ntscf(const uint8_t *b, size_t len,
 
     if (len < RCP_AVTP_NTSCF_HEADER_LEN) return RCP_AVTP_ERR_SHORT_FRAME;
     if (b[0] != RCP_AVTP_SUBTYPE_NTSCF) return RCP_AVTP_ERR_BAD_SUBTYPE;
+    if (((b[1] >> 4) & 0x7u) != 0u) return RCP_AVTP_ERR_BAD_VERSION;
 
     dlen = (uint16_t)(((uint16_t)(b[1] & 0x07u) << 8) | b[2]);
     if (len < RCP_AVTP_NTSCF_HEADER_LEN + (size_t)dlen) return RCP_AVTP_ERR_SHORT_FRAME;
@@ -213,6 +216,7 @@ rcp_bytes_t rcp_avtp_encode_tscf(const rcp_avtp_tscf_header_t *hdr,
 //cfusa:req REQ-AVTP-022
 //cfusa:req REQ-AVTP-023
 //cfusa:req REQ-AVTP-024
+//cfusa:req REQ-INGRESS-030
 rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
                                      rcp_avtp_tscf_header_t *out_hdr,
                                      const uint8_t **out_payload, size_t *out_payload_len)
@@ -221,6 +225,7 @@ rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
 
     if (len < RCP_AVTP_TSCF_HEADER_LEN) return RCP_AVTP_ERR_SHORT_FRAME;
     if (b[0] != RCP_AVTP_SUBTYPE_TSCF) return RCP_AVTP_ERR_BAD_SUBTYPE;
+    if (((b[1] >> 4) & 0x7u) != 0u) return RCP_AVTP_ERR_BAD_VERSION;
 
     dlen = get_u16(&b[20]);
     if (len < RCP_AVTP_TSCF_HEADER_LEN + (size_t)dlen) return RCP_AVTP_ERR_SHORT_FRAME;

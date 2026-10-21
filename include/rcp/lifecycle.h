@@ -583,6 +583,27 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                                    rcp_avtp_tscf_fallback_t
                                                        unsupported_time_sync_policy);
 
+/* Issue #618 (REQ-INGRESS-007): the frame-level half of
+ * rcp_lifecycle_should_accept() above -- everything that depends only on
+ * the AVTPDU's own subtype, not on any ACF member inside it -- so an
+ * ingress pipeline can apply it once per AVTPDU before looking at any
+ * member (TC18-12.3.1.1-002, TC18-12.3.1.2-002, TC18-12.6.1-002):
+ *
+ *   - rcp_avtp_should_drop_tscf() true -> RCP_LIFECYCLE_DROP;
+ *   - HW_UNCONFIGURED: any subtype other than NTSCF -> RCP_LIFECYCLE_DROP;
+ *   - HW_CONFIGURED: TSCF -> RCP_LIFECYCLE_DROP;
+ *   - otherwise RCP_LIFECYCLE_ACCEPT.
+ *
+ * Never returns RCP_LIFECYCLE_REJECT: REJECT is a per-message (EP0,
+ * non-ABB) outcome. rcp_lifecycle_should_accept() calls this function
+ * first and returns its DROP unchanged, so the two can never disagree on
+ * a subtype-only decision. */
+rcp_lifecycle_accept_t rcp_lifecycle_should_accept_subtype(rcp_lifecycle_state_t state,
+                                                            bool time_sync_supported,
+                                                            uint8_t avtp_subtype,
+                                                            rcp_avtp_tscf_fallback_t
+                                                                unsupported_time_sync_policy);
+
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 
 /* Which broad category a register field falls into for locking purposes.

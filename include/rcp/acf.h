@@ -359,6 +359,15 @@ rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_mess
 bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t *hdr,
                                                bool cs_has_meaning);
 
+/* Issue #618 (REQ-INGRESS-011): true iff the two reserved fields of a
+ * raw, still-packed byte_message_info header are zero -- octet 2 bits 4:3
+ * and octet 4 bits 3:2 (TC18-11.2.1-005's rsv=00b). rcp_acf_unpack_
+ * header() deliberately does not decode these bits at all (it has no
+ * struct field to put them in), so this works on the raw 8 octets
+ * instead. in must point at least 8 readable octets. */
+//cfusa:req REQ-INGRESS-011
+bool rcp_acf_header_reserved_bits_zero(const uint8_t in[8]);
+
 /* True iff hdr's rsp bit is 0 -- TC18's own rsp field description (Table 4)
  * states rsp=1b identifies a response; a decoded message with rsp=1 set
  * must not be admitted as a request. A caller decoding an inbound frame it

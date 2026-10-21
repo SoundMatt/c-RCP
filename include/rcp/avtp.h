@@ -116,10 +116,17 @@ extern "C" {
 #define RCP_AVTP_NTSCF_MAX_PAYLOAD ((size_t)2047u)
 #define RCP_AVTP_TSCF_MAX_PAYLOAD  ((size_t)65535u)
 
+/* RCP_AVTP_ERR_BAD_VERSION (issue #618, REQ-INGRESS-001/030): the header's
+ * own 3-bit version field (octet 1 bits 6:4) is not 0. TC18-11.1-002/
+ * TC18-11.1-004 define only version 0 of both header variants, so
+ * rcp_avtp_decode_ntscf()/_tscf() reject every other value instead of
+ * storing it and decoding the rest of a header whose layout this
+ * revision does not know. */
 typedef enum {
     RCP_AVTP_OK              = 0,
     RCP_AVTP_ERR_SHORT_FRAME = 1,
     RCP_AVTP_ERR_BAD_SUBTYPE = 2,
+    RCP_AVTP_ERR_BAD_VERSION = 3,
 } rcp_avtp_errc_t;
 
 /* Human-readable message for an rcp_avtp_errc_t value. Never returns NULL. */
@@ -198,7 +205,10 @@ rcp_bytes_t rcp_avtp_encode_ntscf(const rcp_avtp_ntscf_header_t *hdr,
  * caller must keep b alive at least as long as it uses *out_payload).
  * Returns RCP_AVTP_ERR_SHORT_FRAME if b is shorter than the fixed header
  * or than the header-plus-declared-payload length. Returns
- * RCP_AVTP_ERR_BAD_SUBTYPE if byte 0 is not RCP_AVTP_SUBTYPE_NTSCF. */
+ * RCP_AVTP_ERR_BAD_SUBTYPE if byte 0 is not RCP_AVTP_SUBTYPE_NTSCF.
+ * Returns RCP_AVTP_ERR_BAD_VERSION (checked after the subtype, before the
+ * length) if the version field is not 0 (issue #618, REQ-INGRESS-001);
+ * *out_hdr is left untouched on every error return. */
 rcp_avtp_errc_t rcp_avtp_decode_ntscf(const uint8_t *b, size_t len,
                                       rcp_avtp_ntscf_header_t *out_hdr,
                                       const uint8_t **out_payload, size_t *out_payload_len);
@@ -256,7 +266,9 @@ typedef struct {
 rcp_bytes_t rcp_avtp_encode_tscf(const rcp_avtp_tscf_header_t *hdr,
                                   const uint8_t *payload, size_t payload_len);
 
-/* Same conventions as rcp_avtp_decode_ntscf(): *out_payload borrows from b. */
+/* Same conventions as rcp_avtp_decode_ntscf(), including the
+ * RCP_AVTP_ERR_BAD_VERSION rejection of a non-zero version field (REQ-INGRESS-030):
+ * *out_payload borrows from b. */
 rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
                                      rcp_avtp_tscf_header_t *out_hdr,
                                      const uint8_t **out_payload, size_t *out_payload_len);
@@ -306,15 +318,12 @@ uint64_t rcp_avtp_extend_timestamp(uint32_t wire_ts, uint64_t reference_now);
 rcp_avtp_errc_t rcp_avtp_peek_subtype(const uint8_t *b, size_t len, uint8_t *out_subtype);
 
 /* TC18 §13.3's own configurable disposition for a TSCF-headed AVTPDU an
- * RC Server cannot (or chooses not to) honor the ordinary way -- shared
- * by rcp_avtp_should_drop_tscf()'s unsupported-time-sync rule and
- * rcp_avtp_tscf_reserved_all_zero()'s reserved-bytes rule below, since
- * both of §13.3's own sentences describing them have the identical
- * "...or dropped, depending on the configuration of the RC Server"
- * shape -- one server-wide policy knob, not two, covers both (a caller
- * needing genuinely independent per-rule policy can still pass a
- * different value to each call, since neither function stores this
- * itself). RCP_AVTP_TSCF_FALLBACK_DROP is 0, so any caller-owned
+ * RC Server cannot honor the ordinary way because it does not support
+ * time synchronization (rcp_avtp_should_drop_tscf()'s rule). Issue #618:
+ * this enum used to be shared with the reserved-bytes rule as well; that
+ * rule now has its own rcp_avtp_tscf_reserved_zero_policy_t (below), so
+ * the two can be configured independently. RCP_AVTP_TSCF_FALLBACK_DROP
+ * is 0, so any caller-owned
  * rcp_avtp_tscf_fallback_t left zero-initialized (or a server built
  * before this enum existed, simply passing the literal 0) reproduces
  * this library's pre-issue-#431 unconditional-drop behavior exactly --
@@ -331,6 +340,29 @@ typedef enum {
                                            time were included */
 } rcp_avtp_tscf_fallback_t;
 
+/* Issue #618 (REQ-INGRESS-004/005/006): the RC Server's own disposition
+ * for TC18-13.3-003's reserved-bytes rule, kept separate from
+ * rcp_avtp_tscf_fallback_t (which now governs only the unsupported-
+ * time-sync rule). An IEEE 1722-conformant sender -- rcp_avtp_encode_
+ * tscf() included -- always transmits the TSCF reserved bytes as zero,
+ * so a literal reading of TC18-13.3-003 would turn every conformant
+ * timed request into an untimed one (or drop it), contradicting
+ * TC18-11.1-001/TC18-11.2-001/TC18-11.2.1-003. The default (0, so any
+ * calloc()'d server gets it) therefore keeps the presentation-time gate;
+ * the two literal readings stay available as configuration. See
+ * docs/TC18-NON-NORMATIVE-CLAUSES.md, "Interpretations of conflicting
+ * normative clauses", for the full rationale. */
+typedef enum {
+    RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE = 0, /* default: honour tv/the
+                                                   presentation time as
+                                                   usual */
+    RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF  = 1, /* process exactly as if the
+                                                   frame had an NTSCF header
+                                                   (subtype and tv both
+                                                   substituted) */
+    RCP_AVTP_TSCF_RESERVED_ZERO_DROP      = 2, /* drop silently */
+} rcp_avtp_tscf_reserved_zero_policy_t;
+
 /* REQ-AVTP-014/021, TC18 §13.3 ("In case the RC Server does not support
  * time synchronization, the presentation time shall be ignored, and the
  * request(s) executed as if no presentation time were included or
@@ -346,8 +378,7 @@ typedef enum {
  * function returns false, so the frame is NOT dropped -- a caller taking
  * that path is responsible for actually ignoring the presentation time
  * per that same sentence, e.g. by admitting the request with tv treated
- * as false; rcp_mock_server_dispatch_tscf()'s own dispatch_plain_inner()
- * helper does exactly this).
+ * as false; rcp_ingress_resolve_timing() (ingress.h) does exactly this).
  *
  * This is its own function (rather than folded into a transport's
  * receive loop) precisely so the rule is a deliberate, directly-testable
@@ -362,18 +393,14 @@ bool rcp_avtp_should_drop_tscf(bool server_time_sync_supported, uint8_t subtype,
  * bytes in the header are all zero, then the request shall be queued as
  * if the header was in NTSCF format or dropped, depending on
  * configuration." Returns true iff hdr's own reserved0/reserved1 are
- * both zero -- callers combine this with a caller-owned
- * rcp_avtp_tscf_fallback_t exactly the way rcp_avtp_should_drop_tscf()'s
- * own unsupported_time_sync_policy parameter is used (see that
- * function's own doc comment): RCP_AVTP_TSCF_FALLBACK_DROP means drop
- * the frame outright when this returns true; RCP_AVTP_TSCF_FALLBACK_
- * IGNORE means process it as if it had genuinely arrived under an NTSCF
- * header -- a literal, full substitution (this rule's own "queued as if
- * the header was in NTSCF format" wording, not merely "ignore the
- * presentation time" the way the unsupported-time-sync rule's own
- * narrower wording reads) -- see rcp_mock_server_dispatch_tscf()'s own
- * doc comment for the one call site currently wired to actually make
- * that substitution. Deliberately takes the full decoded header (not
+ * both zero -- callers combine this with a
+ * rcp_avtp_tscf_reserved_zero_policy_t (issue #618; see that enum and
+ * rcp_ingress_resolve_timing(), ingress.h, which applies it):
+ * RCP_AVTP_TSCF_RESERVED_ZERO_DROP drops the frame when this returns
+ * true; _AS_NTSCF processes it as if it had arrived under an NTSCF
+ * header (a literal, full substitution, not merely "ignore the
+ * presentation time"); _TIME_GATE, the default, lets the presentation-
+ * time gate apply as usual. Deliberately takes the full decoded header (not
  * just the reserved bytes) so its own signature reads self-explanatory
  * at every call site; a subtype other than RCP_AVTP_SUBTYPE_TSCF has no
  * such header to check in the first place and is the caller's own

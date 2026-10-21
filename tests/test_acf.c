@@ -1316,9 +1316,39 @@ static void test_acf_strerror_unique_nonempty(void)
     }
 }
 
+/* Issue #618 (T11, TC18-11.2.1-005): Table 4 fixes mtv=0b for ACF_ABB, so
+ * rcp_acf_encode_abb() never copies a caller-supplied mtv onto the wire
+ * (octet 2 bit 5); the GBB encoder keeps passing mtv through, since there
+ * it is a real field. */
+//cfusa:test REQ-INGRESS-012
+static void test_encode_abb_forces_mtv_zero_but_gbb_keeps_it(void)
+{
+    rcp_acf_byte_message_info_t h;
+    rcp_acf_gbb_header_t        g;
+    rcp_bytes_t                 a, b;
+
+    memset(&h, 0, sizeof(h));
+    h.byte_bus_id = 5;
+    h.mtv         = RCP_ACF_MTV_VALID;
+    a             = rcp_acf_encode_abb(&h, NULL, 0);
+    TEST_ASSERT_NOT_NULL(a.data);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, (uint8_t)(a.data[2] & 0x20u));
+
+    memset(&g, 0, sizeof(g));
+    g.info.byte_bus_id = 5;
+    g.info.mtv         = RCP_ACF_MTV_VALID;
+    b                  = rcp_acf_encode_gbb(&g, NULL, 0);
+    TEST_ASSERT_NOT_NULL(b.data);
+    TEST_ASSERT_EQUAL_HEX8(0x20u, (uint8_t)(b.data[2] & 0x20u));
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_encode_abb_forces_mtv_zero_but_gbb_keeps_it);
 
     RUN_TEST(test_msg_type_abb_constant);
     RUN_TEST(test_msg_type_gbb_constant);

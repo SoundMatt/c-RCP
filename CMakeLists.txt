@@ -48,6 +48,7 @@ add_library(rcp STATIC
     src/avtp.c
     src/acf.c
     src/fragment.c
+    src/ingress.c
     src/lifecycle.c
     src/server.c
     src/regmap.c

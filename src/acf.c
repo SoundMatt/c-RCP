@@ -200,6 +200,12 @@ bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t 
     return true;
 }
 
+//cfusa:req REQ-INGRESS-011
+bool rcp_acf_header_reserved_bits_zero(const uint8_t in[8])
+{
+    return (in[2] & 0x18u) == 0u && (in[4] & 0x0Cu) == 0u;
+}
+
 //cfusa:req REQ-ACF-050
 bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr)
 {
@@ -359,6 +365,7 @@ rcp_bytes_t rcp_acf_build_acknowledge_rejected_response(rcp_byte_bus_id_t byte_b
 //cfusa:req REQ-ACF-004
 //cfusa:req REQ-ACF-006
 //cfusa:req REQ-ACF-014
+//cfusa:req REQ-INGRESS-012
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len)
 {
@@ -382,6 +389,11 @@ rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
 
     h     = *hdr;
     h.pad = pad;
+    /* Issue #618 (REQ-INGRESS-012): TC18-11.2.1-005 fixes mtv=0b for
+     * ACF_ABB -- ABB has no message_timestamp for the bit to describe --
+     * so a caller-supplied mtv is never copied onto the wire here. The
+     * GBB encoder keeps passing mtv through, since there it is real. */
+    h.mtv = (uint8_t)RCP_ACF_MTV_UNTIMED;
     rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_ABB, quadlets, &h);
 
     if (payload_len > 0) rcp_memcpy_bounded(&b[RCP_ACF_ABB_HEADER_LEN], payload_len, payload, payload_len);

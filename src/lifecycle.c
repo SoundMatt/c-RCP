@@ -252,6 +252,33 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 
 /* ── Per-state request filtering ───────────────────────────────────────────── */
 
+//cfusa:req REQ-INGRESS-007
+//cfusa:req REQ-INGRESS-031
+rcp_lifecycle_accept_t rcp_lifecycle_should_accept_subtype(rcp_lifecycle_state_t state,
+                                                            bool time_sync_supported,
+                                                            uint8_t avtp_subtype,
+                                                            rcp_avtp_tscf_fallback_t
+                                                                unsupported_time_sync_policy)
+{
+    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype,
+                                   unsupported_time_sync_policy)) {
+        return RCP_LIFECYCLE_DROP;
+    }
+    /* HW_UNCONFIGURED: only NTSCF AVTPDUs are accepted at all -- TSCF's
+     * presentation-time semantics presuppose a configured request stream,
+     * which cannot exist yet during bootstrap (TC18-12.3.1.1-002). */
+    if (state == RCP_LIFECYCLE_HW_UNCONFIGURED && avtp_subtype != RCP_AVTP_SUBTYPE_NTSCF) {
+        return RCP_LIFECYCLE_DROP;
+    }
+    /* HW_CONFIGURED: TSCF is still dropped, regardless of the general
+     * time-sync rule above (TC18-12.3.1.2-002) -- see
+     * rcp_lifecycle_should_accept()'s own HW_CONFIGURED comment. */
+    if (state == RCP_LIFECYCLE_HW_CONFIGURED && avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) {
+        return RCP_LIFECYCLE_DROP;
+    }
+    return RCP_LIFECYCLE_ACCEPT;
+}
+
 //cfusa:req REQ-LIFECYCLE-014
 //cfusa:req REQ-LIFECYCLE-015
 //cfusa:req REQ-LIFECYCLE-016
@@ -269,20 +296,19 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                                     rcp_avtp_tscf_fallback_t
                                                         unsupported_time_sync_policy)
 {
-    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype,
-                                   unsupported_time_sync_policy)) {
+    /* Issue #618: the subtype-only part of this rule lives in
+     * rcp_lifecycle_should_accept_subtype() (the general time-sync rule,
+     * plus HW_UNCONFIGURED's NTSCF-only and HW_CONFIGURED's TSCF-drop
+     * rules), called first so the frame-level and per-message decisions
+     * can never drift apart. */
+    if (rcp_lifecycle_should_accept_subtype(state, time_sync_supported, avtp_subtype,
+                                             unsupported_time_sync_policy) ==
+        RCP_LIFECYCLE_DROP) {
         return RCP_LIFECYCLE_DROP;
     }
 
     if (state == RCP_LIFECYCLE_HW_UNCONFIGURED) {
-        /* TSCF's presentation-time semantics presuppose a configured
-         * request stream, which cannot exist yet during bootstrap --
-         * dropped outright regardless of the node's own time-sync
-         * capability, unlike the general rule just applied above. */
-        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return RCP_LIFECYCLE_DROP;
-
-        if (avtp_subtype != RCP_AVTP_SUBTYPE_NTSCF ||
-            byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) {
+        if (byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) {
             return RCP_LIFECYCLE_DROP;
         }
 
@@ -337,8 +363,9 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
          * rules layered on top of this once register-map wire I/O
          * eventually exists). This is a plain DROP, not REJECT: §12.7's
          * more specific EP0-scoped REJECT rule below does not reach a
-         * request that never made it to EP0 in the first place. */
-        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return RCP_LIFECYCLE_DROP;
+         * request that never made it to EP0 in the first place. (The
+         * TSCF drop this paragraph describes is applied by
+         * rcp_lifecycle_should_accept_subtype(), above.) */
         if (byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) return RCP_LIFECYCLE_DROP;
 
         /* REQ-LIFECYCLE-033/029 (TC18 §12.7 vs. §12.3.1.2): addressed to
