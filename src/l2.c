@@ -361,6 +361,30 @@ bool rcp_l2_avtp_transport_local_mac(rcp_avtp_transport_t *t, uint8_t out_mac[6]
     return true;
 }
 
+//cfusa:req REQ-INGRESS-024
+bool rcp_l2_set_rcvbuf(rcp_avtp_transport_t *t, size_t bytes)
+{
+    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)t;
+    int                       v;
+
+    if (!l->ok || bytes > (size_t)0x7FFFFFFF) return false;
+    v = (int)bytes;
+    return setsockopt(l->fd, SOL_SOCKET, SO_RCVBUF, &v, (socklen_t)sizeof(v)) == 0;
+}
+
+//cfusa:req REQ-INGRESS-024
+bool rcp_l2_get_rcvbuf(rcp_avtp_transport_t *t, size_t *out_bytes)
+{
+    rcp_l2_avtp_transport_t *l   = (rcp_l2_avtp_transport_t *)t;
+    int                       v   = 0;
+    socklen_t                 len = (socklen_t)sizeof(v);
+
+    if (!l->ok) return false;
+    if (getsockopt(l->fd, SOL_SOCKET, SO_RCVBUF, &v, &len) != 0 || v < 0) return false;
+    *out_bytes = (size_t)v;
+    return true;
+}
+
 #else /* !defined(__linux__) -- raw AF_PACKET/SOCK_RAW is Linux-specific,
        * see this module's own header doc comment; every non-Linux build
        * gets the same fail-cleanly stub udp.c's own Windows path uses. */
@@ -425,6 +449,22 @@ bool rcp_l2_avtp_transport_ok(rcp_avtp_transport_t *t)
 bool rcp_l2_avtp_transport_local_mac(rcp_avtp_transport_t *t, uint8_t out_mac[6])
 {
     (void)t; (void)out_mac;
+    return false;
+}
+
+//cfusa:req REQ-INGRESS-024
+bool rcp_l2_set_rcvbuf(rcp_avtp_transport_t *t, size_t bytes)
+{
+    (void)t;
+    (void)bytes;
+    return false;
+}
+
+//cfusa:req REQ-INGRESS-024
+bool rcp_l2_get_rcvbuf(rcp_avtp_transport_t *t, size_t *out_bytes)
+{
+    (void)t;
+    (void)out_bytes;
     return false;
 }
 

@@ -137,6 +137,69 @@ static int roundtrip_one_way(const char *label, rcp_avtp_transport_t *tx,
     return 0;
 }
 
+/* Issue #618 (T10, REQ-INGRESS-024, TC18-12.8.2-004): a back-to-back
+ * burst with no receive in between. rx's SO_RCVBUF is set to
+ * VETH_BURST_RCVBUF first and must read back at least that size (Linux
+ * reports double the request); the burst is then sized to that buffer
+ * using the sizing rule documented in l2.h -- VETH_BURST_FRAMES frames at
+ * a budgeted VETH_BURST_FRAME_COST octets of kernel cost each must fit --
+ * and every frame must arrive, in order, byte-for-byte: zero loss. */
+#define VETH_BURST_RCVBUF     ((size_t)256u * 1024u)
+#define VETH_BURST_FRAMES     200u
+#define VETH_BURST_FRAME_COST ((size_t)1280u)
+
+//cfusa:test REQ-INGRESS-024
+static int test_burst_sized_to_rcvbuf_is_received_without_loss(rcp_avtp_transport_t *tx,
+                                                               rcp_avtp_transport_t *rx)
+{
+    size_t   effective = 0;
+    unsigned i;
+
+    if (!rcp_l2_set_rcvbuf(rx, VETH_BURST_RCVBUF) || !rcp_l2_get_rcvbuf(rx, &effective)) {
+        fprintf(stderr, "[burst] SO_RCVBUF could not be set/read\n");
+        return 1;
+    }
+    if (effective < VETH_BURST_RCVBUF) {
+        fprintf(stderr, "[burst] SO_RCVBUF reads back %zu, configured %zu\n", effective,
+                VETH_BURST_RCVBUF);
+        return 1;
+    }
+    if ((size_t)VETH_BURST_FRAMES * VETH_BURST_FRAME_COST > effective) {
+        fprintf(stderr, "[burst] burst does not fit the configured buffer\n");
+        return 1;
+    }
+
+    for (i = 0; i < VETH_BURST_FRAMES; i++) {
+        rcp_bytes_t frame = build_ntscf_frame((uint8_t)i);
+        int         rc    = frame.data ? rcp_avtp_transport_send(tx, frame.data, frame.len)
+                                       : RCP_ERR_CLOSED;
+        rcp_bytes_free(&frame);
+        if (rc != RCP_OK) {
+            fprintf(stderr, "[burst] send %u failed: rc=%d\n", i, rc);
+            return 1;
+        }
+    }
+    for (i = 0; i < VETH_BURST_FRAMES; i++) {
+        rcp_bytes_t   want = build_ntscf_frame((uint8_t)i);
+        rcp_context_t ctx  = rcp_context_with_timeout_ms(2000);
+        uint8_t       buf[512];
+        size_t        out_len = 0;
+        int           rc      = rcp_avtp_transport_recv(rx, &ctx, buf, sizeof(buf), &out_len);
+        int           same    = rc == RCP_OK && want.data && out_len == want.len &&
+                                memcmp(buf, want.data, want.len) == 0;
+
+        rcp_bytes_free(&want);
+        if (!same) {
+            fprintf(stderr, "[burst] frame %u of %u lost or corrupted (rc=%d)\n", i,
+                    VETH_BURST_FRAMES, rc);
+            return 1;
+        }
+    }
+    printf("[burst] OK: %u back-to-back frames received with zero loss (SO_RCVBUF %zu)\n",
+           VETH_BURST_FRAMES, effective);
+    return 0;
+}
+
 typedef struct {
     rcp_avtp_transport_t *t;
     int                     result;
@@ -236,6 +299,7 @@ int main(void)
 
     failures += roundtrip_one_way("veth0->veth1", a, b, 0x11);
     failures += roundtrip_one_way("veth1->veth0", b, a, 0x22);
+    failures += test_burst_sized_to_rcvbuf_is_received_without_loss(a, b);
     /* a is deliberately closed (not just released) here, before either
      * transport is torn down below: this exercises REQ-L2-008 against a
      * transport that has already done real send()/recv() traffic, not a

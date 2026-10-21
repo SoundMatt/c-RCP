@@ -168,6 +168,34 @@ bool rcp_l2_avtp_transport_ok(rcp_avtp_transport_t *t);
  * returned by this module's own new(). */
 bool rcp_l2_avtp_transport_local_mac(rcp_avtp_transport_t *t, uint8_t out_mac[6]);
 
+/* ── Burst reception (issue #618, REQ-INGRESS-024) ───────────────────────── */
+
+/* TC18-12.8.2-004 requires the RC Server to receive and handle frames that
+ * arrive at the minimum inter-packet gap. recv() moves one frame per call,
+ * so a back-to-back burst is held by the kernel's socket receive buffer
+ * until the caller's loop (rcp_mock_server_pump_transport() or the
+ * integrator's own) drains it; a buffer too small for the burst drops
+ * frames silently in the kernel. Sizing rule (SEOOC_BOUNDARY.md AoU-11):
+ *
+ *     bytes >= worst-case burst length (frames) x per-frame kernel cost,
+ *
+ * where the per-frame cost is the largest Ethernet frame the stream can
+ * carry plus the kernel's per-packet bookkeeping overhead (on Linux, the
+ * skb truesize -- budget at least 1 KiB per small frame).
+ *
+ * rcp_l2_set_rcvbuf() applies SO_RCVBUF to t's raw socket. Returns false
+ * if t is not ok() or the socket option is refused. The kernel may round
+ * or cap the request (Linux doubles it, bounded by net.core.rmem_max);
+ * rcp_l2_get_rcvbuf() reports the size actually in effect. Both return
+ * false on the non-Linux stub. Behavior is undefined if t was not
+ * returned by rcp_l2_avtp_transport_new(). */
+bool rcp_l2_set_rcvbuf(rcp_avtp_transport_t *t, size_t bytes);
+
+/* Writes the receive-buffer size currently in effect for t's socket
+ * (getsockopt(SO_RCVBUF)) into *out_bytes and returns true; false (and
+ * *out_bytes untouched) if t is not ok() or the query fails. */
+bool rcp_l2_get_rcvbuf(rcp_avtp_transport_t *t, size_t *out_bytes);
+
 #ifdef __cplusplus
 }
 #endif

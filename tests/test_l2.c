@@ -199,6 +199,25 @@ static void test_transport_new_bad_interface_is_not_ok(void)
     rcp_avtp_transport_release(t);
 }
 
+/* Issue #618 (REQ-INGRESS-024): SO_RCVBUF can only be configured on an
+ * ok() transport -- a transport whose socket never opened (bad interface,
+ * no privilege, or the non-Linux stub) refuses both calls and leaves the
+ * out parameter untouched. The real, privileged set/read-back path is
+ * exercised by l2_veth_roundtrip_test.c's burst test in CI's veth job. */
+//cfusa:test REQ-INGRESS-024
+static void test_rcvbuf_refused_on_a_transport_that_is_not_ok(void)
+{
+    rcp_avtp_transport_t *t     = rcp_l2_avtp_transport_new("no-such-if-9999", k_dst_mac, false);
+    size_t                bytes = 1234u;
+
+    TEST_ASSERT_NOT_NULL(t);
+    TEST_ASSERT_FALSE(rcp_l2_avtp_transport_ok(t));
+    TEST_ASSERT_FALSE(rcp_l2_set_rcvbuf(t, 65536u));
+    TEST_ASSERT_FALSE(rcp_l2_get_rcvbuf(t, &bytes));
+    TEST_ASSERT_EQUAL_UINT(1234u, bytes);
+    rcp_avtp_transport_release(t);
+}
+
 #if !defined(__linux__)
 /* REQ-L2-009 is specifically scoped to "on a non-Linux platform": the
  * stub vtable (src/l2.c's #else branch) unconditionally returns
@@ -249,6 +268,7 @@ int main(void)
     RUN_TEST(test_mac_is_unicast_classifies_unicast_multicast_broadcast);
     RUN_TEST(test_transport_new_ok_or_gracefully_unavailable);
     RUN_TEST(test_transport_new_bad_interface_is_not_ok);
+    RUN_TEST(test_rcvbuf_refused_on_a_transport_that_is_not_ok);
 #if !defined(__linux__)
     RUN_TEST(test_transport_send_recv_closed_when_not_ok);
 #endif
