@@ -3626,6 +3626,7 @@ static const rcp_mock_rx_ctx_t RX_TS = {true, 0u, false};
  * time (TC18-11.1-001, TC18-11.2-001, TC18-11.2.1-003). */
 //cfusa:test REQ-INGRESS-004
 //cfusa:test REQ-INGRESS-009
+//cfusa:test REQ-INGRESS-035
 static void test_receive_avtpdu_conformant_tscf_waits_for_presentation_time(void)
 {
     rcp_mock_server_t          *srv = rcp_mock_server_new();

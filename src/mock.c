@@ -1599,6 +1599,7 @@ typedef struct {
 //cfusa:req REQ-MOCK-021
 //cfusa:req REQ-MOCK-030
 //cfusa:req REQ-AVTP-030
+//cfusa:req REQ-INGRESS-035
 /* Step 4 (issue #618): admission proper -- the store/ack/execute/overflow
  * half of the old dispatch_plain_inner(), now reached only after every
  * filter and gate has passed, with the frame's own effective tv /

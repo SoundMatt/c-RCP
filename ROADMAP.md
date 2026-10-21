@@ -19147,7 +19147,7 @@ Gaps closed (audit indices 0, 6, 7, 9, 56, 101, 110, 111, 112, 128, 131,
 - `rcp_l2_set_rcvbuf()`/`rcp_l2_get_rcvbuf()` for burst reception
   (TC18-12.8.2-004), with a veth burst test in CI.
 
-New requirements REQ-INGRESS-001..034; REQ-AVTP-032/033, REQ-ACF-021,
+New requirements REQ-INGRESS-001..035; REQ-AVTP-032/033, REQ-ACF-021,
 REQ-WDG-010, REQ-E2E-021/038/039 and REQ-ISELED-025 updated.
 
 **Next** (wave 1, coordinated): #617 (admission internals), #619
