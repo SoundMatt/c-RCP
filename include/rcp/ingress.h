@@ -120,11 +120,16 @@ typedef enum {
  *   5. Otherwise PRESENTATION. tu = 1 is treated exactly like tu = 0
  *      (REQ-AVTP-023): it is never consulted.
  *
- * *out_effective_subtype is the subtype every later stage (lifecycle
- * filtering, admission) must use; *out_effective_tv is the tv admission
- * must use. Both are written on every return, including DROP (where they
- * carry f->subtype and false). The CRC stage still uses the real
- * f->subtype/header_octet1, never the effective ones. */
+ * *out_effective_subtype is the subtype the frame is timed as (NTSCF after
+ * an _AS_NTSCF relabelling); *out_effective_tv is the tv admission must
+ * use. Both are written on every return, including DROP (where they
+ * carry f->subtype and false). The relabelling is a timing decision only:
+ * the state-dependent subtype rules (rcp_lifecycle_should_accept_subtype()
+ * / rcp_lifecycle_should_accept(): NTSCF only in HW_UNCONFIGURED, TSCF
+ * dropped in HW_CONFIGURED -- TC18-12.3.1.1-002/12.3.1.2-002) must be
+ * given the wire subtype f->subtype, or a conformant TSCF AVTPDU would
+ * get past them under _AS_NTSCF (REQ-INGRESS-036). The CRC stage also
+ * uses the real f->subtype/header_octet1, never the effective ones. */
 //cfusa:req REQ-INGRESS-003
 //cfusa:req REQ-INGRESS-004
 rcp_ingress_timing_t rcp_ingress_resolve_timing(const rcp_ingress_avtpdu_t *f,

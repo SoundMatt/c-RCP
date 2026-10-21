@@ -3822,7 +3822,7 @@ static void t4_assert_every_path_drops(rcp_mock_server_t *srv, const rcp_bytes_t
     rcp_bytes_t                    pdu = rx_ntscf(RX_SID, 1, w->data, w->len);
     rx_capture_t                   cap;
     rcp_mock_rx_summary_t          sum;
-    rcp_mock_rx_ctx_t              ctx = {time_sync, 0u, false};
+    rcp_mock_rx_ctx_t              ctx = {false, 0u, false};
     uint8_t                        st  = RCP_AVTP_SUBTYPE_NTSCF;
 
 #define T4_SINGLE(call)                                                                            \
@@ -3831,6 +3831,9 @@ static void t4_assert_every_path_drops(rcp_mock_server_t *srv, const rcp_bytes_t
         TEST_ASSERT_NULL(resp.data);                                                               \
     } while (0)
 
+    /* Assigned, not initialized: MSVC's C mode rejects a non-constant
+     * aggregate initializer (C4204 under /W4 /WX). */
+    ctx.time_sync_supported = time_sync;
     T4_SINGLE(rcp_mock_server_dispatch(srv, 5, st, RCP_ACF_MSG_TYPE_ABB, time_sync, RX_SID, w->data,
                                        w->len, &resp));
     T4_SINGLE(rcp_mock_server_dispatch_tscf(srv, 5, st, RCP_ACF_MSG_TYPE_ABB, time_sync, RX_SID,
@@ -4697,6 +4700,84 @@ static void test_receive_avtpdu_drops_tscf_in_pre_operational_states(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-INGRESS-036 (TC18-12.3.1.1-002 / TC18-12.3.1.2-002): the state-
+ * dependent subtype rules see the wire subtype. Under _AS_NTSCF a
+ * conformant TSCF AVTPDU is *timed* as NTSCF, but in HW_UNCONFIGURED and
+ * HW_CONFIGURED it must still be dropped silently -- under every
+ * reserved-zero policy, with tv 0 or 1, through receive_avtpdu() and all
+ * four TSCF-aware legacy wrappers. Under _DROP the timing stage drops the
+ * frame first (TIMING_DROP); the other two policies reach the frame-level
+ * lifecycle filter (LIFECYCLE_DROP). Either way: no response, no handler
+ * call. The EP0 ABB inside would be accepted as NTSCF in both states, so
+ * a filter fed the relabelled subtype runs it. */
+//cfusa:test REQ-INGRESS-036
+//cfusa:test REQ-INGRESS-032
+static void test_tscf_dropped_pre_operational_under_every_reserved_zero_policy(void)
+{
+    static const rcp_avtp_tscf_reserved_zero_policy_t pols[3] = {
+        RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE, RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF,
+        RCP_AVTP_TSCF_RESERVED_ZERO_DROP};
+    rcp_bytes_t m = rx_abb(0, 1, 0);
+    size_t      p;
+    int         state, tvi;
+
+    for (state = 0; state < 2; state++) {
+        for (p = 0; p < 3u; p++) {
+            for (tvi = 0; tvi < 2; tvi++) {
+                rcp_mock_server_t             *srv  = rcp_mock_server_new();
+                bool                           tv   = tvi != 0;
+                rcp_bytes_t                    pdu  = rx_tscf(RX_SID, 0, tv, 1000u, m.data, m.len);
+                rcp_bytes_t                    resp = {0};
+                rcp_mock_frame_member_result_t fr[2];
+                rx_capture_t                   cap;
+                rcp_mock_rx_summary_t          sum;
+
+                rcp_mock_server_add_endpoint(srv, 0, 1, true, counting_echo_handler, NULL);
+                if (state == 1) to_hw_configured(srv);
+                rcp_mock_server_set_tscf_reserved_zero_policy(srv, pols[p]);
+                g_rx_count = 0;
+                rx_capture_init(&cap);
+
+                (void)rcp_mock_server_receive_avtpdu(srv, pdu.data, pdu.len, &RX_TS,
+                                                     rx_capture_sink, &cap, &sum);
+                TEST_ASSERT_EQUAL(pols[p] == RCP_AVTP_TSCF_RESERVED_ZERO_DROP
+                                      ? RCP_MOCK_RX_FRAME_TIMING_DROP
+                                      : RCP_MOCK_RX_FRAME_LIFECYCLE_DROP,
+                                  sum.outcome);
+                TEST_ASSERT_EQUAL_UINT(0u, cap.n);
+
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+                                  rcp_mock_server_dispatch_tscf(
+                                      srv, 0, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      RX_SID, tv, 1000u, true, 0u, m.data, m.len, &resp));
+                TEST_ASSERT_NULL(resp.data);
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+                                  rcp_mock_server_dispatch_e2e_tscf(
+                                      srv, 0, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      RX_SID, tv, 1000u, 0u, m.data, m.len, &resp));
+                TEST_ASSERT_NULL(resp.data);
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+                                  rcp_mock_server_dispatch_e2e_fragment_tscf(
+                                      srv, 0, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      RX_SID, tv, 1000u, 0u, m.data, m.len, &resp));
+                TEST_ASSERT_NULL(resp.data);
+                TEST_ASSERT_EQUAL_UINT(1u, rcp_mock_server_dispatch_frame_e2e_tscf(
+                                               srv, RCP_AVTP_SUBTYPE_TSCF, true, RX_SID, tv,
+                                               1000u, 0u, 0u, m.data, m.len, fr, 2));
+                TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED, fr[0].result);
+                TEST_ASSERT_NULL(fr[0].response.data);
+
+                TEST_ASSERT_EQUAL_UINT_MESSAGE(0u, g_rx_count, "handler ran");
+                TEST_ASSERT_EQUAL_UINT(0u, rcp_mock_server_pending_count(srv, 0));
+                rx_capture_free(&cap);
+                rcp_bytes_free(&pdu);
+                rcp_mock_server_destroy(srv);
+            }
+        }
+    }
+    rcp_bytes_free(&m);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -4844,5 +4925,6 @@ int main(void)
     RUN_TEST(test_burst_of_timed_requests_keeps_store_bounded);
 
     RUN_TEST(test_receive_avtpdu_drops_tscf_in_pre_operational_states);
+    RUN_TEST(test_tscf_dropped_pre_operational_under_every_reserved_zero_policy);
     return UNITY_END();
 }

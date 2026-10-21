@@ -1290,7 +1290,11 @@ static void rx_join_responses(rcp_bytes_t *buf, size_t count, rcp_bytes_t *out)
         }
         rcp_bytes_free(&buf[i]);
     }
-    if (!joined) return; /* allocation failure: nothing to hand back */
+    /* Allocation failure: the responses are lost. This is heap exhaustion
+     * (the rcp_malloc() hook failing, SEOOC_BOUNDARY.md AoU-8), not the
+     * capacity overflow REQ-INGRESS-021 counts, so it is not added to
+     * response_overflow_count. */
+    if (!joined) return;
     out->data = joined;
     out->len  = total;
 }
@@ -1592,7 +1596,6 @@ typedef struct {
     rcp_ingress_avtpdu_t f;
     bool                 time_sync_supported;
     uint64_t             gptp_reference_now;
-    uint8_t              eff_subtype; /* rcp_ingress_resolve_timing() */
     bool                 eff_tv;      /* rcp_ingress_resolve_timing() */
 } rx_frame_t;
 
@@ -1839,10 +1842,13 @@ static void suppress_response_per_stream_cfg(rcp_mock_server_t *srv, uint64_t st
  * member on every path. Side-effect free apart from the REJECT response
  * REQ-LIFECYCLE-033 requires (TC18 §12.7's EP0-scoped REQUEST_REJECTED);
  * DROP produces nothing at all (TC18-12.3.1.1-003, TC18-12.7-003). The
- * effective subtype is the frame-level one, so an AS_NTSCF substitution
- * (TC18-13.3-003) is seen here exactly as if the frame had been NTSCF. */
+ * subtype is the one on the wire (fr->f.subtype), never the AS_NTSCF
+ * relabelling (TC18-13.3-003): that substitution decides timing only and
+ * must not let a TSCF AVTPDU past the state-dependent subtype rules
+ * (REQ-INGRESS-036). */
 //cfusa:req REQ-INGRESS-009
 //cfusa:req REQ-INGRESS-033
+//cfusa:req REQ-INGRESS-036
 //cfusa:req REQ-LIFECYCLE-033
 static rcp_lifecycle_accept_t rx_lifecycle_filter(rcp_mock_server_t *srv, const rx_frame_t *fr,
                                                   uint8_t acf_msg_type,
@@ -1852,7 +1858,7 @@ static rcp_lifecycle_accept_t rx_lifecycle_filter(rcp_mock_server_t *srv, const 
 {
     uint8_t                tn = 0;
     rcp_lifecycle_accept_t accept =
-        rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->eff_subtype,
+        rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->f.subtype,
                                     acf_msg_type, byte_bus_id,
                                     srv->tscf_unsupported_time_sync_policy);
 
@@ -2334,6 +2340,10 @@ static rcp_mock_dispatch_result_t rx_member_process(rcp_mock_server_t *srv, cons
     if (rs == RX_REASM_REJECTED) return RCP_MOCK_DISPATCH_REJECTED;
 
     if (rx_crc_stage(srv, fr, slot, &m, byte_bus_id, o) != RCP_MOCK_DISPATCH_OK) {
+        /* rx_crc_fault_latch() may already have purged m.ctx through
+         * broadcast_safe_state(); releasing it again is harmless, because
+         * reasm_release() only resets / destroys-then-inits, both
+         * idempotent, and nothing can re-claim the context in between. */
         if (m.ctx) reasm_release(m.ctx);
         rcp_bytes_free(&m.owned);
         return RCP_MOCK_DISPATCH_CRC_ERROR;
@@ -2351,22 +2361,29 @@ static rcp_mock_dispatch_result_t rx_member_process(rcp_mock_server_t *srv, cons
 /* Frame-level stages (b) and (c): the once-per-AVTPDU timing decision
  * (REQ-INGRESS-003/006) and the subtype-only lifecycle filter
  * (REQ-INGRESS-007). False means the whole AVTPDU is dropped silently,
- * with no side effects. */
+ * with no side effects. The filter sees the wire subtype, not the
+ * effective one: an AS_NTSCF relabelling (TC18-13.3-003) only changes how
+ * the frame is timed, so a TSCF AVTPDU is still dropped in HW_UNCONFIGURED
+ * and HW_CONFIGURED (TC18-12.3.1.1-002/12.3.1.2-002, REQ-INGRESS-036). In
+ * RCP_CONFIGURED the two subtypes give the same verdict, because AS_NTSCF
+ * only applies when time sync is supported. */
 //cfusa:req REQ-INGRESS-006
 //cfusa:req REQ-INGRESS-032
+//cfusa:req REQ-INGRESS-036
 static bool rx_frame_admit_timing(rcp_mock_server_t *srv, rx_frame_t *fr,
                                   rcp_mock_rx_summary_t *sum)
 {
-    rcp_ingress_timing_t t = rcp_ingress_resolve_timing(
+    uint8_t              eff_subtype = 0; /* timing only; not a filter input */
+    rcp_ingress_timing_t t           = rcp_ingress_resolve_timing(
         &fr->f, fr->time_sync_supported, srv->tscf_unsupported_time_sync_policy,
-        srv->tscf_reserved_zero_policy, &fr->eff_subtype, &fr->eff_tv);
+        srv->tscf_reserved_zero_policy, &eff_subtype, &fr->eff_tv);
 
     if (sum) sum->timing = t;
     if (t == RCP_INGRESS_TIMING_DROP) {
         if (sum) sum->outcome = RCP_MOCK_RX_FRAME_TIMING_DROP;
         return false;
     }
-    if (rcp_lifecycle_should_accept_subtype(srv->state, fr->time_sync_supported, fr->eff_subtype,
+    if (rcp_lifecycle_should_accept_subtype(srv->state, fr->time_sync_supported, fr->f.subtype,
                                             srv->tscf_unsupported_time_sync_policy) ==
         RCP_LIFECYCLE_DROP) {
         if (sum) sum->outcome = RCP_MOCK_RX_FRAME_LIFECYCLE_DROP;
@@ -2376,14 +2393,24 @@ static bool rx_frame_admit_timing(rcp_mock_server_t *srv, rx_frame_t *fr,
 }
 
 /* Builds the synthetic frame a legacy wrapper enters the pipeline with
- * (step 9): header_octet1 is 0x80 | tv -- sv = 1, version 0, mr = 0,
- * exactly what rcp_avtp_encode_ntscf()/_tscf() emit -- and tu is 0. A TSCF
- * wrapper with no reserved-bytes argument passes reserved_all_zero true,
- * the value every IEEE 1722-conformant sender emits, so all four TSCF
- * wrappers agree under every reserved-zero policy. */
+ * (step 9). header_octet1 is the byte rcp_avtp_encode_ntscf()/_tscf()
+ * would emit for a payload of data_len octets (REQ-INGRESS-018): sv = 1,
+ * version 0, then for TSCF mr = 0, rsv = 0 and tv; for NTSCF r = 0 and
+ * ntscf_data_length[10:8], i.e. 0x81..0x87 once the payload reaches 256
+ * octets. The safe-command-mode CRC covers octet 1 in full, so a wrapper
+ * that dropped those length bits would disagree with
+ * rcp_mock_server_receive_avtpdu() on every large NTSCF frame. tu is 0.
+ * data_len is the request (single-request wrappers) or the whole member
+ * stream (frame wrappers) -- the AVTPDU payload a real sender would have
+ * framed. A TSCF wrapper with no reserved-bytes argument passes
+ * reserved_all_zero true, the value every IEEE 1722-conformant sender
+ * emits, so all four TSCF wrappers agree under every reserved-zero
+ * policy. */
+//cfusa:req REQ-INGRESS-018
 static void rx_frame_legacy(rx_frame_t *fr, uint8_t avtp_subtype, uint64_t stream_id, bool tv,
                             uint32_t avtp_timestamp, bool reserved_all_zero,
-                            bool time_sync_supported, uint64_t gptp_reference_now)
+                            bool time_sync_supported, uint64_t gptp_reference_now,
+                            size_t data_len)
 {
     bool tscf = avtp_subtype == RCP_AVTP_SUBTYPE_TSCF;
 
@@ -2391,7 +2418,8 @@ static void rx_frame_legacy(rx_frame_t *fr, uint8_t avtp_subtype, uint64_t strea
     fr->f.subtype                = avtp_subtype;
     fr->f.sv                     = 1u;
     fr->f.tv                     = (uint8_t)((tscf && tv) ? 1u : 0u);
-    fr->f.header_octet1          = (uint8_t)(0x80u | fr->f.tv);
+    fr->f.header_octet1          = tscf ? (uint8_t)(0x80u | fr->f.tv)
+                                        : (uint8_t)(0x80u | ((data_len >> 8) & 0x07u));
     fr->f.stream_id              = stream_id;
     fr->f.avtp_timestamp         = tscf ? avtp_timestamp : 0u;
     fr->f.tscf_reserved_all_zero = tscf && reserved_all_zero;
@@ -2420,7 +2448,7 @@ static rcp_mock_dispatch_result_t rx_single(rcp_mock_server_t *srv, rx_frame_t *
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, fr->f.stream_id);
 
     if (!rx_frame_admit_timing(srv, fr, NULL)) return RCP_MOCK_DISPATCH_DROPPED;
-    if (rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->eff_subtype,
+    if (rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->f.subtype,
                                     acf_msg_type, byte_bus_id,
                                     srv->tscf_unsupported_time_sync_policy) ==
         RCP_LIFECYCLE_DROP) {
@@ -2705,7 +2733,7 @@ static bool rx_frame_prepass(rcp_mock_server_t *srv, const rx_frame_t *fr,
         rcp_mock_rx_member_t m;
 
         rx_member_identity(member, &m);
-        if (rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->eff_subtype,
+        if (rcp_lifecycle_should_accept(srv->state, fr->time_sync_supported, fr->f.subtype,
                                         m.acf_msg_type, m.byte_bus_id,
                                         srv->tscf_unsupported_time_sync_policy) !=
             RCP_LIFECYCLE_DROP) {
@@ -2854,7 +2882,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     rx_out_t                   o;
     rcp_mock_dispatch_result_t result;
 
-    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u);
+    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u,
+                    request_len);
     rx_out_init(&o, buf, RCP_MOCK_MAX_RESPONSES_PER_EXEC);
     result = rx_single(srv, &fr, byte_bus_id, acf_msg_type, true, request, request_len, &o);
     rx_finish_single(srv, stream_id, &o, out_response);
@@ -2885,7 +2914,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
      * the same frame-level timing decision every other path uses, under
      * srv's own reserved-zero policy (issue #618). */
     rx_frame_legacy(&fr, avtp_subtype, stream_id, tv, avtp_timestamp, tscf_reserved_all_zero,
-                    time_sync_supported, gptp_reference_now);
+                    time_sync_supported, gptp_reference_now, request_len);
     rx_out_init(&o, buf, RCP_MOCK_MAX_RESPONSES_PER_EXEC);
     result = rx_single(srv, &fr, byte_bus_id, acf_msg_type, false, request, request_len, &o);
     rx_finish_single(srv, stream_id, &o, out_response);
@@ -2904,7 +2933,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
     rx_out_t                   o;
     rcp_mock_dispatch_result_t result;
 
-    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u);
+    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u,
+                    request_len);
     /* The caller's own array and capacity, passed straight through: no
      * new cap for existing callers. */
     rx_out_init(&o, out_responses, out_cap);
@@ -2955,7 +2985,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *
     rcp_mock_dispatch_result_t result;
 
     rx_frame_legacy(&fr, avtp_subtype, stream_id, tv, avtp_timestamp, true, time_sync_supported,
-                    gptp_reference_now);
+                    gptp_reference_now, request_len);
     rx_out_init(&o, buf, RCP_MOCK_MAX_RESPONSES_PER_EXEC);
     result = rx_single(srv, &fr, byte_bus_id, acf_msg_type, false, request, request_len, &o);
     rx_finish_single(srv, stream_id, &o, out_response);
@@ -3054,7 +3084,8 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
 {
     rx_frame_t fr;
 
-    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u);
+    rx_frame_legacy(&fr, avtp_subtype, stream_id, false, 0u, true, time_sync_supported, 0u,
+                    frame_len);
     return rx_legacy_frame(srv, &fr, true, sequence_num, frame, frame_len, out_results, out_cap);
 }
 
@@ -3071,7 +3102,7 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
     rx_frame_t fr;
 
     rx_frame_legacy(&fr, avtp_subtype, stream_id, false, avtp_timestamp, true,
-                    time_sync_supported, 0u);
+                    time_sync_supported, 0u, frame_len);
     return rx_legacy_frame(srv, &fr, false, sequence_num, frame, frame_len, out_results, out_cap);
 }
 
@@ -3089,7 +3120,7 @@ size_t rcp_mock_server_dispatch_frame_e2e_tscf(rcp_mock_server_t *srv, uint8_t a
     rx_frame_t fr;
 
     rx_frame_legacy(&fr, avtp_subtype, stream_id, tv, avtp_timestamp, true, time_sync_supported,
-                    gptp_reference_now);
+                    gptp_reference_now, frame_len);
     return rx_legacy_frame(srv, &fr, false, sequence_num, frame, frame_len, out_results, out_cap);
 }
 

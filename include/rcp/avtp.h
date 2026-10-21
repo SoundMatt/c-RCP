@@ -356,10 +356,12 @@ typedef enum {
     RCP_AVTP_TSCF_RESERVED_ZERO_TIME_GATE = 0, /* default: honour tv/the
                                                    presentation time as
                                                    usual */
-    RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF  = 1, /* process exactly as if the
-                                                   frame had an NTSCF header
-                                                   (subtype and tv both
-                                                   substituted) */
+    RCP_AVTP_TSCF_RESERVED_ZERO_AS_NTSCF  = 1, /* time and admit it exactly
+                                                   as if the frame had an
+                                                   NTSCF header (subtype and
+                                                   tv both substituted); the
+                                                   lifecycle-state subtype
+                                                   rules still see TSCF */
     RCP_AVTP_TSCF_RESERVED_ZERO_DROP      = 2, /* drop silently */
 } rcp_avtp_tscf_reserved_zero_policy_t;
 
